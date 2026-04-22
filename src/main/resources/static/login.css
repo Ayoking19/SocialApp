@@ -1,0 +1,146 @@
+/* A CSS Reset to ensure all browsers display the spacing identically */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Designing the premium Dark Theme background */
+body {
+    /* radial-gradient creates a circular color blend starting from the top center */
+    background: radial-gradient(circle at top, #11221c, #0a0a0a);
+    color: #ffffff; /* Sets all default text to white */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* Designing the responsive frosted glass container */
+.container {
+    background: rgba(255, 255, 255, 0.03); 
+    backdrop-filter: blur(16px); 
+    -webkit-backdrop-filter: blur(16px); 
+    border: 1px solid rgba(255, 255, 255, 0.1); 
+    padding: 40px;
+    border-radius: 16px; 
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+    
+    /* --- NEW RESPONSIVE RULES --- */
+    width: 100%; /* Tells the box to take up the full width of whatever screen it is on */
+    max-width: 380px; /* BUT prevents the box from growing wider than 380px on large computer monitors */
+    margin: 0 20px; /* Adds a 20-pixel invisible bumper on the left and right so the box never touches the absolute edge of a phone screen */
+    /* ---------------------------- */
+    
+    text-align: center;
+}
+
+/* Resetting the invisible form wrapper */
+form {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Spacing and styling the header */
+h2 {
+    margin-bottom: 25px;
+    color: #ffffff;
+    letter-spacing: 1px; /* Spaces out the letters slightly for an elegant feel */
+}
+
+/* Designing the input fields to blend into the dark theme */
+input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    background: rgba(0, 0, 0, 0.2); /* A dark, semi-transparent background inside the box */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #ffffff; /* Ensures the text the user types is white */
+    font-size: 15px;
+    outline: none; /* Removes the default blue glow browsers add when clicked */
+    transition: all 0.3s ease; /* Commands any visual change to happen smoothly over 0.3 seconds */
+}
+
+/* Designing the Focus State (What happens when the user clicks inside the box to type) */
+input:focus {
+    border-color: #00ea7b; /* The vibrant neon green inspired by your video */
+    box-shadow: 0 0 10px rgba(0, 234, 123, 0.2); /* A soft neon green glow around the box */
+}
+
+/* Designing the Submit Button */
+button {
+    width: 100%;
+    padding: 12px;
+    background-color: #00ea7b; /* The vibrant neon green */
+    color: #0a0a0a; /* Very dark text to create high contrast against the bright green */
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    transition: all 0.3s ease; /* Smooth transition for the hover effect */
+}
+
+/* Designing the Hover State (Micro-interaction) */
+button:hover {
+    background-color: #00c266; /* Darkens the green slightly */
+    transform: translateY(-2px); /* Physically lifts the button UP by 2 pixels to simulate being pressed */
+    box-shadow: 0 5px 15px rgba(0, 234, 123, 0.3); /* Increases the glow when hovered */
+}
+
+/* Styling the helper text at the bottom */
+p {
+    font-size: 14px;
+    color: #a0a0a0; /* A soft light gray so it doesn't overpower the bright button */
+}
+
+/* Styling the hyperlinks */
+a {
+    color: #00ea7b;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: #ffffff; /* Makes the link flash bright white when hovered */
+}
+/* Designing the pop-up alert box */
+.alert-box {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    display: none; /* Crucial: This keeps the box completely invisible by default! */
+}
+
+/* Specific colors for an error */
+.alert-error {
+    background: rgba(255, 77, 77, 0.1); /* Transparent red */
+    border: 1px solid rgba(255, 77, 77, 0.4);
+    color: #ff4d4d; /* Bright red text */
+}
+
+/* Specific colors for a success message */
+.alert-success {
+    background: rgba(0, 234, 123, 0.1); /* Transparent neon green */
+    border: 1px solid rgba(0, 234, 123, 0.4);
+    color: #00ea7b; /* Bright neon green text */
+}
+/* Responsive Media Query for Mobile Devices */
+@media (max-width: 480px) {
+    .container {
+        padding: 30px 20px; /* Shrinks the inner spacing on small screens to give the form inputs more room */
+    }
+    
+    h2 {
+        font-size: 22px; /* Makes the title slightly smaller for mobile */
+    }
+}

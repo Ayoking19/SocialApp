@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Our Social Network</title>
+    <!-- We link to the EXACT same CSS file so our world-class theme applies here too -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- Left Sidebar Navigation (Same as Home Page) -->
+        <nav class="sidebar">
+            <div class="logo">Social<span>App</span></div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="#">Following</a></li>
+                <li><a href="search.html">Search</a></li>
+                <li><a href="profile.html" class="active">Profile</a></li>
+                <!-- FIX 2: Added the onclick command -->
+                <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Profile Area -->
+        <main class="feed">
+            
+            <!-- THE MISSING BANNER IS BACK! -->
+            <div class="profile-banner"></div>
+
+            <!-- Profile Info Section -->
+            <div class="profile-info-section">
+                <div class="profile-pic-wrapper">
+                    <!-- We keep your original ID here! -->
+                    <img id="profileImage" src="https://ui-avatars.com/api/?name=User" class="large-profile-pic" alt="Profile Picture">
+                    
+                    <!-- THE FIX: We added the onclick command to your camera button! -->
+                    <div class="edit-pic-btn" id="editPicBtn" onclick="document.getElementById('avatarUpload').click()">📷</div>
+                    
+                    <!-- The Hidden File Input -->
+                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+                </div>
+
+                <!-- THE FIX: We removed the premature closing div so the profile details sit nicely beside the picture! -->
+                <div class="profile-details">
+                    
+                    <!-- NEW: The Flexbox Header -->
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <h1 class="profile-display-name" id="displayName" style="margin: 0;">Loading...</h1>
+                        
+                        <!-- The Follow Button (Hidden by default until JS checks who is viewing) -->
+                        <button id="profileFollowBtn" class="media-control-btn" style="display: none;" onclick="executeProfileFollow()">Follow</button>
+                        
+                        <!-- The Follows You Badge (Hidden by default) -->
+                        <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2);">Follows you</span>
+                    </div>
+
+                    <p class="profile-username" id="displayUsername" style="margin-top: 5px;">@loading</p>
+                    
+                    <div class="bio-section">
+                        <p class="bio-text" id="displayBio">Loading bio...</p>
+                        <button class="edit-bio-btn" id="editBioBtn" onclick="openBioModal()">Edit Bio</button>
+                    </div>
+
+                    <div class="profile-stats-bar">
+                        <div class="stat-box">
+                            <span class="stat-number" id="followerCount">0</span>
+                            <span class="stat-label">Followers</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-number" id="followingCount">0</span>
+                            <span class="stat-label">Following</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-number" id="postCount">0</span>
+                            <span class="stat-label">Posts</span>
+                        </div>
+                    </div>
+                    
+                    <!-- FIX 3: Empty container prepared for the user's specific posts -->
+                    <div class="profile-tabs" style="margin-top: 20px;">
+                        <!-- We added the IDs and the onclick commands to your exact buttons! -->
+                        <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
+                        <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
+                    </div>
+                    
+                    <div id="profileFeedContainer"></div>                  
+                </div>
+            </div> <!-- THE FIX: The profile-info-section officially closes here! -->
+            
+        </main>
+    </div>
+
+    <!-- FIX 2: The Log Out Modal Overlay (Hidden by default) -->
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you absolutely sure you want to log out of your account?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Yes, Log Out</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- The Edit Bio Modal Overlay (Hidden by default) -->
+    <div class="modal-overlay" id="editBioModal" style="display: none;">
+        <div class="modal-card">
+            <h3>Edit Your Bio</h3>
+            <p>Write something interesting about yourself.</p>
+            
+            <!-- We use the custom class you already styled in style.css! -->
+            <textarea id="newBioInput" class="bio-edit-input" placeholder="Passionate about UI/UX..."></textarea>
+            
+            <div class="modal-buttons">
+                <!-- Cancel safely closes it -->
+                <button class="modal-cancel-btn" onclick="closeBioModal()">Cancel</button>
+                <!-- Save triggers the database update -->
+                <button class="modal-confirm-btn" onclick="saveNewBio()" style="background: #00e676; color: black; box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIX 1: Script tag is safely inside the body tag -->
+    <script>
+        /* 1. THE BOUNCER: Security Check */
+        const currentUser = localStorage.getItem("loggedInUser");
+        if (!currentUser) {
+            window.location.href = "login.html";
+        }
+
+        /* 2. LOGOUT MODAL LOGIC (Copied from Home Page) */
+        function openLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'flex';
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+
+        function executeLogout() {
+            localStorage.removeItem("loggedInUser"); 
+            window.location.href = "login.html"; 
+        }
+
+        /* 3. URL PARAMETER CHECK: Who are we looking at? */
+        const urlParams = new URLSearchParams(window.location.search);
+        // If the URL says ?user=Someone, use 'Someone'. Otherwise, use 'currentUser'
+        const profileUser = urlParams.get('user') || currentUser;
+
+        /* 4. SECURITY GATE: Hide edit buttons if it is not your profile */
+        if (profileUser !== currentUser) {
+            document.getElementById("editBioBtn").style.display = "none";
+            document.getElementById("editPicBtn").style.display = "none";
+        }
+        
+        /* 6. THE PROFILE POST PAINTER: Fetch and draw the user's specific posts */
+        function loadUserPosts() {
+            const feedContainer = document.getElementById("profileFeedContainer");
+            
+            feedContainer.innerHTML = "<p style='text-align: center; color: #00e676;'>Loading posts...</p>";
+
+            fetch('http://localhost:8080/api/userPosts', {
+                method: 'POST',
+                // THE FIX: We successfully injected the currentUser here so Java doesn't crash!
+                body: JSON.stringify({ username: profileUser, currentUser: currentUser })
+            })
+            .then(response => response.json()) 
+            .then(posts => {
+                feedContainer.innerHTML = ""; 
+                
+                if (posts.length === 0) {
+                    feedContainer.innerHTML = "<p style='text-align: center; color: #a09eb5;'>This user hasn't posted anything yet.</p>";
+                    return;
+                }
+
+                posts.forEach(post => {
+                    let mediaHTML = "";
+                    if (post.media && post.media.trim() !== "") {
+                        if (post.media.startsWith("data:video")) {
+                            mediaHTML = `<video src="${post.media}" controls style="width: 100%; max-height: 400px; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(0, 230, 118, 0.3);"></video>`;
+                        } else {
+                            /* --- CLEANED UP IMAGE CONTROLS --- */
+                            mediaHTML = `
+                                <div style="position: relative; margin-top: 15px;">
+                                    <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);" alt="Post Media">
+                                    
+                                    <div style="margin-top: 8px; display: flex; gap: 10px;">
+                                        <!-- Notice how clean this is now! We just use class="media-control-btn" -->
+                                        <a href="${post.media}" download="SocialApp_Image.png" class="media-control-btn">⬇️ Download</a>
+                                        
+                                        <button onclick="this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn">🔍 Full Screen</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                    const postHTML = `
+                        <!-- THE FILTER FIX: We added the secret labels right next to your 'post' class! -->
+                        <div class="post ${post.media && post.media.trim() !== '' ? 'has-media' : 'no-media'}">
+                            
+                            <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                                <!-- THE FIX: We use ${post.avatar} instead of the hardcoded link! -->
+                                <img src="${post.avatar}" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                                <!-- Notice we don't need a link here, because we are already on their profile! -->
+                                <strong>${post.username}</strong>
+                                <span class="time-stamp">${post.timestamp}</span>
+                            </div>
+                            <div class="post-content">
+                                <p>${post.content}</p>
+                                ${mediaHTML}
+                            </div>
+                            <div class="post-stats">
+                                <span onclick="toggleLike(this, ${post.id})" class="like-btn">
+                                    ❤️ <span class="like-count">${post.likes}</span> Likes
+                                </span>
+                                
+                                <!-- THE FIX: We injected the live comment count here! -->
+                                <span class="comment-btn" onclick="toggleComments(${post.id})">
+                                    💬 <span class="comment-count">${post.commentCount}</span> Comments
+                                </span>
+                            </div>
+
+                            <!-- 2. THE NEW COMMENT TRAY (Hidden by default) -->
+                            <div class="comments-section" id="comments-${post.id}" style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                                
+                                <!-- This empty box is where the JavaScript will draw the comments -->
+                                <div id="comment-list-${post.id}" style="margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
+                                    <p style="color: gray; font-size: 14px; text-align: center;">Loading...</p>
+                                </div>
+                                
+                                <!-- The Input Area -->
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                    <button onclick="submitComment(${post.id})" class="media-control-btn">Post</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    feedContainer.innerHTML += postHTML;
+                });
+            })
+            .catch(error => {
+                feedContainer.innerHTML = "<p style='text-align: center; color: #ff3366;'>Error loading posts.</p>";
+            });
+        }
+
+        /* 5. THE PAINTER: Fetch and draw the profile data */
+        function loadProfileData() {
+            fetch('http://localhost:8080/api/profile', {
+                method: 'POST',
+                body: JSON.stringify({ username: profileUser })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "ERROR") {
+                    document.getElementById("displayName").textContent = "User Not Found";
+                    return;
+                }
+                
+                // Convert the Java string into a JavaScript dictionary
+                const profile = JSON.parse(data);
+
+                // Inject the live data onto the screen!
+                document.getElementById("displayName").textContent = profile.username;
+                document.getElementById("displayUsername").textContent = "@" + profile.username;
+                document.getElementById("displayBio").textContent = profile.bio;
+                
+                document.getElementById("followerCount").textContent = profile.followers;
+                document.getElementById("followingCount").textContent = profile.following;
+                document.getElementById("postCount").textContent = profile.postCount;
+
+                /* --- THE ONLY LINE THAT CHANGES --- */
+                /* [Data Binding: We assign the exact Base64 text string from the database directly to the image source!] */
+                document.getElementById("profileImage").src = profile.avatar;
+            })
+            .catch(error => console.error("Error loading profile:", error));
+        }
+
+        /* --- PREMIUM BIO EDITING LOGIC --- */
+        function openBioModal() {
+            document.getElementById('editBioModal').style.display = 'flex';
+            
+            // Pre-fill the box with their current bio so they don't have to retype everything!
+            const currentBio = document.getElementById("displayBio").textContent;
+            if (currentBio !== "Loading bio..." && currentBio !== "This user hasn't written a bio yet.") {
+                document.getElementById("newBioInput").value = currentBio;
+            }
+        }
+
+        function closeBioModal() {
+            document.getElementById('editBioModal').style.display = 'none';
+        }
+
+        function saveNewBio() {
+            const newBio = document.getElementById("newBioInput").value;
+            
+            if (newBio.trim() !== "") {
+                fetch('http://localhost:8080/api/updateBio', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        username: currentUser, 
+                        bio: newBio 
+                    })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === "SUCCESS") {
+                        // Instantly update the text on the screen
+                        document.getElementById("displayBio").textContent = newBio;
+                        // Close the fancy modal
+                        closeBioModal();
+                    } else {
+                        alert("Error saving your new bio.");
+                    }
+                })
+                .catch(error => console.error("Network Error:", error));
+            }
+        }
+
+        /* --- LIKE SYSTEM LOGIC --- */
+        function toggleLike(element, postId) {
+            fetch('http://localhost:8080/api/toggleLike', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    username: currentUser, 
+                    postId: postId.toString() 
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                /* [DOM Traversal: We look inside the specific button we clicked to find the span holding the number] */
+                const likeCountSpan = element.querySelector('.like-count');
+                let currentLikes = parseInt(likeCountSpan.textContent);
+
+                if (data === "LIKED") {
+                    // Instantly add 1 and turn the text pink!
+                    likeCountSpan.textContent = currentLikes + 1;
+                    element.style.color = "#ff3366"; 
+                } else if (data === "UNLIKED") {
+                    // Instantly subtract 1 and return text to normal color!
+                    likeCountSpan.textContent = currentLikes - 1;
+                    element.style.color = ""; 
+                } else {
+                    alert("Error processing like.");
+                }
+            })
+            .catch(error => console.error("Network Error:", error));
+        }
+
+        /* ========================================= */
+        /* --- COMMENT SYSTEM LOGIC --- */
+        /* ========================================= */
+
+        /* 1. TOGGLE THE TRAY */
+        function toggleComments(postId) {
+            const commentSection = document.getElementById(`comments-${postId}`);
+            
+            // If it is hidden, open it and fetch the comments!
+            if (commentSection.style.display === "none") {
+                commentSection.style.display = "block";
+                loadComments(postId); 
+            } else {
+                // If it is already open, hide it!
+                commentSection.style.display = "none";
+            }
+        }
+
+        /* 2. FETCH AND DRAW COMMENTS */
+        function loadComments(postId) {
+            const commentList = document.getElementById(`comment-list-${postId}`);
+            commentList.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>Loading comments...</p>";
+
+            // Upgrade the fetch command inside loadComments()
+            fetch('http://localhost:8080/api/getComments', {
+                method: 'POST',
+                body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
+            })
+            .then(response => response.json())
+            .then(comments => {
+                // If the array is empty, tell the user!
+                if (comments.length === 0) {
+                    commentList.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>No comments yet. Be the first!</p>";
+                    return;
+                }
+                
+                commentList.innerHTML = ""; // Clear the loading text
+                
+                // Loop through the comments and draw them!
+                comments.forEach(comment => {
+                    
+                    // Generate the tiny Follow button for the commenter
+                    let commentFollowBtn = "";
+                    if (comment.username !== currentUser) {
+                        if (comment.isFollowing) {
+                            commentFollowBtn = `<button class="media-control-btn" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);" onclick="feedFollowUser(this, '${comment.username}')">Unfollow</button>`;
+                        } else {
+                            commentFollowBtn = `<button class="media-control-btn" style="margin-left: 10px; padding: 2px 6px; font-size: 10px;" onclick="feedFollowUser(this, '${comment.username}')">Follow</button>`;
+                        }
+                    }
+
+                    commentList.innerHTML += `
+                        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00e676;">
+                            <div style="display: flex; align-items: center;">
+                                <a href="profile.html?user=${comment.username}" style="text-decoration: none;">
+                                    <strong style="color: #00e676; font-size: 14px; transition: 0.2s;" onmouseover="this.style.textShadow='0 0 8px rgba(0,230,118,0.5)'" onmouseout="this.style.textShadow='none'">${comment.username}</strong> 
+                                </a>
+                                
+                                ${commentFollowBtn}
+                                
+                                <span style="font-size: 11px; color: gray; margin-left: auto;">${comment.timestamp}</span>
+                            </div>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #e0e0e0;">${comment.content}</p>
+                            
+                            <!-- THE NEW REPLY BUTTON -->
+                            <div style="margin-top: 8px;">
+                                <span style="font-size: 11px; color: #a09eb5; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'" onclick="replyToComment(${postId}, '${comment.username}')">
+                                    ↩️ Reply
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            })
+            .catch(error => console.error("Error loading comments:", error));
+        }
+
+        /* 3. SEND A NEW COMMENT */
+        function submitComment(postId) {
+            const inputField = document.getElementById(`comment-input-${postId}`);
+            const content = inputField.value;
+
+            // Make sure they didn't just submit empty spaces
+            if (content.trim() !== "") {
+                fetch('http://localhost:8080/api/addComment', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: currentUser,
+                        postId: postId.toString(),
+                        content: content
+                    })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === "SUCCESS") {
+                        inputField.value = ""; // Clear the typing box
+                        loadComments(postId); // Refresh the comment list so the new comment appears instantly!
+                    } else {
+                        alert("Error posting comment.");
+                    }
+                })
+                .catch(error => console.error("Error submitting comment:", error));
+            }
+        }
+
+        /* 4. THE REPLY TELEPORTER */
+        function replyToComment(postId, targetUsername) {
+            /* [DOM Selection: We find the specific typing box for the post we are looking at] */
+            const inputField = document.getElementById(`comment-input-${postId}`);
+            
+            /* [Value Injection: We pre-fill the box with the @ tag and a space!] */
+            inputField.value = `@${targetUsername} `;
+            
+            /* [Focus Method: A native browser command that forces the blinking text cursor into the box, ready for the user to type] */
+            inputField.focus();
+        }
+
+        /* ========================================= */
+        /* --- FOLLOWER SYSTEM LOGIC --- */
+        /* ========================================= */
+
+        function loadRelations() {
+            fetch('http://localhost:8080/api/getRelations', {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: profileUser })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 1. ALWAYS update the counts, no matter whose profile we are looking at!
+                document.getElementById("followerCount").textContent = data.followers;
+                document.getElementById("followingCount").textContent = data.following;
+                
+                // 2. ONLY draw the Follow buttons if we are looking at SOMEONE ELSE'S profile!
+                if (profileUser !== currentUser) {
+                    const followBtn = document.getElementById("profileFollowBtn");
+                    followBtn.style.display = "inline-block";
+                    
+                    if (data.isFollowing) {
+                        followBtn.textContent = "Unfollow";
+                        followBtn.style.background = "rgba(255, 51, 102, 0.1)"; 
+                        followBtn.style.color = "#ff3366";
+                        followBtn.style.borderColor = "rgba(255, 51, 102, 0.3)";
+                    } else {
+                        followBtn.textContent = "Follow";
+                        followBtn.style.background = "rgba(255, 255, 255, 0.05)";
+                        followBtn.style.color = "#00e676";
+                        followBtn.style.borderColor = "rgba(0, 230, 118, 0.3)";
+                    }
+                    
+                    if (data.followsYou) {
+                        document.getElementById("followsYouBadge").style.display = "inline-block";
+                    }
+                }
+            })
+            .catch(error => console.error("Error loading relations:", error));
+        }
+        
+        function executeProfileFollow() {
+            fetch('http://localhost:8080/api/toggleFollow', {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: profileUser })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "FOLLOWED" || data === "UNFOLLOWED") {
+                    // Instantly refresh the numbers and buttons!
+                    loadRelations(); 
+                }
+            })
+            .catch(error => console.error("Error toggling follow:", error));
+        }
+
+        /* --- THE FIX: ADDED COMMENT FOLLOW TELEPORTER --- */
+        function feedFollowUser(element, targetUsername) {
+            fetch('http://localhost:8080/api/toggleFollow', {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: targetUsername })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "FOLLOWED") {
+                    element.textContent = "Unfollow";
+                    element.style.background = "rgba(255, 51, 102, 0.1)"; 
+                    element.style.color = "#ff3366";
+                    element.style.borderColor = "rgba(255, 51, 102, 0.3)";
+                } else if (data === "UNFOLLOWED") {
+                    element.textContent = "Follow";
+                    element.style.background = "";
+                    element.style.color = "";
+                    element.style.borderColor = "";
+                }
+            })
+            .catch(error => console.error("Error toggling follow:", error));
+        }
+
+        /* ========================================= */
+        /* --- AVATAR UPLOAD (AUTO-CROP & COMPRESS) --- */
+        /* ========================================= */
+        function handleAvatarUpload(input) {
+            const file = input.files[0];
+            
+            if (file) {
+                document.getElementById('profileImage').style.opacity = "0.5";
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        
+                        /* 1. Create the invisible Canvas */
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        /* 2. Set the perfect square size (400x400 pixels) */
+                        const size = 400;
+                        canvas.width = size;
+                        canvas.height = size;
+
+                        /* 3. The Auto-Crop Math: Finds the center of the image */
+                        const minSize = Math.min(img.width, img.height);
+                        const startX = (img.width - minSize) / 2;
+                        const startY = (img.height - minSize) / 2;
+
+                        /* 4. Draw and Crop the image onto the canvas */
+                        ctx.drawImage(img, startX, startY, minSize, minSize, 0, 0, size, size);
+
+                        /* 5. Compress the image into a lightweight JPEG! */
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8); 
+
+                        // Send the lightweight, cropped image to Java!
+                        fetch('http://localhost:8080/api/uploadAvatar', {
+                            method: 'POST',
+                            body: JSON.stringify({ 
+                                username: currentUser, 
+                                image: compressedBase64 
+                            })
+                        })
+                        .then(response => response.text())
+                        .then(data => {
+                            if (data === "SUCCESS") {
+                                document.getElementById('profileImage').src = compressedBase64;
+                                document.getElementById('profileImage').style.opacity = "1";
+                            } else {
+                                alert("Error saving profile picture.");
+                                document.getElementById('profileImage').style.opacity = "1";
+                            }
+                        })
+                        .catch(error => console.error("Network Error:", error));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file); 
+            }
+        }
+
+        /* ========================================= */
+        /* --- PROFILE TAB FILTER LOGIC --- */
+        /* ========================================= */
+        function showAllPosts() {
+            /* [NodeList Iteration: We grab every single element with the class 'post' and force it to be visible] */
+            document.querySelectorAll('.post').forEach(post => {
+                post.style.display = 'block';
+            });
+            
+            /* [Class Manipulation: We move your 'active-tab' design to the Posts button!] */
+            document.getElementById('tab-posts').classList.add('active-tab');
+            document.getElementById('tab-media').classList.remove('active-tab');
+        }
+
+        function showOnlyMedia() {
+            /* We hide the posts with no media, and show the ones with media! */
+            document.querySelectorAll('.no-media').forEach(post => {
+                post.style.display = 'none';
+            });
+            document.querySelectorAll('.has-media').forEach(post => {
+                post.style.display = 'block';
+            });
+            
+            /* [Class Manipulation: We move your 'active-tab' design to the Media button!] */
+            document.getElementById('tab-media').classList.add('active-tab');
+            document.getElementById('tab-posts').classList.remove('active-tab');
+        }
+
+        /* Ignition: Start loading immediately */
+        loadProfileData();
+        loadUserPosts();
+        loadRelations(); 
+    </script>
+</body>
+</html>

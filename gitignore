@@ -1,0 +1,15 @@
+# 1. Ignore Compiled Java Files (GitHub only needs the readable code, not the machine code!)
+*.class
+bin/
+build/
+out/
+
+# 2. Ignore IDE Settings (Prevents your personal VS Code settings from being uploaded)
+.idea/
+.vscode/
+*.iml
+
+# 3. Ignore Secret Configuration Files & Databases (CRITICAL SECURITY)
+secrets.properties
+*.db
+social_network.db

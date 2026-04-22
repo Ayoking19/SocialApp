@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Our Social Network</title>
+    <!-- Linking our world-class stylesheet again -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- Left Sidebar / Bottom Navigation -->
+        <nav class="sidebar">
+            <div class="logo">Social<span>App</span></div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="#">Following</a></li>
+                <!-- We moved the 'active' class here to highlight Search -->
+                <li><a href="search.html" class="active">Search</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Search Area -->
+        <main class="feed">
+            
+            <div class="feed-header">
+                <h2>Explore</h2>
+            </div>
+            
+            <!-- The Search Input Section -->
+            <div class="search-container">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <!-- We updated the placeholder text to reflect the new capabilities! -->
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search for users or posts..." onkeyup="executeSearch()">
+                    <button class="search-btn" onclick="executeSearch()">Search</button>
+                </div>
+            </div>
+
+            <!-- THE NEW SEARCH TABS SECTION -->
+            <div class="profile-tabs" style="margin-top: 20px; display: flex; justify-content: center; margin-bottom: 20px;">
+                <!-- We use your exact 'tab-btn' class and assign unique IDs so JavaScript can control them! -->
+                <button id="tab-all" class="tab-btn active-tab" onclick="switchSearchTab('all')">All</button>
+                <button id="tab-users" class="tab-btn" onclick="switchSearchTab('users')">Users</button>
+                <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Posts</button>
+            </div>
+
+            <!-- The Results Area (Starts empty) -->
+            <div id="searchResults" class="search-results-area">
+                <p class="search-placeholder-text">Type something above to explore the network.</p>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- The Log Out Modal (Copied here so it works on this page too) -->
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you absolutely sure you want to log out of your account?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Yes, Log Out</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ========================================= */
+        /* --- GLOBAL SEARCH STATE --- */
+        /* ========================================= */
+        let currentSearchUsers = [];
+        let currentSearchPosts = [];
+        let activeTab = 'all'; 
+
+        /* ========================================= */
+        /* --- 1. THE DATA FETCH ENGINE --- */
+        /* ========================================= */
+        function executeSearch() {
+            const query = document.getElementById('searchInput').value;
+            const resultsArea = document.getElementById('searchResults');
+            
+            if (query.trim() === "") {
+                resultsArea.innerHTML = `<p class="search-placeholder-text">Type something above to explore the network.</p>`;
+                // Clear the state if the box is empty
+                currentSearchUsers = [];
+                currentSearchPosts = [];
+                return; 
+            }
+
+            /* We grab the logged-in user so the Java server can calculate if you follow these people! */
+            const activeUser = localStorage.getItem("currentUser");
+
+            fetch('http://localhost:8080/api/search', {
+                method: 'POST',
+                body: JSON.stringify({ query: query, currentUser: activeUser })
+            })
+            .then(response => response.json())
+            .then(data => {
+                /* [State Mutation: We save the split data into our global variables!] */
+                currentSearchUsers = data.users;
+                currentSearchPosts = data.posts;
+                
+                // Immediately draw the screen based on whatever tab is currently clicked
+                renderResults();
+            })
+            .catch(error => console.error("Search Error:", error));
+        }
+
+        /* ========================================= */
+        /* --- 2. THE TAB SWITCHING ENGINE --- */
+        /* ========================================= */
+        function switchSearchTab(tabName) {
+            // Update the global state
+            activeTab = tabName;
+            
+            // [Class Manipulation]: Move the green active highlight to the clicked tab!
+            document.getElementById('tab-all').classList.remove('active-tab');
+            document.getElementById('tab-users').classList.remove('active-tab');
+            document.getElementById('tab-posts').classList.remove('active-tab');
+            
+            document.getElementById(`tab-${tabName}`).classList.add('active-tab');
+            
+            // Re-draw the screen! (Notice we do not use 'fetch' again, saving massive server resources!)
+            renderResults();
+        }
+
+        /* ========================================= */
+        /* --- 3. THE MASTER RENDERING ENGINE --- */
+        /* ========================================= */
+        function renderResults() {
+            const resultsArea = document.getElementById('searchResults');
+            resultsArea.innerHTML = ""; 
+
+            if (currentSearchUsers.length === 0 && currentSearchPosts.length === 0) {
+                resultsArea.innerHTML = `<p class="search-placeholder-text" style="color: #ff3366;">No results found.</p>`;
+                return;
+            }
+
+            /* --- BUILD THE USER HTML --- */
+            let usersHTML = "";
+            if (currentSearchUsers.length > 0) {
+                currentSearchUsers.forEach(user => {
+                    usersHTML += `
+                        <div class="post" style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                            <img src="${user.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                            <div style="flex: 1;">
+                                <a href="profile.html?user=${user.username}" style="color: #00e676; text-decoration: none; font-size: 18px; font-weight: bold;">@${user.username}</a>
+                                <p style="color: #a09eb5; margin: 5px 0 0 0; font-size: 14px;">${user.bio}</p>
+                            </div>
+                            <a href="profile.html?user=${user.username}">
+                                <button class="search-btn" style="padding: 8px 15px; font-size: 14px;">View Profile</button>
+                            </a>
+                        </div>
+                    `;
+                });
+            } else { usersHTML = `<p class="search-placeholder-text">No users match this search.</p>`; }
+
+            /* --- BUILD THE POST HTML --- */
+            let postsHTML = "";
+            if (currentSearchPosts.length > 0) {
+                currentSearchPosts.forEach(post => {
+                    postsHTML += `
+                        <div class="post" style="margin-bottom: 15px;">
+                            <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                                <img src="${post.avatar}" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                                <strong>${post.username}</strong>
+                                <span class="time-stamp" style="margin-left: auto; color: #a09eb5; font-size: 12px;">${post.timestamp}</span>
+                            </div>
+                            <div class="post-content" style="margin-top: 10px; margin-bottom: 10px;">${post.content}</div>
+                            ${post.media && post.media.trim() !== "" ? `<img src="${post.media}" style="width: 100%; border-radius: 12px; margin-bottom: 10px;">` : ""}
+                        </div>
+                    `;
+                });
+            } else { postsHTML = `<p class="search-placeholder-text">No posts match this search.</p>`; }
+
+            /* --- DRAW TO SCREEN BASED ON ACTIVE TAB --- */
+            if (activeTab === 'all') {
+                resultsArea.innerHTML = `<h3 style="color: white; margin-bottom: 15px;">Users</h3>` + usersHTML + 
+                                        `<h3 style="color: white; margin-top: 25px; margin-bottom: 15px;">Posts</h3>` + postsHTML;
+            } else if (activeTab === 'users') {
+                resultsArea.innerHTML = usersHTML;
+            } else if (activeTab === 'posts') {
+                resultsArea.innerHTML = postsHTML;
+            }
+        }
+
+        /* Modal Functions (Required here so the Log Out button works) */
+        function openLogoutModal() { document.getElementById('logoutModal').style.display = 'flex'; }
+        function closeLogoutModal() { document.getElementById('logoutModal').style.display = 'none'; }
+        function executeLogout() { window.location.href = "login.html"; }
+    </script>
+</body>
+</html>

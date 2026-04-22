@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Social Network</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- The Flash Message for Login -->
+    <div class="welcome-message" id="welcomeMsg">
+        Welcome to our social media website! 
+        <button onclick="dismissWelcome()">Acknowledge</button>
+    </div>
+    <div class="container">
+        
+        <!-- Left Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">Social<span>App</span></div>
+            <ul class="nav-links">
+                <li><a href="#" class="active">Home</a></li>
+                <li><a href="following.html">Following</a></li>
+                <li><a href="search.html">Search</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li> 
+            </ul>
+        </nav>
+
+        <!-- Main Feed Area -->
+        <main class="feed">
+            
+            <div class="feed-header">
+                <h2>Home</h2>
+            </div>
+            
+            <!-- The Create Post Box -->
+            <div class="create-post-box">
+                <div class="create-post-top">
+                    <img src="https://ui-avatars.com/api/?name=User&background=1e293b&color=00e676&rounded=true" alt="Default Profile" class="mini-profile-pic">
+                    <textarea id="postContent" placeholder="What's on your mind?"></textarea>
+                </div>
+                
+                <!-- Media Preview Area -->
+                <div id="mediaPreview" class="media-preview-container"></div>
+
+                <div class="create-post-bottom">
+                    <div class="upload-options">
+                        <input type="file" id="imageUpload" accept="image/*" hidden onchange="previewMedia(this, 'image')">
+                        <input type="file" id="videoUpload" accept="video/*" hidden onchange="previewMedia(this, 'video')">
+                        
+                        <label for="imageUpload" class="icon-btn">🖼️</label>
+                        <label for="videoUpload" class="icon-btn">🎥</label>
+                    </div>
+                    <button id="postBtn" class="main-post-btn">Post</button>
+                </div>
+            </div>
+            
+            <!-- The empty container where JavaScript will inject REAL posts -->
+            <div id="feedContainer"></div>
+            
+        </main>
+    </div>
+
+    <!-- The Log Out Modal Overlay (Hidden by default) -->
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you absolutely sure you want to log out of your account?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Yes, Log Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- --- FRONTEND LOGIC --- -->
+    <!-- ========================================= -->
+    <script>
+        /* 1. THE BOUNCER: Security Check */
+        const currentUser = localStorage.getItem("loggedInUser");
+        if (!currentUser) {
+            window.location.href = "login.html";
+        }
+
+        /* --- WELCOME MESSAGE LOGIC --- */
+        // Check if they already acknowledged it this session
+        if (sessionStorage.getItem("welcomeAcknowledged") === "true") {
+            document.getElementById('welcomeMsg').style.display = 'none';
+        }
+
+        function dismissWelcome() {
+            // Hide the box visually
+            document.getElementById('welcomeMsg').style.display = 'none';
+            // Save the permanent memory flag for this session
+            sessionStorage.setItem("welcomeAcknowledged", "true");
+        }
+
+        /* --- PHASE 2: MEDIA UPLOAD ENGINE (BASE64) --- */
+        let attachedMediaBase64 = ""; // This will hold our massive text-converted image
+        let attachedMediaType = "";
+
+        function previewMedia(input, type) {
+            const previewContainer = document.getElementById('mediaPreview');
+            const file = input.files[0];
+
+            if (file) {
+                attachedMediaType = type;
+                const reader = new FileReader();
+                
+                reader.onloadend = function() {
+                    attachedMediaBase64 = reader.result; 
+                    
+                    if (type === 'image') {
+                        previewContainer.innerHTML = `
+                            <div class="preview-item">
+                                <img src="${attachedMediaBase64}" alt="Preview">
+                                <button class="remove-media-btn" onclick="removeMedia()">X</button>
+                            </div>
+                        `;
+                    } else if (type === 'video') {
+                        /* [HTML Video Element: A specialized tag that includes a built-in media player using the 'controls' attribute] */
+                        previewContainer.innerHTML = `
+                            <div class="preview-item">
+                                <video src="${attachedMediaBase64}" controls style="max-height: 300px; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);"></video>
+                                <button class="remove-media-btn" onclick="removeMedia()">X</button>
+                            </div>
+                        `;
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeMedia() {
+            attachedMediaBase64 = "";
+            attachedMediaType = "";
+            document.getElementById('mediaPreview').innerHTML = "";
+            document.getElementById('imageUpload').value = ""; 
+            /* THE FIX 1: We successfully added the video reset command! */
+            document.getElementById('videoUpload').value = ""; 
+        }
+
+        /* 2. LOGOUT MODAL LOGIC */
+        function openLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'flex';
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+
+        function executeLogout() {
+            /* [Clear Data: Wipes the user's secure vault clean] */
+            localStorage.removeItem("loggedInUser"); 
+            /* Redirects them to the login screen */
+            window.location.href = "login.html"; 
+        }
+
+        /* 3. THE PAINTER: Fetch and Draw the Feed */
+        function loadFeed() {
+            const feedContainer = document.getElementById("feedContainer");
+            
+            feedContainer.innerHTML = "<p style='text-align: center; color: #00e676;'>Loading posts...</p>";
+
+            fetch('http://localhost:8080/api/getFeed', {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser })
+            })
+            .then(response => response.json()) 
+            .then(posts => {
+                feedContainer.innerHTML = ""; 
+                
+                if (posts.length === 0) {
+                    feedContainer.innerHTML = "<p style='text-align: center; color: #a09eb5;'>No posts yet. Be the first to say something!</p>";
+                    return;
+                }
+
+                // Loop through every post and draw the HTML
+                posts.forEach(post => {
+                    
+                    let mediaHTML = "";
+                    if (post.media && post.media.trim() !== "") {
+                        if (post.media.startsWith("data:video")) {
+                            mediaHTML = `<video src="${post.media}" controls style="width: 100%; max-height: 400px; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(0, 230, 118, 0.3);"></video>`;
+                        } else {
+                            /* --- CLEANED UP IMAGE CONTROLS --- */
+                            mediaHTML = `
+                                <div style="position: relative; margin-top: 15px;">
+                                    <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);" alt="Post Media">
+                                    
+                                    <div style="margin-top: 8px; display: flex; gap: 10px;">
+                                        <a href="${post.media}" download="SocialApp_Image.png" class="media-control-btn">⬇️ Download</a>
+                                        <button onclick="this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn">🔍 Full Screen</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    const postHTML = `
+                        <div class="post">
+                            <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                                <img src="${post.avatar}" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                                
+                                <div style="display: flex; flex-direction: column;">
+                                    <a href="profile.html?user=${post.username}" style="color: white; text-decoration: none;">
+                                        <strong>${post.username}</strong>
+                                    </a>
+                                    <span class="time-stamp">${post.timestamp}</span>
+                                </div>
+                                
+                                <!-- STATE-AWARE FEED FOLLOW BUTTON -->
+                                ${post.username !== currentUser ? 
+                                    (post.isFollowing ? 
+                                        `<button class="media-control-btn" style="margin-left: auto; padding: 4px 10px; font-size: 12px; background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);" onclick="feedFollowUser(this, '${post.username}')">Unfollow</button>` 
+                                        : 
+                                        `<button class="media-control-btn" style="margin-left: auto; padding: 4px 10px; font-size: 12px;" onclick="feedFollowUser(this, '${post.username}')">Follow</button>`
+                                    ) 
+                                : ''}
+                            </div>
+                            <div class="post-content">
+                                <p>${post.content}</p>
+                                ${mediaHTML} 
+                            </div>
+                            <div class="post-stats">
+                                <span onclick="toggleLike(this, ${post.id})" class="like-btn">
+                                    ❤️ <span class="like-count">${post.likes}</span> Likes
+                                </span>
+                                
+                                <span class="comment-btn" onclick="toggleComments(${post.id})">
+                                    💬 <span class="comment-count">${post.commentCount}</span> Comments
+                                </span>
+                            </div>
+
+                            <!-- THE NEW COMMENT TRAY (Hidden by default) -->
+                            <div class="comments-section" id="comments-${post.id}" style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                                
+                                <div id="comment-list-${post.id}" style="margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
+                                    <p style="color: gray; font-size: 14px; text-align: center;">Loading...</p>
+                                </div>
+                                
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                    <button onclick="submitComment(${post.id})" class="media-control-btn">Post</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    feedContainer.innerHTML += postHTML;
+                });
+            })
+            .catch(error => {
+                feedContainer.innerHTML = "<p style='text-align: center; color: #ff3366;'>Error loading feed. Is the server running?</p>";
+            });
+        }
+
+        /* 4. THE MESSENGER: Sending a New Post */
+        document.getElementById("postBtn").addEventListener("click", function() {
+            const postContent = document.getElementById("postContent").value;
+
+            /* THE FIX 2: Check if BOTH text and media are empty to support image-only posts! */
+            if (postContent.trim() === "" && attachedMediaBase64 === "") {
+                alert("You cannot publish an empty post! Please add some text or an image.");
+                return;
+            }
+
+            fetch('http://localhost:8080/api/createPost', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    username: currentUser, 
+                    content: postContent,
+                    media: attachedMediaBase64 
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    document.getElementById("postContent").value = "";
+                    /* THE FIX 3: Clear the visual image preview after posting! */
+                    removeMedia(); 
+                    loadFeed(); 
+                } else {
+                    alert("Error saving post to the database.");
+                }
+            });
+        });
+
+        /* --- LIKE SYSTEM LOGIC --- */
+        function toggleLike(element, postId) {
+            fetch('http://localhost:8080/api/toggleLike', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    username: currentUser, 
+                    postId: postId.toString() 
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                const likeCountSpan = element.querySelector('.like-count');
+                let currentLikes = parseInt(likeCountSpan.textContent);
+
+                if (data === "LIKED") {
+                    likeCountSpan.textContent = currentLikes + 1;
+                    element.style.color = "#ff3366"; 
+                } else if (data === "UNLIKED") {
+                    likeCountSpan.textContent = currentLikes - 1;
+                    element.style.color = ""; 
+                } else {
+                    alert("Error processing like.");
+                }
+            })
+            .catch(error => console.error("Network Error:", error));
+        }
+
+        /* ========================================= */
+        /* --- COMMENT SYSTEM LOGIC --- */
+        /* ========================================= */
+
+        function toggleComments(postId) {
+            const commentSection = document.getElementById(`comments-${postId}`);
+            
+            if (commentSection.style.display === "none") {
+                commentSection.style.display = "block";
+                loadComments(postId); 
+            } else {
+                commentSection.style.display = "none";
+            }
+        }
+
+        function loadComments(postId) {
+            const commentList = document.getElementById(`comment-list-${postId}`);
+            commentList.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>Loading comments...</p>";
+
+            fetch('http://localhost:8080/api/getComments', {
+                method: 'POST',
+                body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
+            })
+            .then(response => response.json())
+            .then(comments => {
+                if (comments.length === 0) {
+                    commentList.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>No comments yet. Be the first!</p>";
+                    return;
+                }
+                
+                commentList.innerHTML = ""; 
+                
+                comments.forEach(comment => {
+                    let commentFollowBtn = "";
+                    if (comment.username !== currentUser) {
+                        if (comment.isFollowing) {
+                            commentFollowBtn = `<button class="media-control-btn" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);" onclick="feedFollowUser(this, '${comment.username}')">Unfollow</button>`;
+                        } else {
+                            commentFollowBtn = `<button class="media-control-btn" style="margin-left: 10px; padding: 2px 6px; font-size: 10px;" onclick="feedFollowUser(this, '${comment.username}')">Follow</button>`;
+                        }
+                    }
+
+                    commentList.innerHTML += `
+                        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00e676;">
+                            <div style="display: flex; align-items: center;">
+                                <a href="profile.html?user=${comment.username}" style="text-decoration: none;">
+                                    <strong style="color: #00e676; font-size: 14px; transition: 0.2s;" onmouseover="this.style.textShadow='0 0 8px rgba(0,230,118,0.5)'" onmouseout="this.style.textShadow='none'">${comment.username}</strong> 
+                                </a>
+                                
+                                ${commentFollowBtn}
+                                
+                                <span style="font-size: 11px; color: gray; margin-left: auto;">${comment.timestamp}</span>
+                            </div>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #e0e0e0;">${comment.content}</p>
+                            
+                            <div style="margin-top: 8px;">
+                                <span style="font-size: 11px; color: #a09eb5; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'" onclick="replyToComment(${postId}, '${comment.username}')">
+                                    ↩️ Reply
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            })
+            .catch(error => console.error("Error loading comments:", error));
+        }
+
+        function submitComment(postId) {
+            const inputField = document.getElementById(`comment-input-${postId}`);
+            const content = inputField.value;
+
+            if (content.trim() !== "") {
+                fetch('http://localhost:8080/api/addComment', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: currentUser,
+                        postId: postId.toString(),
+                        content: content
+                    })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === "SUCCESS") {
+                        inputField.value = ""; 
+                        loadComments(postId); 
+                    } else {
+                        alert("Error posting comment.");
+                    }
+                })
+                .catch(error => console.error("Error submitting comment:", error));
+            }
+        }
+
+        function replyToComment(postId, targetUsername) {
+            const inputField = document.getElementById(`comment-input-${postId}`);
+            inputField.value = `@${targetUsername} `;
+            inputField.focus();
+        }
+
+        /* --- UPGRADED FEED FOLLOW LOGIC --- */
+        function feedFollowUser(buttonElement, targetUsername) {
+            fetch('http://localhost:8080/api/toggleFollow', {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: targetUsername })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "FOLLOWED") {
+                    buttonElement.textContent = "Unfollow";
+                    buttonElement.style.background = "rgba(255, 51, 102, 0.1)";
+                    buttonElement.style.color = "#ff3366";
+                    buttonElement.style.borderColor = "rgba(255, 51, 102, 0.3)";
+                } else if (data === "UNFOLLOWED") {
+                    buttonElement.textContent = "Follow";
+                    buttonElement.style.background = "rgba(255, 255, 255, 0.05)";
+                    buttonElement.style.color = "#00e676";
+                    buttonElement.style.borderColor = "rgba(0, 230, 118, 0.3)";
+                }
+            })
+            .catch(error => console.error("Error toggling follow:", error));
+        }
+
+        /* 5. THE IGNITION: Start drawing the feed */
+        loadFeed();
+    </script>
+</body>
+</html>

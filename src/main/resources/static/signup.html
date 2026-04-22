@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up Page</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Create a New Account</h2>
+        
+        <div id="alertBox" class="alert-box" style="display: none;"></div>
+
+        <form id="signupForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="email" id="email" placeholder="Email" required> <!-- Restored! -->
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+        
+        <!-- Fixed Static Link -->
+        <p>Already have an account? <a href="login.html">Log In</a></p>
+    </div>
+
+    <script>
+        const alertBox = document.getElementById('alertBox');
+
+        document.getElementById('signupForm').addEventListener('submit', function(event) {
+            /* This stops the annoying page refresh bug! */
+            event.preventDefault();
+
+            const user = document.getElementById('username').value;
+            const emailVal = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+
+            fetch('http://localhost:8080/api/register', {
+                method: 'POST',
+                body: JSON.stringify({ username: user, email: emailVal, password: pass }) 
+            })
+            .then(response => response.text())
+            .then(data => {
+                alertBox.style.display = 'block';
+                if (data === "SUCCESS") {
+                    alertBox.className = 'alert-box alert-success';
+                    alertBox.textContent = 'Account created! Please log in.';
+                } else {
+                    alertBox.className = 'alert-box alert-error';
+                    alertBox.textContent = 'ERROR: Username already exists.';
+                }
+            })
+            .catch(error => {
+                console.error("Network Error:", error);
+            });
+        });
+    </script>
+</body>
+</html>
