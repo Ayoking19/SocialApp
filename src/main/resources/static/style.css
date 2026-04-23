@@ -8,18 +8,19 @@
 
 /* --- 2. The Gradient Background --- */
 body {
-    /* This creates the sweeping dark purple to black background seen in your video */
     background: linear-gradient(135deg, #1a0b2e 0%, #000000 100%);
-    background-attachment: fixed; /* Keeps the background still while you scroll */
+    background-attachment: fixed; 
     color: #ffffff;
     min-height: 100vh;
+    padding-top: 70px;
+    padding-bottom: 80px;
 }
 
 /* --- 3. The Neon Green Welcome Message --- */
 .welcome-message {
-    background-color: rgba(0, 230, 118, 0.1); /* Transparent neon green */
-    color: #00e676; /* Solid neon green text */
-    border-bottom: 1px solid #00e676; /* A glowing bottom line */
+    background-color: rgba(0, 230, 118, 0.1); 
+    color: #00e676; 
+    border-bottom: 1px solid #00e676; 
     text-align: center;
     padding: 15px;
     font-weight: bold;
@@ -27,23 +28,21 @@ body {
     justify-content: center;
     align-items: center;
     gap: 20px;
-    /* [Box-Shadow: A CSS property that adds a shadow or glow effect behind an element] */
     box-shadow: 0px 4px 15px rgba(0, 230, 118, 0.2); 
 }
 
 .welcome-message button {
     background-color: #00e676;
-    color: #000000; /* Dark text on bright button for contrast */
+    color: #000000; 
     border: none;
     padding: 8px 20px;
-    border-radius: 20px; /* Pill-shaped buttons like in the video */
+    border-radius: 20px; 
     cursor: pointer;
     font-weight: bold;
     transition: 0.3s ease;
 }
 
 .welcome-message button:hover {
-    /* Makes the button glow brighter when the mouse touches it */
     box-shadow: 0px 0px 15px #00e676; 
 }
 
@@ -55,17 +54,6 @@ body {
 }
 
 /* --- 5. The Glassmorphism Sidebar --- */
-.sidebar {
-    width: 250px;
-    height: 100vh;
-    padding: 30px 20px;
-    position: sticky;
-    top: 0;
-    /* Here is the Glassmorphism effect: */
-    background: rgba(255, 255, 255, 0.03); /* Barely visible white */
-    backdrop-filter: blur(12px); /* Blurs whatever is behind the sidebar */
-    border-right: 1px solid rgba(255, 255, 255, 0.05); /* Very faint border */
-}
 
 .logo {
     font-size: 28px;
@@ -76,50 +64,130 @@ body {
 }
 
 .logo span {
-    color: #00e676; /* Makes part of the logo neon green */
+    color: #00e676; 
 }
 
-.nav-links {
-    list-style: none;
+/* --- THE NAVIGATION OVERHAUL --- */
+
+/* --- THE TOP BAR ENGINE --- */
+.top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 65px;
+    background: #0b0f1a; 
+    border-bottom: 2px solid #00e676; 
+    display: flex; 
+    align-items: center; /* Vertically centers the Menu trigger */
+    padding: 0 20px;
+    z-index: 2000;
 }
 
-.nav-links li {
-    margin-bottom: 15px;
+/* THE FIX: Vertical & Horizontal Centering */
+.top-bar .logo {
+    position: absolute; 
+    left: 50%;
+    top: 50%; /* Moves it to the vertical center of the bar */
+    transform: translate(-50%, -50%); /* Centers it on both X and Y axes */
+    font-size: 24px;
+    font-weight: bold;
+    white-space: nowrap; 
+    margin-bottom: 0; /* Clears any margins that might push it up or down */
+    z-index: 10; 
 }
 
-.nav-links a {
-    text-decoration: none;
-    color: #a09eb5; /* Muted grey/purple for unselected links */
-    font-size: 18px;
-    font-weight: 500;
+.menu-trigger {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-}
-
-/* The Neon Hover Effect for Links */
-.nav-links a:hover, .nav-links a.active {
-    background: rgba(0, 230, 118, 0.1);
+    gap: 8px;
     color: #00e676;
-    transform: translateX(5px); /* [Transform: Moves the text slightly to the right when hovered] */
+    cursor: pointer;
+    font-weight: bold;
+    z-index: 2100; 
 }
 
-.nav-links a.logout {
-    color: #ff3366; /* Neon pink/red for log out */
-    margin-top: 50px;
+/* --- THE OVERLAY MENU (CLEANED & FIXED) --- */
+.overlay-menu {
+    position: fixed;
+    top: 0;
+    left: -100%; 
+    width: 100%;
+    height: 100vh;
+    background: rgba(11, 15, 26, 0.98);
+    /* HIGHEST Z-INDEX: Ensures it covers the header and close button is visible */
+    z-index: 5000; 
+    transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 40px;
+    box-sizing: border-box;
 }
 
-.nav-links a.logout:hover {
-    background: rgba(255, 51, 102, 0.1);
+.overlay-menu.open {
+    left: 0; 
 }
 
-/* --- 6. The Feed & Glassmorphism Posts --- */
+.menu-header { 
+    display: flex; 
+    justify-content: flex-end; 
+    margin-bottom: 30px;
+    padding-top: 10px; /* Pushes the close button away from the very top edge */
+}
+
+.close-btn { 
+    color: #ff3366; 
+    cursor: pointer; 
+    font-size: 35px; 
+}
+
+.overlay-links { list-style: none; padding: 0; }
+.overlay-links li { margin: 25px 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+.overlay-links a { color: white; text-decoration: none; font-size: 22px; font-weight: bold; transition: 0.2s; }
+.overlay-links a:hover { color: #00e676; padding-left: 10px; }
+
+/* 4. Bottom Nav Icon Fix */
+.bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%;
+    height: 70px;
+    background: #0b0f1a;
+    border-top: 2px solid #00e676;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 2000;
+}
+
+.bottom-nav a {
+    color: #a09eb5;
+    text-decoration: none;
+    position: relative;
+}
+
+.bottom-nav .material-icons {
+    font-size: 32px;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3366;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    font-weight: bold;
+    border: 2px solid #0f172a;
+}
+
+/* --- 6. The Feed & Glassmorphism Posts (Identical to your original) --- */
 .feed {
     flex: 1;
-    max-width: 700px; /* Slightly wider for a better reading experience */
-    margin: 0 auto; /* Centers the feed */
+    max-width: 700px; 
+    margin: 0 auto; 
     padding: 0 20px;
 }
 
@@ -130,9 +198,8 @@ body {
     background: rgba(26, 11, 46, 0.8); 
     backdrop-filter: blur(10px);
     z-index: 10;
-    /* --- NEW LINES BELOW --- */
     display: flex;
-    justify-content: center; /* [Justify-Content: A CSS property that aligns items along the main axis; 'center' pushes them to the middle] */
+    justify-content: center; 
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -142,20 +209,19 @@ body {
     font-weight: 700;
 }
 
-/* The Individual Posts (Styled like the cards in your video) */
 .post {
-    background: rgba(255, 255, 255, 0.03); /* Glass card */
-    border: 1px solid rgba(255, 255, 255, 0.05); /* Faint border */
-    border-radius: 20px; /* Smooth rounded corners */
+    background: rgba(255, 255, 255, 0.03); 
+    border: 1px solid rgba(255, 255, 255, 0.05); 
+    border-radius: 20px; 
     padding: 25px;
     margin-bottom: 25px;
     transition: all 0.3s ease;
 }
 
 .post:hover {
-    background: rgba(255, 255, 255, 0.05); /* Gets slightly brighter on hover */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Adds a deep shadow to look like it's floating */
-    transform: translateY(-2px); /* Lifts the post up slightly */
+    background: rgba(255, 255, 255, 0.05); 
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+    transform: translateY(-2px); 
 }
 
 .user-info {
@@ -173,7 +239,7 @@ body {
 }
 
 .user-info strong:hover {
-    color: #00e676; /* Username turns neon green when hovered */
+    color: #00e676; 
 }
 
 .time-stamp {
@@ -184,7 +250,7 @@ body {
 .post-content {
     font-size: 16px;
     line-height: 1.6;
-    color: #d1d0dd; /* Very light grey for easy reading */
+    color: #d1d0dd; 
     margin-bottom: 20px;
 }
 
@@ -199,8 +265,9 @@ body {
     font-weight: 600;
     background: rgba(0, 230, 118, 0.1);
     padding: 5px 12px;
-    border-radius: 20px; /* Pill shaped stat badges */
+    border-radius: 20px; 
 }
+
 /* --- Comment Section Styling --- */
 .comment-section {
     margin-top: 20px;
@@ -221,11 +288,11 @@ body {
     padding: 10px 15px;
     border-radius: 10px;
     color: white;
-    outline: none; /* [Outline: The border that appears around an input when you click it; 'none' allows us to use our own custom style] */
+    outline: none; 
 }
 
 .comment-input:focus {
-    border-color: #00e676; /* Glows neon green when you click to type */
+    border-color: #00e676; 
 }
 
 .post-comment-btn {
@@ -250,7 +317,7 @@ body {
     margin-right: 5px;
 }
 
-/* --- Create Post Box Styling --- */
+/* --- Create Post Box Styling (Identical to your original) --- */
 .create-post-box {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
@@ -267,7 +334,7 @@ body {
 .mini-profile-pic {
     width: 50px;
     height: 50px;
-    border-radius: 50%; /* [Border-Radius 50%: A CSS trick to turn a square image into a perfect circle] */
+    border-radius: 50%; 
     object-fit: cover;
 }
 
@@ -277,7 +344,7 @@ textarea {
     border: none;
     color: white;
     font-size: 18px;
-    resize: none; /* Prevents the user from manually stretching the box */
+    resize: none; 
     outline: none;
     padding-top: 10px;
     min-height: 80px;
@@ -286,7 +353,7 @@ textarea {
 .media-preview-container {
     margin-top: 15px;
     display: flex;
-    flex-wrap: wrap; /* Allows multiple images to wrap to the next line */
+    flex-wrap: wrap; 
     gap: 10px;
 }
 
@@ -325,7 +392,7 @@ textarea {
 
 .icon-btn:hover {
     background: rgba(0, 230, 118, 0.1);
-    transform: scale(1.1); /* [Scale: A transform function that makes an element slightly larger or smaller] */
+    transform: scale(1.1); 
 }
 
 .main-post-btn {
@@ -342,15 +409,15 @@ textarea {
 .main-post-btn:hover {
     box-shadow: 0 0 15px #00e676;
 }
-/* --- The Cancel Media Button --- */
+
 .remove-media-btn {
-    position: absolute; /* Allows it to float on top of the image */
-    top: -10px;         /* Pushes it slightly above the top edge */
-    right: -10px;       /* Pushes it slightly past the right edge */
-    background: #ff3366; /* Bright neon pink/red */
+    position: absolute; 
+    top: -10px;         
+    right: -10px;       
+    background: #ff3366; 
     color: white;
     border: none;
-    border-radius: 50%; /* Makes it a perfect circle */
+    border-radius: 50%; 
     width: 35px;
     height: 35px;
     font-size: 20px;
@@ -359,16 +426,17 @@ textarea {
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 4px 10px rgba(255, 51, 102, 0.4); /* Red glowing shadow */
+    box-shadow: 0 4px 10px rgba(255, 51, 102, 0.4); 
     transition: 0.2s ease;
 }
 
 .remove-media-btn:hover {
-    transform: scale(1.15); /* Makes the button pop out when you hover over it */
-    background: #ff0040; /* Darkens slightly on hover */
+    transform: scale(1.15); 
+    background: #ff0040; 
 }
+
 /* ========================================= */
-/* --- PROFILE PAGE SPECIFIC STYLES --- */
+/* --- PROFILE PAGE SPECIFIC STYLES (Identical to your original) --- */
 /* ========================================= */
 
 .profile-card {
@@ -376,12 +444,12 @@ textarea {
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     margin-bottom: 25px;
-    overflow: hidden; /* [Overflow Hidden: A CSS property that prevents content from spilling outside the rounded corners of its container] */
+    overflow: hidden; 
 }
 
 .profile-banner {
     height: 150px;
-    background: linear-gradient(90deg, #3b82f6 0%, #00e676 100%); /* A cool blue-to-neon-green gradient banner */
+    background: linear-gradient(90deg, #3b82f6 0%, #00e676 100%); 
 }
 
 .profile-info-section {
@@ -392,8 +460,8 @@ textarea {
 .profile-pic-wrapper {
     position: relative;
     display: inline-block;
-    margin-top: -50px; /* Pulls the picture UP so it overlaps the banner */
-    border: 5px solid #0f172a; /* Creates a cutout effect against the banner */
+    margin-top: -50px; 
+    border: 5px solid #0f172a; 
     border-radius: 50%;
 }
 
@@ -476,7 +544,7 @@ textarea {
 
 .stat-box {
     display: flex;
-    flex-direction: column; /* Stacks the number on top of the text */
+    flex-direction: column; 
 }
 
 .stat-number {
@@ -510,57 +578,55 @@ textarea {
 
 .active-tab {
     color: #00e676;
-    border-bottom: 3px solid #00e676; /* Highlights the currently selected tab */
+    border-bottom: 3px solid #00e676; 
 }
-/* --- Bio Editing Input --- */
+
 .bio-edit-input {
     width: 100%;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid #00e676; /* Neon green border to show it's active */
+    border: 1px solid #00e676; 
     color: #ffffff;
     font-size: 16px;
     padding: 10px;
     border-radius: 10px;
     margin-bottom: 10px;
     min-height: 80px;
-    resize: none; /* Prevents stretching */
+    resize: none; 
     outline: none;
     font-family: inherit;
-    /* [Box-Shadow: We add a slight green glow when typing to make it feel premium] */
     box-shadow: 0 0 10px rgba(0, 230, 118, 0.1); 
 }
+
 /* ========================================= */
-/* --- MODAL POP-UP STYLES --- */
+/* --- MODAL POP-UP STYLES (Identical to your original) --- */
 /* ========================================= */
 
 .modal-overlay {
-    position: fixed; /* [Position Fixed: A CSS rule that locks an element to the screen itself, meaning it stays in place even if the user scrolls up or down] */
+    position: fixed; 
     top: 0;
     left: 0;
-    width: 100vw; /* [Viewport Width (vw): 100vw means it takes up 100% of the screen's width] */
-    height: 100vh; /* [Viewport Height (vh): 100vh means it takes up 100% of the screen's height] */
-    background: rgba(0, 0, 0, 0.7); /* Heavily darkens the background */
-    backdrop-filter: blur(10px); /* Creates our signature frosted glass effect */
+    width: 100vw; 
+    height: 100vh; 
+    background: rgba(0, 0, 0, 0.7); 
+    backdrop-filter: blur(10px); 
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000; /* [Z-Index: Determines the stacking order of elements. A massive number like 1000 guarantees this box sits on top of absolutely everything else] */
+    z-index: 1000; 
 }
 
 .modal-card {
     background: rgba(26, 11, 46, 0.9);
-    border: 1px solid rgba(255, 51, 102, 0.3); /* A subtle red border to indicate a warning */
+    border: 1px solid rgba(255, 51, 102, 0.3); 
     border-radius: 20px;
     padding: 40px;
     width: 90%;
     max-width: 400px;
     text-align: center;
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
-    /* [Animation: We make the box slide up slightly when it appears for a premium feel] */
     animation: slideUp 0.3s ease-out forwards; 
 }
 
-/* Defining the animation we just referenced */
 @keyframes slideUp {
     from { transform: translateY(30px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
@@ -599,7 +665,7 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     transition: 0.2s;
-    flex: 1; /* Makes both buttons the exact same width */
+    flex: 1; 
 }
 
 .modal-cancel-btn:hover {
@@ -607,7 +673,7 @@ textarea {
 }
 
 .modal-confirm-btn {
-    background: #ff3366; /* Neon red/pink for the destructive action */
+    background: #ff3366; 
     border: none;
     color: #ffffff;
     padding: 10px 20px;
@@ -623,8 +689,9 @@ textarea {
     background: #ff0040;
     transform: scale(1.05);
 }
+
 /* ========================================= */
-/* --- SEARCH PAGE STYLES --- */
+/* --- SEARCH PAGE STYLES (Identical to your original) --- */
 /* ========================================= */
 
 .search-container {
@@ -638,12 +705,11 @@ textarea {
     align-items: center;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 30px; /* Highly rounded, pill-shaped design */
+    border-radius: 30px; 
     padding: 5px 5px 5px 20px;
     transition: 0.3s;
 }
 
-/* Make the box glow green when the user clicks into it to type */
 .search-box:focus-within {
     border-color: #00e676;
     box-shadow: 0 0 15px rgba(0, 230, 118, 0.2);
@@ -661,7 +727,7 @@ textarea {
     border: none;
     color: #ffffff;
     font-size: 16px;
-    outline: none; /* Removes the ugly default browser highlight */
+    outline: none; 
 }
 
 .search-btn {
@@ -690,11 +756,11 @@ textarea {
     font-size: 16px;
     margin-top: 40px;
 }
+
 /* ========================================= */
-/* --- COMMENT SECTION INTERACTIVITY --- */
+/* --- COMMENT SECTION INTERACTIVITY (Identical to your original) --- */
 /* ========================================= */
 
-/* Targeting the area where a user types a comment */
 .comment-input-area:hover,
 .comment-input:focus {
     box-shadow: 0 0 15px rgba(0, 230, 118, 0.2);
@@ -702,13 +768,13 @@ textarea {
     transition: 0.3s ease-in-out;
 }
 
-/* Targeting the actual button used to post the comment */
 .post-comment-btn:hover,
 .comment-action-btn:hover {
     box-shadow: 0 0 15px #00e676;
-    transform: scale(1.05); /* Makes the button slightly grow to feel tactile */
+    transform: scale(1.05); 
     transition: 0.3s ease-in-out;
 }
+
 /* --- IMAGE CONTROLS (DOWNLOAD & FULLSCREEN) --- */
 .media-control-btn {
     background: rgba(255, 255, 255, 0.05);
@@ -720,102 +786,124 @@ textarea {
     font-weight: bold;
     border: 1px solid rgba(0, 230, 118, 0.3);
     cursor: pointer;
-    display: inline-block; /* Ensures the <a> link behaves exactly like a <button> */
-    /* [Transition: Ensures the glow fades in smoothly rather than snapping instantly] */
+    display: inline-block; 
     transition: all 0.3s ease; 
 }
 
-/* The Hover State: This creates the glowing neon shadow you requested! */
 .media-control-btn:hover {
     background: rgba(0, 230, 118, 0.1);
-    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); /* The green glow */
-    transform: translateY(-2px); /* Lifts the button slightly toward the user */
-}
-/* --- ENGAGEMENT BUTTONS (LIKE & COMMENT) --- */
-.like-btn, .comment-btn {
-    cursor: pointer;
-    padding: 5px 10px;
-    border-radius: 8px;
-    display: inline-block;
-    transition: all 0.3s ease;
+    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); 
+    transform: translateY(-2px); 
 }
 
-/* The Pink Like Glow */
+/* --- ENGAGEMENT BUTTONS (LIKE & COMMENT) --- */
+.like-btn, .comment-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 .like-btn:hover {
     background: rgba(255, 51, 102, 0.1);
     box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
     transform: translateY(-2px);
 }
 
-/* The Green Comment Glow */
 .comment-btn:hover {
     background: rgba(0, 230, 118, 0.1);
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
     transform: translateY(-2px);
 }
+/* --- SMART NAVIGATION HIGHLIGHTING --- */
+
+/* This turns the active icon neon green and adds a subtle glow */
+.nav-link-active {
+    color: #00e676 !important; /* Forces the color to neon green */
+    /* [Text-Shadow: A CSS property that adds a glow or shadow effect to text or icons] */
+    text-shadow: 0 0 10px rgba(0, 230, 118, 0.6); 
+    transform: scale(1.1); /* Makes the active icon slightly larger */
+    transition: 0.3s ease;
+}
+
+/* Adds a small green dot under the active icon for a premium feel */
+.nav-link-active::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    background: #00e676;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00e676;
+}
+
 /* ========================================= */
-/* --- MOBILE RESPONSIVENESS --- */
+/* --- MOBILE RESPONSIVENESS FIXES --- */
 /* ========================================= */
 
 @media (max-width: 768px) {
     
-    /* 1. Re-stack the main layout */
     .container {
-        flex-direction: column; /* [Flex-Direction Column: Stacks items vertically from top to bottom instead of side-by-side] */
+        flex-direction: column; 
     }
 
-    /* 2. Transform the Sidebar into a Bottom Navigation Bar */
     .sidebar {
         width: 100%;
         height: 70px;
-        position: fixed; /* Locks it to the screen */
-        bottom: 0; /* Pushes it to the very bottom edge */
-        top: auto; /* Removes the top-sticking behavior from the desktop version */
+        position: fixed; 
+        bottom: 0; 
+        top: auto; 
         left: 0;
         padding: 0;
         display: flex;
         align-items: center;
-        background: rgba(26, 11, 46, 0.95); /* Solidifies the background so you can read it over posts */
+        background: rgba(26, 11, 46, 0.95); 
         border-right: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.1); /* Adds a line on top of the bar */
-        z-index: 100; /* Ensures the menu is always layered above the scrolling posts */
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 100; 
     }
 
-    /* 3. Hide the main text logo to save thumb-space */
-    .logo {
-        display: none;
+    /* THE MOBILE LOGO FIX: It remains centered and aligned */
+    .top-bar .logo {
+        display: block; 
+        font-size: 20px;
     }
 
-    /* 4. Align the links horizontally across the bottom */
     .nav-links {
         display: flex;
         width: 100%;
-        justify-content: space-around; /* [Space-Around: Distributes the menu items evenly across the entire width] */
+        justify-content: space-around; 
     }
 
     .nav-links li {
-        margin-bottom: 0; /* Removes the vertical spacing from the desktop version */
+        margin-bottom: 0; 
     }
 
     .nav-links a {
-        font-size: 14px; /* Shrinks the text slightly for small screens */
+        font-size: 14px; 
         padding: 10px;
     }
     
-    /* Adjusting the Logout button so it doesn't have a huge top margin anymore */
     .nav-links a.logout {
         margin-top: 0; 
     }
 
-    /* 5. Adjust the Main Feed */
     .feed {
-        padding-bottom: 90px; /* [Padding-Bottom: We add empty space at the very bottom of the feed so the last post doesn't get permanently hidden behind our new bottom navigation bar] */
+        padding-bottom: 90px; 
         border-right: none;
     }
 
-    /* 6. Fix the Create Post box for narrow screens */
     .create-post-top {
-        flex-direction: column; /* Puts the profile pic on top of the typing area */
+        flex-direction: column; 
         align-items: flex-start;
     }
 
@@ -823,7 +911,6 @@ textarea {
         margin-bottom: 10px;
     }
 
-    /* 7. Squeeze the Profile Stats closer together so they fit */
     .profile-stats-bar {
         gap: 15px; 
         justify-content: space-between;

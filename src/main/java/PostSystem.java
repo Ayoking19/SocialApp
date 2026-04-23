@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.regex.Pattern;
 
 
 public class PostSystem {
@@ -295,73 +296,167 @@ public class PostSystem {
         return jsonBuilder.toString();
     }
     /* ========================================= */
-    /* --- METHOD 7: SEARCH POSTS (WORD MATCH) --- */
+    /* --- STRICT METHOD: SEARCH POSTS --- */
     /* ========================================= */
     public static String searchPosts(String searchQuery, String currentUser) {
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        Pattern strictWordPattern = Pattern.compile("\\b" + Pattern.quote(searchQuery) + "\\b", Pattern.CASE_INSENSITIVE);
         
-        /* [Exact Word Match Engine]: We use a 4-part OR statement to check if the word has spaces around it, is at the beginning, the end, or is the only word in the post! */
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comment_count, " +
-                          "(SELECT COUNT(*) FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "WHERE (posts.content LIKE ? OR posts.content LIKE ? OR posts.content LIKE ? OR posts.content = ?) " +
-                          "ORDER BY posts.created_at DESC LIMIT 15";
-
-        StringBuilder jsonBuilder = new StringBuilder();
-        jsonBuilder.append("[");
+        String searchSQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, " +
+                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS like_count, " +
+                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comment_count, " +
+                           "(SELECT GROUP_CONCAT(content, ' ') FROM comments WHERE comments.post_id = posts.id) AS all_comments, " +
+                           "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following " +
+                           "FROM posts " +
+                           "JOIN users ON posts.user_id = users.id " +
+                           "WHERE posts.content LIKE ? " +
+                           "OR posts.id IN (SELECT post_id FROM comments WHERE content LIKE ?) " +
+                           "ORDER BY posts.created_at DESC";
 
         try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
+             PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
 
-            // 1. Inject the currentUser for the Follow button math
+            String searchPattern = "%" + searchQuery + "%";
             pstmt.setString(1, currentUser);
-            
-            // 2. The 4 variations for an exact word boundary!
-            pstmt.setString(2, "% " + searchQuery + " %"); // Word is in the middle of a sentence
-            pstmt.setString(3, searchQuery + " %");        // Word is at the very beginning of the post
-            pstmt.setString(4, "% " + searchQuery);        // Word is at the very end of the post
-            pstmt.setString(5, searchQuery);               // The post is literally just this exact word
-            
-            ResultSet rs = pstmt.executeQuery();
+            pstmt.setString(2, searchPattern);
+            pstmt.setString(3, searchPattern);
 
-            boolean isFirstItem = true;
+            ResultSet rs = pstmt.executeQuery();
+            boolean first = true;
+
+            // Notice we bring the Matcher back!
+            java.util.regex.Matcher commentMatcher; 
+
             while (rs.next()) {
-                if (!isFirstItem) { jsonBuilder.append(","); }
+                String text = rs.getString("content");
+                String allComments = rs.getString("all_comments");
+
+                if (text == null) { text = ""; }
+                if (allComments == null) { allComments = ""; }
+
+                boolean matchFoundInPost = strictWordPattern.matcher(text).find();
                 
-                int postId = rs.getInt("id");
+                commentMatcher = strictWordPattern.matcher(allComments);
+                boolean matchFoundInComments = commentMatcher.find();
+
+                if (!matchFoundInPost && !matchFoundInComments) {
+                    continue; 
+                }
+
+                /* THE SNIPPET EXTRACTOR: If the post didn't match, but the comment did! */
+                String matchedSnippet = "";
+                if (!matchFoundInPost && matchFoundInComments) {
+                    // Grab a preview window around the matched word!
+                    int start = Math.max(0, commentMatcher.start() - 25);
+                    int end = Math.min(allComments.length(), commentMatcher.end() + 25);
+                    matchedSnippet = "..." + allComments.substring(start, end).replace("\"", "\\\"").replace("\n", " ") + "...";
+                }
+
+                if (!first) { jsonBuilder.append(","); }
+                first = false;
+
+                int id = rs.getInt("id");
                 String user = rs.getString("username");
                 String avatar = rs.getString("profile_pic_url");
-                String text = rs.getString("content");
                 String media = rs.getString("image_url");
                 String time = rs.getString("created_at");
                 int likes = rs.getInt("like_count");
                 int comments = rs.getInt("comment_count");
-                boolean isFollowing = rs.getInt("is_following") > 0;
+                boolean isFollowing = rs.getBoolean("is_following");
 
-                /* [Fallback Logic] */
                 if (avatar == null || avatar.trim().isEmpty()) {
                     avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
                 }
-                
-                if (text == null) { text = ""; }
                 if (media == null) { media = ""; }
 
                 jsonBuilder.append("{")
-                           .append("\"id\":").append(postId).append(",")
+                           .append("\"id\":").append(id).append(",")
                            .append("\"username\":\"").append(user).append("\",")
                            .append("\"avatar\":\"").append(avatar).append("\",")
                            .append("\"content\":\"").append(text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
                            .append("\"media\":\"").append(media).append("\",")
+                           .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",") // Send snippet to frontend!
                            .append("\"likes\":").append(likes).append(",")
                            .append("\"commentCount\":").append(comments).append(",")
                            .append("\"isFollowing\":").append(isFollowing).append(",")
                            .append("\"timestamp\":\"").append(time).append("\"")
                            .append("}");
-                isFirstItem = false;
             }
-        } catch (SQLException e) { System.out.println("Error searching posts: " + e.getMessage()); }
+        } catch (Exception e) {
+            System.out.println("Error searching posts: " + e.getMessage());
+        }
         
+        jsonBuilder.append("]");
+        return jsonBuilder.toString();
+    }
+    /* ========================================= */
+    /* --- UPGRADED: GLOBAL ACTIVITY SEARCH --- */
+    /* ========================================= */
+    public static String searchProfilePosts(String searchQuery, String targetUsername, String currentUser) {
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        java.util.regex.Pattern strictWordPattern = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(searchQuery) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+        /* [The Bridge Query]: We search for posts OWNED by the user OR posts where the user LEFT A COMMENT. */
+        String searchSQL = "SELECT DISTINCT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, " +
+                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS like_count, " +
+                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comment_count, " +
+                           "(SELECT GROUP_CONCAT(content, ' ') FROM comments WHERE comments.post_id = posts.id) AS all_comments, " +
+                           "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following " +
+                           "FROM posts " +
+                           "JOIN users ON posts.user_id = users.id " +
+                           "LEFT JOIN comments c_search ON c_search.post_id = posts.id " +
+                           "WHERE (users.username = ? OR c_search.user_id = (SELECT id FROM users WHERE username = ?)) " +
+                           "AND (posts.content LIKE ? OR posts.id IN (SELECT post_id FROM comments WHERE content LIKE ?)) " +
+                           "ORDER BY posts.created_at DESC";
+
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
+
+            String searchPattern = "%" + searchQuery + "%";
+            pstmt.setString(1, currentUser);
+            pstmt.setString(2, targetUsername);
+            pstmt.setString(3, targetUsername); // Scope lock for user's own comments
+            pstmt.setString(4, searchPattern);
+            pstmt.setString(5, searchPattern);
+
+            ResultSet rs = pstmt.executeQuery();
+            boolean first = true;
+            while (rs.next()) {
+                String text = rs.getString("content");
+                String allComments = rs.getString("all_comments");
+                if (text == null) text = "";
+                if (allComments == null) allComments = "";
+
+                boolean matchFoundInPost = strictWordPattern.matcher(text).find();
+                java.util.regex.Matcher commentMatcher = strictWordPattern.matcher(allComments);
+                boolean matchFoundInComments = commentMatcher.find();
+
+                if (!matchFoundInPost && !matchFoundInComments) continue;
+
+                String matchedSnippet = "";
+                if (!matchFoundInPost && matchFoundInComments) {
+                    int start = Math.max(0, commentMatcher.start() - 25);
+                    int end = Math.min(allComments.length(), commentMatcher.end() + 25);
+                    matchedSnippet = "..." + allComments.substring(start, end).replace("\"", "\\\"").replace("\n", " ") + "...";
+                }
+
+                if (!first) jsonBuilder.append(",");
+                first = false;
+
+                jsonBuilder.append("{")
+                           .append("\"id\":").append(rs.getInt("id")).append(",")
+                           .append("\"username\":\"").append(rs.getString("username")).append("\",")
+                           .append("\"avatar\":\"").append(rs.getString("profile_pic_url")).append("\",")
+                           .append("\"content\":\"").append(text.replace("\"", "\\\"").replace("\n", "\\n")).append("\",")
+                           .append("\"media\":\"").append(rs.getString("image_url")).append("\",")
+                           .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
+                           .append("\"likes\":").append(rs.getInt("like_count")).append(",")
+                           .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
+                           .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
+                           .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
+                           .append("}");
+            }
+        } catch (Exception e) { System.out.println("Error: " + e.getMessage()); }
         jsonBuilder.append("]");
         return jsonBuilder.toString();
     }
@@ -431,6 +526,92 @@ public class PostSystem {
             }
         } catch (SQLException e) { System.out.println("Error fetching following feed: " + e.getMessage()); }
         
+        jsonBuilder.append("]");
+        return jsonBuilder.toString();
+    }
+    /* ========================================= */
+    /* --- METHOD 10: GET SINGLE POST --- */
+    /* ========================================= */
+    public static String getSinglePost(String postId, String currentUser) {
+        
+        /* [Targeted Query]: We ask the database for exactly ONE post matching the specific ID we click on. We also use advanced subqueries to count the likes, comments, and check if you are following the author! */
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, " +
+                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS like_count, " +
+                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comment_count, " +
+                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following " +
+                          "FROM posts " +
+                          "JOIN users ON posts.user_id = users.id " +
+                          "WHERE posts.id = ?";
+
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
+
+            // We inject the currentUser to check the follow status, and the postId to find the specific post!
+            pstmt.setString(1, currentUser);
+            pstmt.setInt(2, Integer.parseInt(postId));
+            
+            ResultSet rs = pstmt.executeQuery();
+
+            /* We use 'if' instead of 'while' because we know there will only ever be a maximum of ONE post returned! */
+            if (rs.next()) {
+                int id = rs.getInt("id");
+                String user = rs.getString("username");
+                String avatar = rs.getString("profile_pic_url");
+                String text = rs.getString("content");
+                String media = rs.getString("image_url");
+                String time = rs.getString("created_at");
+                int likes = rs.getInt("like_count");
+                int comments = rs.getInt("comment_count");
+                boolean isFollowing = rs.getBoolean("is_following");
+                
+                if (avatar == null || avatar.trim().isEmpty()) {
+                    avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                }
+                if (text == null) { text = ""; }
+                if (media == null) { media = ""; }
+
+                /* [JSON Object Creation]: Notice we are NOT using the '[' brackets here. Because this is only ONE post, we return a single dictionary object, not an array! */
+                return "{" +
+                       "\"id\":" + id + "," +
+                       "\"username\":\"" + user + "\"," +
+                       "\"avatar\":\"" + avatar + "\"," +
+                       "\"content\":\"" + text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\"," +
+                       "\"media\":\"" + media + "\"," +
+                       "\"likes\":" + likes + "," +
+                       "\"commentCount\":" + comments + "," +
+                       "\"isFollowing\":" + isFollowing + "," +
+                       "\"timestamp\":\"" + time + "\"" +
+                       "}";
+            }
+        } catch (Exception e) { 
+            System.out.println("Error fetching single post: " + e.getMessage()); 
+        }
+        
+        // If the post was deleted or doesn't exist, we send back a clear error signal.
+        return "ERROR";
+    }
+    public static String getUserActivity(String targetUsername) {
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        String sql = "SELECT comments.content, comments.created_at, posts.id AS post_id, users.username AS post_owner " +
+                     "FROM comments " +
+                     "JOIN posts ON comments.post_id = posts.id " +
+                     "JOIN users ON posts.user_id = users.id " +
+                     "WHERE comments.user_id = (SELECT id FROM users WHERE username = ?) " +
+                     "ORDER BY comments.created_at DESC";
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, targetUsername);
+            ResultSet rs = pstmt.executeQuery();
+            boolean first = true;
+            while (rs.next()) {
+                if (!first) jsonBuilder.append(",");
+                first = false;
+                jsonBuilder.append("{\"content\":\"").append(rs.getString("content")).append("\",")
+                           .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",")
+                           .append("\"postId\":").append(rs.getInt("post_id")).append(",")
+                           .append("\"postOwner\":\"").append(rs.getString("post_owner")).append("\"}");
+            }
+        } catch (Exception e) { System.out.println(e.getMessage()); }
         jsonBuilder.append("]");
         return jsonBuilder.toString();
     }

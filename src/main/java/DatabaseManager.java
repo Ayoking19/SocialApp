@@ -17,9 +17,11 @@ public class DatabaseManager {
     public static Connection connect() {
         Connection conn = null;
         try {
+            /* [DriverManager: A basic service for managing a set of JDBC (Java Database Connectivity) drivers] */
             conn = DriverManager.getConnection(DATABASE_URL);
             System.out.println("Connection to SQLite has been established.");
         } catch (SQLException e) {
+            /* [SQLException: An exception that provides information on a database access error or other errors] */
             System.out.println("Connection Error: " + e.getMessage());
         }
         return conn;
@@ -30,12 +32,8 @@ public class DatabaseManager {
        You only need to run this once when the application starts! 
     */
     public static void initializeDatabase() {
-        /* 
-           [SQL String: A text variable containing a command written in 
-           Structured Query Language that the database can understand.] 
-        */
         
-        // 1. Creating the Users Table (You already have this)
+        // 1. Creating the Users Table
         String createUsersTable = "CREATE TABLE IF NOT EXISTS users ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "username TEXT NOT NULL UNIQUE,"
@@ -45,12 +43,8 @@ public class DatabaseManager {
                 + "profile_pic_url TEXT,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
-
-        // 2. Creating the Posts Table (ADD THIS!)
-        /* 
-           [Foreign Key: A rule that links the 'user_id' in this table directly 
-           to the 'id' in the users table, ensuring no ghost posts exist] 
-        */
+         
+        // 2. Creating the Posts Table
         String createPostsTable = "CREATE TABLE IF NOT EXISTS posts ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "user_id INTEGER NOT NULL,"
@@ -62,10 +56,6 @@ public class DatabaseManager {
                 + ");";
 
         // 3. Creating the Comments Table
-        /* 
-           [Dual Foreign Keys: This table acts as a bridge. It links to the ID of the 
-           person typing the comment, AND the ID of the post they are looking at.] 
-        */
         String createCommentsTable = "CREATE TABLE IF NOT EXISTS comments ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "post_id INTEGER NOT NULL,"
@@ -76,12 +66,7 @@ public class DatabaseManager {
                 + "FOREIGN KEY (user_id) REFERENCES users(id)"
                 + ");";
         
-        // 4. Creating the Likes Table (NEW!)
-        /* 
-           [UNIQUE Constraint: A strict database rule that makes it physically 
-           impossible for the exact same user_id and post_id combination to be saved twice. 
-           This prevents double-liking at the deepest level of the application!] 
-        */
+        // 4. Creating the Likes Table
         String createLikesTable = "CREATE TABLE IF NOT EXISTS likes ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "user_id INTEGER NOT NULL,"
@@ -90,32 +75,47 @@ public class DatabaseManager {
                 + "FOREIGN KEY (user_id) REFERENCES users(id),"
                 + "FOREIGN KEY (post_id) REFERENCES posts(id),"
                 + "UNIQUE(user_id, post_id)" 
-                + ");";
-
-        // 5. Creating the Followers Table (NEW!)
-        /* 
-           [Bidirectional Tracking: This table records two IDs. The person clicking the button (follower_id), 
-           and the person they are choosing to follow (following_id).] 
-        */
+                + ");";            
+                      
+        // 5. Creating the Followers Table
         String createFollowersTable = "CREATE TABLE IF NOT EXISTS followers ("
                 + "follower_id INTEGER NOT NULL,"
                 + "following_id INTEGER NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
                 + "FOREIGN KEY (follower_id) REFERENCES users(id),"
                 + "FOREIGN KEY (following_id) REFERENCES users(id),"
-                + "PRIMARY KEY (follower_id, following_id)" // Prevents following the same person twice!
+                + "PRIMARY KEY (follower_id, following_id)"
                 + ");";
 
+        // 6. Creating the Notifications Table (NEWLY ADDED!)
+        /* 
+           [Schema: The formal structure or "blueprint" of a database that defines 
+           how data is organized into tables and columns] 
+        */
+        String createNotificationsTable = "CREATE TABLE IF NOT EXISTS notifications ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "recipient_user TEXT NOT NULL,"
+                + "actor_user TEXT NOT NULL,"
+                + "type TEXT NOT NULL," // This stores 'LIKE', 'FOLLOW', or 'COMMENT'
+                + "post_id INTEGER,"    // This is optional (only used for likes/comments)
+                + "is_read BOOLEAN DEFAULT 0,"
+                + "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP"
+                + ");";
+
+        /* [Try-with-resources: A structure that ensures that each resource is closed 
+           at the end of the statement, preventing memory leaks] */
         try (Connection conn = connect();
+             /* [Statement: An interface used to execute a static SQL statement and return the results] */
              Statement stmt = conn.createStatement()) {
             
             stmt.execute(createUsersTable);
             stmt.execute(createPostsTable);
             stmt.execute(createCommentsTable);
             stmt.execute(createLikesTable);
-            stmt.execute(createFollowersTable); // RUN THE NEW TABLE!
+            stmt.execute(createFollowersTable);
+            stmt.execute(createNotificationsTable); // RUN THE NOTIFICATIONS TABLE!
             
-            System.out.println("Database tables have been successfully initialized!");
+            System.out.println("All database tables have been successfully initialized!");
         } catch (SQLException e) {
             System.out.println("Error creating tables: " + e.getMessage());
         }

@@ -4,26 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search - Our Social Network</title>
-    <!-- Linking our world-class stylesheet again -->
     <link rel="stylesheet" href="style.css">
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
+    <!-- 1. The Head: Access to the Icon Library -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<!-- THE HIDDEN MENU (Must exist for the button to work!) -->
+<div class="overlay-menu" id="fullMenu">
+    <div style="display: flex; justify-content: flex-end;">
+        <span class="material-icons" style="color:#ff3366; cursor:pointer; font-size:40px;" onclick="toggleOverlayMenu()">close</span>
+    </div>
+    <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="profile.html">Profile</a></li>
+        <li><a href="search.html">Search</a></li>
+        <li><a href="following.html">Following</a></li>        
+        <li><a href="notifications.html">Notifications</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+    </ul>
+</div>
+
+<header class="top-bar">
+    <div class="menu-trigger" onclick="toggleOverlayMenu()">
+        <span class="material-icons">menu</span>
+        <span>Menu</span>
+    </div>
+    <div class="logo">Social<span>App</span></div>
+    <div style="width: 50px;"></div> <!-- Placeholder for balance -->
+</header>
+<!-- 2. The Top Bar -->
+<header class="top-bar">
+    <div class="menu-trigger" onclick="toggleOverlayMenu()">
+        <span class="material-icons">menu</span>
+        <span>Menu</span>
+    </div>
+    
+    <div class="logo">Social<span>App</span></div>
+    
+    <!-- Empty div for grid symmetry -->
+    <div></div>
+</header>
+
+<!-- 3. The Bottom Nav -->
+<nav class="bottom-nav">
+    <a href="index.html">
+        <span class="material-icons">home</span>
+    </a>
+    <a href="search.html">
+        <span class="material-icons">search</span>
+    </a>
+    <a href="notifications.html" id="nav-bell">
+        <span class="material-icons">notifications</span>
+        <!-- Badge will be injected here by shared.js -->
+    </a>
+    <a href="profile.html"><span class="material-icons">person</span></a>
+</nav>
 
     <div class="container">
-        
-        <!-- Left Sidebar / Bottom Navigation -->
-        <nav class="sidebar">
-            <div class="logo">Social<span>App</span></div>
-            <ul class="nav-links">
-                <li><a href="index.html">Home</a></li>
-                <li><a href="#">Following</a></li>
-                <!-- We moved the 'active' class here to highlight Search -->
-                <li><a href="search.html" class="active">Search</a></li>
-                <li><a href="profile.html">Profile</a></li>
-                <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
-            </ul>
-        </nav>
-
         <!-- Main Search Area -->
         <main class="feed">
             
@@ -35,18 +75,18 @@
             <div class="search-container">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
-                    <!-- We updated the placeholder text to reflect the new capabilities! -->
                     <input type="text" id="searchInput" class="search-input" placeholder="Search for users or posts..." onkeyup="executeSearch()">
                     <button class="search-btn" onclick="executeSearch()">Search</button>
                 </div>
             </div>
 
-            <!-- THE NEW SEARCH TABS SECTION -->
+            <!-- THE UPGRADED SEARCH TABS SECTION -->
             <div class="profile-tabs" style="margin-top: 20px; display: flex; justify-content: center; margin-bottom: 20px;">
-                <!-- We use your exact 'tab-btn' class and assign unique IDs so JavaScript can control them! -->
                 <button id="tab-all" class="tab-btn active-tab" onclick="switchSearchTab('all')">All</button>
                 <button id="tab-users" class="tab-btn" onclick="switchSearchTab('users')">Users</button>
-                <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Posts</button>
+                <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Latest Posts</button>
+                <button id="tab-top" class="tab-btn" onclick="switchSearchTab('top')">Top</button>
+                <button id="tab-media" class="tab-btn" onclick="switchSearchTab('media')">Media</button>
             </div>
 
             <!-- The Results Area (Starts empty) -->
@@ -57,7 +97,7 @@
         </main>
     </div>
 
-    <!-- The Log Out Modal (Copied here so it works on this page too) -->
+    <!-- The Log Out Modal Overlay -->
     <div class="modal-overlay" id="logoutModal" style="display: none;">
         <div class="modal-card">
             <div class="modal-icon">⚠️</div>
@@ -70,7 +110,13 @@
         </div>
     </div>
 
+    <!-- 1. Link the Shared library first -->
+    <script src="shared.js"></script>
+
     <script>
+        /* 1. INITIAL SECURITY CHECK */
+        checkSecurity(); // Uses the shared check from shared.js
+
         /* ========================================= */
         /* --- GLOBAL SEARCH STATE --- */
         /* ========================================= */
@@ -87,26 +133,20 @@
             
             if (query.trim() === "") {
                 resultsArea.innerHTML = `<p class="search-placeholder-text">Type something above to explore the network.</p>`;
-                // Clear the state if the box is empty
                 currentSearchUsers = [];
                 currentSearchPosts = [];
                 return; 
             }
 
-            /* We grab the logged-in user so the Java server can calculate if you follow these people! */
-            const activeUser = localStorage.getItem("currentUser");
-
+            // [FIXED]: Using currentUser directly from shared.js
             fetch('http://localhost:8080/api/search', {
                 method: 'POST',
-                body: JSON.stringify({ query: query, currentUser: activeUser })
+                body: JSON.stringify({ query: query, currentUser: currentUser })
             })
             .then(response => response.json())
             .then(data => {
-                /* [State Mutation: We save the split data into our global variables!] */
                 currentSearchUsers = data.users;
                 currentSearchPosts = data.posts;
-                
-                // Immediately draw the screen based on whatever tab is currently clicked
                 renderResults();
             })
             .catch(error => console.error("Search Error:", error));
@@ -116,18 +156,55 @@
         /* --- 2. THE TAB SWITCHING ENGINE --- */
         /* ========================================= */
         function switchSearchTab(tabName) {
-            // Update the global state
             activeTab = tabName;
             
-            // [Class Manipulation]: Move the green active highlight to the clicked tab!
-            document.getElementById('tab-all').classList.remove('active-tab');
-            document.getElementById('tab-users').classList.remove('active-tab');
-            document.getElementById('tab-posts').classList.remove('active-tab');
-            
+            // Cleaned up tab switching logic
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
             document.getElementById(`tab-${tabName}`).classList.add('active-tab');
             
-            // Re-draw the screen! (Notice we do not use 'fetch' again, saving massive server resources!)
             renderResults();
+        }
+
+        /* ========================================= */
+        /* --- HTML GENERATOR HELPER --- */
+        /* ========================================= */
+        function generatePostHTMLArray(postArray) {
+            if (postArray.length === 0) return `<p class="search-placeholder-text">No posts match this search.</p>`;
+            
+            let html = "";
+            postArray.forEach(post => {
+                let mediaHTML = "";
+                if (post.media && post.media.trim() !== "") {
+                    if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
+                        mediaHTML = `<video src="${post.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 400px; border-radius: 12px; margin-bottom: 10px; background: #000;"></video>`;
+                    } else {
+                        mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 12px; margin-bottom: 10px; object-fit: cover;">`;
+                    }
+                }
+
+                let snippetHTML = (post.matchedSnippet && post.matchedSnippet !== "") ? `
+                    <div style="background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; padding: 8px 12px; margin-top: 10px; border-radius: 4px; font-size: 13px; color: #a09eb5;">
+                        💬 <span style="color: white; font-style: italic;">"${post.matchedSnippet}"</span>
+                    </div>
+                ` : "";
+
+                html += `
+                    <div class="post" onclick="window.location.href='post.html?id=${post.id}'" style="cursor: pointer; transition: 0.2s; margin-bottom: 15px;">
+                        <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                            <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
+                            <strong>${post.username}</strong>
+                            <span class="time-stamp" style="margin-left: auto; color: #a09eb5; font-size: 12px;">${post.timestamp}</span>
+                        </div>
+                        <div class="post-content" style="margin-top: 10px; margin-bottom: 10px;">${post.content}</div>
+                        ${mediaHTML}
+                        ${snippetHTML}
+                        <div class="post-stats" style="margin-top: 10px; font-size: 14px; color: gray;">
+                            ❤️ ${post.likes} Likes &nbsp;&nbsp; 💬 ${post.commentCount} Comments
+                        </div>
+                    </div>
+                `;
+            });
+            return html;
         }
 
         /* ========================================= */
@@ -142,7 +219,6 @@
                 return;
             }
 
-            /* --- BUILD THE USER HTML --- */
             let usersHTML = "";
             if (currentSearchUsers.length > 0) {
                 currentSearchUsers.forEach(user => {
@@ -161,23 +237,18 @@
                 });
             } else { usersHTML = `<p class="search-placeholder-text">No users match this search.</p>`; }
 
-            /* --- BUILD THE POST HTML --- */
-            let postsHTML = "";
-            if (currentSearchPosts.length > 0) {
-                currentSearchPosts.forEach(post => {
-                    postsHTML += `
-                        <div class="post" style="margin-bottom: 15px;">
-                            <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                                <img src="${post.avatar}" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
-                                <strong>${post.username}</strong>
-                                <span class="time-stamp" style="margin-left: auto; color: #a09eb5; font-size: 12px;">${post.timestamp}</span>
-                            </div>
-                            <div class="post-content" style="margin-top: 10px; margin-bottom: 10px;">${post.content}</div>
-                            ${post.media && post.media.trim() !== "" ? `<img src="${post.media}" style="width: 100%; border-radius: 12px; margin-bottom: 10px;">` : ""}
-                        </div>
-                    `;
-                });
-            } else { postsHTML = `<p class="search-placeholder-text">No posts match this search.</p>`; }
+            let postsHTML = generatePostHTMLArray(currentSearchPosts);
+
+            let topPostsArray = [...currentSearchPosts];
+            topPostsArray.sort((a, b) => {
+                let scoreA = a.likes + a.commentCount;
+                let scoreB = b.likes + b.commentCount;
+                return scoreB !== scoreA ? scoreB - scoreA : b.timestamp.localeCompare(a.timestamp); 
+            });
+            let topHTML = generatePostHTMLArray(topPostsArray);
+
+            let mediaPostsArray = currentSearchPosts.filter(post => post.media && post.media.trim() !== "");
+            let mediaHTML = generatePostHTMLArray(mediaPostsArray);
 
             /* --- DRAW TO SCREEN BASED ON ACTIVE TAB --- */
             if (activeTab === 'all') {
@@ -187,13 +258,14 @@
                 resultsArea.innerHTML = usersHTML;
             } else if (activeTab === 'posts') {
                 resultsArea.innerHTML = postsHTML;
+            } else if (activeTab === 'top') {
+                resultsArea.innerHTML = topHTML;
+            } else if (activeTab === 'media') {
+                resultsArea.innerHTML = mediaHTML;
             }
         }
 
-        /* Modal Functions (Required here so the Log Out button works) */
-        function openLogoutModal() { document.getElementById('logoutModal').style.display = 'flex'; }
-        function closeLogoutModal() { document.getElementById('logoutModal').style.display = 'none'; }
-        function executeLogout() { window.location.href = "login.html"; }
+        /* [LOGOUT FUNCTIONS REMOVED - NOW IN SHARED.JS] */
     </script>
 </body>
 </html>
