@@ -4,27 +4,41 @@ import java.sql.*;
 
 public class NotificationSystem {
 
-    /* [Trigger]: Saves a new alert in the database */
+    /* ========================================= */
+    /* --- METHOD 1: ASYNCHRONOUS NOTIFICATION --- */
+    /* ========================================= */
     public static void createNotification(String recipient, String actor, String type, int postId) {
+        // [Self-Guard]: You cannot send a notification to yourself
         if (recipient.equals(actor)) return; 
 
-        String sql = "INSERT INTO notifications (recipient_user, actor_user, type, post_id) VALUES (?, ?, ?, ?)";
-        
-        try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        // [Asynchronous Threading]: We spawn a background process to handle the database
+        // This guarantees the main application never lags or freezes while waiting for SQLite!
+        new Thread(() -> {
+            // [Strategic Delay]: We pause this background thread for 100 milliseconds. 
+            // This guarantees the parent process (like PostSystem) has enough time to 
+            // finish its own database save and release the file lock.
+            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+
+            String sql = "INSERT INTO notifications (recipient_user, actor_user, type, post_id) VALUES (?, ?, ?, ?)";
             
-            pstmt.setString(1, recipient);
-            pstmt.setString(2, actor);
-            pstmt.setString(3, type);
-            pstmt.setInt(4, postId);
-            pstmt.executeUpdate();
-            
-        } catch (SQLException e) {
-            System.out.println("Notification Save Error: " + e.getMessage());
-        }
+            try (Connection conn = DatabaseManager.connect();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                
+                pstmt.setString(1, recipient);
+                pstmt.setString(2, actor);
+                pstmt.setString(3, type);
+                pstmt.setInt(4, postId);
+                pstmt.executeUpdate();
+                
+            } catch (SQLException e) {
+                System.out.println("Notification Save Error: " + e.getMessage());
+            }
+        }).start();
     }
 
-    /* [Fetch]: Gets the list of alerts for the UI */
+    /* ========================================= */
+    /* --- METHOD 2: FETCH NOTIFICATIONS --- */
+    /* ========================================= */
     public static String getNotifications(String username) {
         StringBuilder json = new StringBuilder("[");
         String sql = "SELECT * FROM notifications WHERE recipient_user = ? ORDER BY timestamp DESC LIMIT 20";
@@ -57,9 +71,10 @@ public class NotificationSystem {
         return json.toString();
     }
 
-    /* [NEW] [Cleanup]: Marks all unread alerts as read for a specific user */
+    /* ========================================= */
+    /* --- METHOD 3: MARK AS READ --- */
+    /* ========================================= */
     public static void markNotificationsAsRead(String username) {
-        // [SQL Update]: Changes the value of a column for existing rows
         String sql = "UPDATE notifications SET is_read = 1 WHERE recipient_user = ? AND is_read = 0";
         
         try (Connection conn = DatabaseManager.connect();
@@ -67,7 +82,6 @@ public class NotificationSystem {
             
             pstmt.setString(1, username);
             pstmt.executeUpdate();
-            System.out.println(">>> Notifications cleared for user: " + username);
             
         } catch (SQLException e) {
             System.out.println("Clear Notifications Error: " + e.getMessage());

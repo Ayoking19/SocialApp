@@ -33,6 +33,7 @@ public class SettingsSystem {
         
         try {
             conn = DatabaseManager.connect();
+            // [Auto-Commit OFF]: This locks the database so we can perform multiple steps safely.
             conn.setAutoCommit(false); 
 
             // STEP 1: Get the user's INTEGER ID (The Missing Key!)
@@ -51,17 +52,16 @@ public class SettingsSystem {
             }
 
             // STEP 2: The Corrected Relational Cleanup
-            // We now use the actual table name ('followers') and the integer IDs!
+            // We use the integer IDs for tables that rely on the user_id foreign key
             executeIdCleanup(conn, "DELETE FROM followers WHERE follower_id = ? OR following_id = ?", userId, true);
-            
-            // Fixing 'posts' since ProfileSystem shows it also uses 'user_id'
             executeIdCleanup(conn, "DELETE FROM posts WHERE user_id = ?", userId, false);
-
-            // Safe fallbacks for other tables based on username
-            executeStringCleanup(conn, "DELETE FROM likes WHERE username = ?", username, false);
-            executeStringCleanup(conn, "DELETE FROM comments WHERE username = ?", username, false);
-            executeStringCleanup(conn, "DELETE FROM notifications WHERE recipient = ? OR actor = ?", username, true);
-
+            
+            // [Type Correction: Swapped from String to Integer ID for likes and comments]
+            executeIdCleanup(conn, "DELETE FROM likes WHERE user_id = ?", userId, false);
+            executeIdCleanup(conn, "DELETE FROM comments WHERE user_id = ?", userId, false);
+            
+            // Safe fallback for the notifications table which still uses the username string
+            executeStringCleanup(conn, "DELETE FROM notifications WHERE recipient_user = ? OR actor_user = ?", username, true);
             // STEP 3: Final removal of the user
             try (PreparedStatement pstmt = conn.prepareStatement("DELETE FROM users WHERE username = ?")) {
                 pstmt.setString(1, username);
@@ -115,6 +115,7 @@ public class SettingsSystem {
             System.out.println("Skipped table cleanup: " + e.getMessage());
         }
     }
+
     /* ========================================= */
     /* --- METHOD 3: GHOST RECORD CLEANUP --- */
     /* ========================================= */
@@ -137,6 +138,36 @@ public class SettingsSystem {
             
         } catch (SQLException e) {
             System.out.println("Ghost Cleanup Error: " + e.getMessage());
+        }
+    }
+    /* ========================================= */
+    /* --- METHOD 4: GHOST ACTIVITY CLEANUP --- */
+    /* ========================================= */
+    /**
+     * Scans the database for Orphan Records in likes, comments, and posts, and deletes them.
+     * [Referential Integrity Sweep: A maintenance task that forces a database to clean up 
+     * secondary tables so they perfectly match the main data tables]
+     */
+    public static void removeGhostActivity() {
+        // [NOT IN Clause]: An SQL operator that isolates data that does not have a match in another list
+        String deleteLikes = "DELETE FROM likes WHERE user_id NOT IN (SELECT id FROM users)";
+        String deleteComments = "DELETE FROM comments WHERE user_id NOT IN (SELECT id FROM users)";
+        String deletePosts = "DELETE FROM posts WHERE user_id NOT IN (SELECT id FROM users)";
+        
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement stmtLikes = conn.prepareStatement(deleteLikes);
+             PreparedStatement stmtComments = conn.prepareStatement(deleteComments);
+             PreparedStatement stmtPosts = conn.prepareStatement(deletePosts)) {
+            
+            int likesDeleted = stmtLikes.executeUpdate();
+            int commentsDeleted = stmtComments.executeUpdate();
+            int postsDeleted = stmtPosts.executeUpdate();
+            
+            System.out.println("GHOST ACTIVITY BUSTED: Erased " + likesDeleted + " likes, " + 
+                               commentsDeleted + " comments, and " + postsDeleted + " posts.");
+            
+        } catch (SQLException e) {
+            System.out.println("Ghost Activity Cleanup Error: " + e.getMessage());
         }
     }
 }

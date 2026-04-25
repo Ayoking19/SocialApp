@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Post - SocialApp</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+
+    <div class="welcome-message" id="welcomeMsg">
+        Welcome to our social media website! 
+        <button onclick="dismissWelcome()">Acknowledge</button>
+    </div>
+
+    <div class="overlay-menu" id="fullMenu">
+        <div style="display: flex; justify-content: flex-end;">
+            <span class="material-icons" style="color:#ff3366; cursor:pointer; font-size:40px;" onclick="toggleOverlayMenu()">close</span>
+        </div>
+        <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            <li><a href="search.html">Search</a></li>
+            <li><a href="following.html">Following</a></li>    
+            <li><a href="messages.html">Messages</a></li>    
+            <li><a href="notifications.html">Notifications</a></li>
+            <li><a href="settings.html">Settings</a></li>
+            <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+        </ul>
+    </div>
+
+    <header class="top-bar">
+        <div class="menu-trigger" onclick="toggleOverlayMenu()">
+            <span class="material-icons">menu</span>
+            <span>Menu</span>
+        </div>
+        <div class="logo">Social<span>App</span></div>
+        <div style="width: 50px;"></div> 
+    </header>
+
+    <nav class="bottom-nav">
+        <a href="index.html">
+            <span class="material-icons">home</span>
+        </a>
+        <a href="search.html">
+            <span class="material-icons">search</span>
+        </a>
+        <a href="messages.html"><span class="material-icons">mail</span></a>
+        <a href="notifications.html" id="nav-bell">
+            <span class="material-icons">notifications</span>
+        </a>
+        <a href="profile.html"><span class="material-icons">person</span></a>
+    </nav>
+
+    <div class="container">
+        
+        <main class="feed">
+            <div class="feed-header">
+                <h2 style="cursor: pointer; display: flex; align-items: center; gap: 5px;" onclick="window.history.back()">
+                    <span class="material-icons">arrow_back</span> Back
+                </h2>
+            </div>
+            
+            <div id="singlePostContainer" style="border-bottom: 1px solid #334155; padding-bottom: 10px;">
+                </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon"><span class="material-icons" style="font-size: 40px; color: #ffeb3b;">warning</span></div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you absolutely sure you want to log out of your account?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Yes, Log Out</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="quotesModal" style="display: none;">
+        <div class="modal-card" style="max-width: 450px; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: white;">Quoted By</h3>
+                <button onclick="closeQuotesModal()" style="background: transparent; border: none; color: #ff3366; cursor: pointer; display: flex; align-items: center;"><span class="material-icons">close</span></button>
+            </div>
+            <div id="quotesListContainer" style="overflow-y: auto; flex: 1; padding-right: 10px;">
+                <p style="text-align: center; color: gray;">Loading quotes...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared.js"></script>
+
+    <script>
+        /* 1. INITIAL SECURITY CHECK */
+        checkSecurity(); 
+
+        /* --- WELCOME MESSAGE LOGIC --- */
+        if (sessionStorage.getItem("welcomeAcknowledged") === "true") {
+            const welcomeMsg = document.getElementById('welcomeMsg');
+            if (welcomeMsg) welcomeMsg.style.display = 'none';
+        }
+
+        function dismissWelcome() {
+            document.getElementById('welcomeMsg').style.display = 'none';
+            sessionStorage.setItem("welcomeAcknowledged", "true");
+        }
+
+        /* 2. DYNAMIC ROUTING IGNITION */
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPostId = urlParams.get('id');
+
+        window.onload = function() {
+            if (!currentPostId) {
+                document.getElementById('singlePostContainer').innerHTML = "<p style='color: white; padding: 20px;'>Error: No post selected.</p>";
+            } else {
+                fetchSinglePost(currentPostId);
+            }
+        };
+
+        /* 3. THE SINGLE POST RENDERER */
+        function fetchSinglePost(postId) {
+            fetch(`${API_BASE}/api/getSinglePost`, {
+                method: 'POST',
+                body: JSON.stringify({ postId: postId, currentUser: currentUser })
+            })
+            .then(response => response.json()) 
+            .then(post => {
+                if (!post || post.error) {
+                    document.getElementById('singlePostContainer').innerHTML = "<p style='color: white; padding: 20px;'>Post not found.</p>";
+                    return;
+                }
+
+                let followBadgeHTML = "";
+                if (post.username !== currentUser) {
+                    const btnStyle = post.isFollowing ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);' : '';
+                    const btnText = post.isFollowing ? 'Unfollow' : 'Follow';
+                    followBadgeHTML = `<button class="media-control-btn" style="margin-left: auto; padding: 4px 10px; font-size: 12px; ${btnStyle}" onclick="feedFollowUser(this, '${post.username}')">${btnText}</button>`;
+                }
+
+                let mediaHTML = "";
+                if (post.media && post.media !== "") {
+                    if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
+                        mediaHTML = `<video src="${post.media}" controls style="width: 100%; max-height: 400px; border-radius: 10px; margin-top: 10px; background: #000;"></video>`;
+                    } else {
+                        mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;" alt="Post media">`;
+                    }
+                }
+
+                const quoteBoxHTML = buildQuoteBox(post.parentPost);
+                
+                // [UI FIX]: Ensures the Single Post view highlights Reposts correctly!
+                const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
+                const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
+
+                // --- NEW CRUD INJECTION ---
+                const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                let postEditDeleteHTML = "";
+                if (post.username === currentUser) {
+                    postEditDeleteHTML = `
+                        <span onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
+                            <span class="material-icons" style="font-size: 14px;">edit</span>
+                        </span>
+                        <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Post">
+                            <span class="material-icons" style="font-size: 14px;">delete</span>
+                        </span>
+                    `;
+                }
+
+                const postHTML = `
+                    <div class="post" style="border: none; background: transparent; padding: 0;">
+                        <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                            <img src="${post.avatar}" onclick="window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; cursor: pointer;">
+                            <div style="display: flex; flex-direction: column;">
+                                <div style="display: flex; align-items: center;">
+                                    <a href="profile.html?user=${post.username}" style="color: white; text-decoration: none;"><strong>${post.username}</strong></a>
+                                    ${editedTag}
+                                    ${postEditDeleteHTML}
+                                </div>
+                                <span class="time-stamp" style="font-size: 12px; color: gray;">${post.timestamp}</span>
+                            </div>
+                            ${followBadgeHTML}
+                        </div>
+                        
+                        <div class="post-content" style="font-size: 18px; line-height: 1.5; margin-top: 15px;">
+                            <p>${post.content}</p>
+                            ${mediaHTML}
+                            ${quoteBoxHTML}
+                        </div>
+                        
+                        <div class="post-actions" style="display: flex; gap: 15px; margin-top: 20px; border-top: 1px solid #334155; padding-top: 15px; color: gray; flex-wrap: wrap;">
+                            <span onclick="toggleLike(this, ${post.id})" class="action-btn like-btn" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; ${likeColorStyle}">
+                                <span class="material-icons" style="font-size: 18px;">favorite</span> 
+                                <span class="like-count">${post.likes}</span> Likes
+                            </span>
+                            
+                            <span class="repost-btn" onclick="openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; border-radius: 20px; ${repostColorStyle}">
+                                <span class="material-icons" style="font-size: 18px;">repeat</span>
+                                <span class="repost-count">${post.pureRepostCount}</span> Reposts
+                            </span>
+
+                            <span class="quote-btn" onclick="openQuotesModal(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; background: rgba(0, 230, 118, 0.05); color: #00e676; border-radius: 20px;">
+                                <span class="material-icons" style="font-size: 18px;">format_quote</span>
+                                <span class="quote-count">${post.quoteCount}</span> Quotes
+                            </span>
+                        </div>
+                        
+                        <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                            <div id="comment-list-${post.id}" style="margin-bottom: 10px; max-height: none;">
+                                <p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                <button onclick="submitComment(${post.id})" class="media-control-btn">Post</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('singlePostContainer').innerHTML = postHTML;
+                loadComments(postId);
+            })
+            .catch(error => {
+                console.error("Error fetching single post:", error);
+                document.getElementById('singlePostContainer').innerHTML = "<p style='color: white; padding: 20px;'>Post not found or deleted.</p>";
+            });
+        }
+
+        /* 4. THE QUOTES MODAL ENGINE */
+        function openQuotesModal(postId) {
+            document.getElementById('quotesModal').style.display = 'flex';
+            const container = document.getElementById('quotesListContainer');
+            container.innerHTML = "<p style='text-align: center; color: #00e676;'>Loading quotes...</p>";
+
+            fetch(`${API_BASE}/api/getPostQuotes`, {
+                method: 'POST',
+                body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
+            })
+            .then(res => res.json())
+            .then(posts => {
+                if (posts.length === 0) {
+                    container.innerHTML = "<p style='text-align: center; color: gray;'>No quotes yet.</p>";
+                    return;
+                }
+                
+                // Batch injection fix!
+                let quotesHTML = "";
+                posts.forEach(post => {
+                    let mediaHTML = "";
+                    if (post.media && post.media !== "") {
+                        mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
+                    }
+                    quotesHTML += `
+                        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <img src="${post.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+                                <strong style="color: white;">${post.username}</strong>
+                                <span style="color: gray; font-size: 12px; margin-left: auto;">${post.timestamp}</span>
+                            </div>
+                            <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
+                            ${mediaHTML}
+                        </div>
+                    `;
+                });
+                container.innerHTML = quotesHTML;
+            });
+        }
+
+        function closeQuotesModal() {
+            document.getElementById('quotesModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

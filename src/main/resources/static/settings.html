@@ -9,22 +9,22 @@
 </head>
 <body>
 
-    <!-- 1. THE OVERLAY MENU -->
     <div class="overlay-menu" id="fullMenu">
         <div class="menu-header">
             <span class="material-icons close-btn" onclick="toggleOverlayMenu()">close</span>
         </div>
-        <ul class="overlay-links">
+        <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
             <li><a href="index.html">Home</a></li>
-            <li><a href="following.html">Following</a></li>
-            <li><a href="search.html">Search</a></li>
             <li><a href="profile.html">Profile</a></li>
+            <li><a href="search.html">Search</a></li>
+            <li><a href="following.html">Following</a></li> 
+            <li><a href="messages.html">Messages</a></li>       
+            <li><a href="notifications.html">Notifications</a></li>
             <li><a href="settings.html">Settings</a></li>
             <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
         </ul>
     </div>
 
-    <!-- 2. THE TOP BAR -->
     <header class="top-bar">
         <div class="menu-trigger" onclick="toggleOverlayMenu()">
             <span class="material-icons">menu</span>
@@ -37,7 +37,6 @@
         <main class="feed">
             <div class="feed-header"><h2>Account Settings</h2></div>
 
-            <!-- CHANGE PASSWORD SECTION -->
             <div class="post">
                 <h3 style="color: #00e676; margin-bottom: 20px;">Change Password</h3>
                 <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -49,7 +48,6 @@
                 <p id="passwordStatus" style="margin-top: 10px; font-size: 14px;"></p>
             </div>
 
-            <!-- DANGER ZONE -->
             <div class="post" style="border: 1px solid rgba(255, 51, 102, 0.3);">
                 <h3 style="color: #ff3366; margin-bottom: 10px;">Danger Zone</h3>
                 <p style="color: #a09eb5; font-size: 14px; margin-bottom: 20px;">
@@ -60,7 +58,6 @@
         </main>
     </div>
 
-    <!-- 3. THE CUSTOM DELETE MODAL (Design Consistency) -->
     <div class="modal-overlay" id="deleteModal" style="display: none;">
         <div class="modal-card" style="border: 1px solid #ff3366;">
             <div class="modal-icon">☢️</div>
@@ -73,7 +70,6 @@
         </div>
     </div>
 
-    <!-- 4. LOGOUT MODAL (Standardized) -->
     <div class="modal-overlay" id="logoutModal" style="display: none;">
         <div class="modal-card">
             <div class="modal-icon">⚠️</div>
@@ -89,6 +85,7 @@
     <nav class="bottom-nav">
         <a href="index.html"><span class="material-icons">home</span></a>
         <a href="search.html"><span class="material-icons">search</span></a>
+        <a href="messages.html" id="nav-mail"><span class="material-icons">mail</span></a>
         <a href="notifications.html"><span class="material-icons">notifications</span></a>
         <a href="profile.html"><span class="material-icons">person</span></a>
     </nav>
@@ -110,7 +107,7 @@
                 return;
             }
 
-            fetch('http://localhost:8080/api/updatePassword', {
+            fetch(`${API_BASE}/api/updatePassword`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser, currentPassword: currentPass, newPassword: newPass })
             })
@@ -147,7 +144,7 @@
             deleteBtn.innerText = "Erasing Data...";
             deleteBtn.disabled = true;
 
-            fetch('http://localhost:8080/api/deleteAccount', {
+            fetch(`${API_BASE}/api/deleteAccount`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser })
             })
@@ -156,6 +153,7 @@
                 if (data === "SUCCESS") {
                     // [Session Termination]: Clearing local data so the user is logged out immediately.
                     sessionStorage.clear();
+                    localStorage.removeItem("loggedInUser");
                     window.location.href = "login.html";
                 } else {
                     alert("Account deletion failed. Please try again or check your server logs.");

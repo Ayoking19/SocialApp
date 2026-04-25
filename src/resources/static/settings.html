@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocialApp - Settings</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+
+    <div class="overlay-menu" id="fullMenu">
+        <div class="menu-header">
+            <span class="material-icons close-btn" onclick="toggleOverlayMenu()">close</span>
+        </div>
+        <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            <li><a href="search.html">Search</a></li>
+            <li><a href="following.html">Following</a></li> 
+            <li><a href="messages.html">Messages</a></li>       
+            <li><a href="notifications.html">Notifications</a></li>
+            <li><a href="settings.html">Settings</a></li>
+            <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+        </ul>
+    </div>
+
+    <header class="top-bar">
+        <div class="menu-trigger" onclick="toggleOverlayMenu()">
+            <span class="material-icons">menu</span>
+            <span>Menu</span>
+        </div>
+        <div class="logo">Social<span>App</span></div>
+    </header>
+
+    <div class="container">
+        <main class="feed">
+            <div class="feed-header"><h2>Account Settings</h2></div>
+
+            <div class="post">
+                <h3 style="color: #00e676; margin-bottom: 20px;">Change Password</h3>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="password" id="currentPass" placeholder="Current Password" class="comment-input" style="width: 100%;">
+                    <input type="password" id="newPass" placeholder="New Password" class="comment-input" style="width: 100%;">
+                    <input type="password" id="confirmPass" placeholder="Confirm New Password" class="comment-input" style="width: 100%;">
+                    <button onclick="updatePassword()" class="main-post-btn">Update Password</button>
+                </div>
+                <p id="passwordStatus" style="margin-top: 10px; font-size: 14px;"></p>
+            </div>
+
+            <div class="post" style="border: 1px solid rgba(255, 51, 102, 0.3);">
+                <h3 style="color: #ff3366; margin-bottom: 10px;">Danger Zone</h3>
+                <p style="color: #a09eb5; font-size: 14px; margin-bottom: 20px;">
+                    Once you delete your account, there is no going back.
+                </p>
+                <button onclick="showDeleteModal()" class="modal-confirm-btn" style="width: 100%;">Delete My Account</button>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="deleteModal" style="display: none;">
+        <div class="modal-card" style="border: 1px solid #ff3366;">
+            <div class="modal-icon">☢️</div>
+            <h3 style="color: #ff3366;">Final Warning</h3>
+            <p>Are you 100% sure? This will permanently erase your posts, profile, and data from SocialApp.</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeDelete()">Erase Everything</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you sure you want to log out?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Log Out</button>
+            </div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="index.html"><span class="material-icons">home</span></a>
+        <a href="search.html"><span class="material-icons">search</span></a>
+        <a href="messages.html"><span class="material-icons">mail</span></a>
+        <a href="notifications.html"><span class="material-icons">notifications</span></a>
+        <a href="profile.html"><span class="material-icons">person</span></a>
+    </nav>
+
+    <script src="shared.js"></script>
+    <script>
+        checkSecurity();
+
+        /* --- PASSWORD LOGIC --- */
+        function updatePassword() {
+            const currentPass = document.getElementById('currentPass').value;
+            const newPass = document.getElementById('newPass').value;
+            const confirmPass = document.getElementById('confirmPass').value;
+            const status = document.getElementById('passwordStatus');
+
+            if (newPass !== confirmPass) {
+                status.innerText = "New passwords do not match!";
+                status.style.color = "#ff3366";
+                return;
+            }
+
+            fetch(`${API_BASE}/api/updatePassword`, {
+                method: 'POST',
+                body: JSON.stringify({ username: currentUser, currentPassword: currentPass, newPassword: newPass })
+            })
+            .then(res => res.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    status.innerText = "Password updated successfully!";
+                    status.style.color = "#00e676";
+                    document.querySelectorAll('input[type="password"]').forEach(i => i.value = "");
+                } else {
+                    status.innerText = "Incorrect current password.";
+                    status.style.color = "#ff3366";
+                }
+            });
+        }
+
+        /* --- CUSTOM DELETE MODAL LOGIC --- */
+        function showDeleteModal() {
+            const menu = document.getElementById('fullMenu');
+            if (menu) menu.classList.remove('open'); // Safety check
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        /* --- UPDATED DELETE LOGIC --- */
+        function executeDelete() {
+            const deleteBtn = document.querySelector('.modal-confirm-btn');
+            const originalText = deleteBtn.innerText;
+            
+            // 1. Give visual feedback that the request started
+            deleteBtn.innerText = "Erasing Data...";
+            deleteBtn.disabled = true;
+
+            fetch(`${API_BASE}/api/deleteAccount`, {
+                method: 'POST',
+                body: JSON.stringify({ username: currentUser })
+            })
+            .then(res => res.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    // [Session Termination]: Clearing local data so the user is logged out immediately.
+                    sessionStorage.clear();
+                    localStorage.removeItem("loggedInUser");
+                    window.location.href = "login.html";
+                } else {
+                    alert("Account deletion failed. Please try again or check your server logs.");
+                    deleteBtn.innerText = originalText;
+                    deleteBtn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error("Network Error:", err);
+                alert("Could not reach the server. Make sure your Java application is running.");
+                deleteBtn.innerText = originalText;
+                deleteBtn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>

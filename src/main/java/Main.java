@@ -15,8 +15,8 @@ import java.nio.file.Files;
 public class Main {
     
     public static void main(String[] args) {
-        // [Initialization Trigger: Code that executes automatically when the application starts]
-SettingsSystem.removeGhostFollowers();
+        SettingsSystem.removeGhostFollowers();
+        SettingsSystem.removeGhostActivity();
         
         System.out.println("=== Starting Social Media Backend ===");
         DatabaseManager.initializeDatabase();
@@ -90,7 +90,35 @@ SettingsSystem.removeGhostFollowers();
                         String content = extractJsonValue(body, "content");
                         String media = extractJsonValue(body, "media");
                         
-                        boolean success = PostSystem.createPost(username, content, media);
+                        Integer parentPostId = null;
+                        if (body.contains("\"parentPostId\":")) {
+                            int startIndex = body.indexOf("\"parentPostId\":") + 15;
+                            int endIndex = body.indexOf(",", startIndex);
+                            if (endIndex == -1) endIndex = body.indexOf("}", startIndex);
+                            
+                            String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
+                            if (!rawId.equals("null") && !rawId.isEmpty()) {
+                                try { 
+                                    parentPostId = Integer.parseInt(rawId); 
+                                } catch (NumberFormatException e) {}
+                            }
+                        }
+
+                        Integer parentCommentId = null;
+                        if (body.contains("\"parentCommentId\":")) {
+                            int startIndex = body.indexOf("\"parentCommentId\":") + 18;
+                            int endIndex = body.indexOf(",", startIndex);
+                            if (endIndex == -1) endIndex = body.indexOf("}", startIndex);
+                            
+                            String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
+                            if (!rawId.equals("null") && !rawId.isEmpty()) {
+                                try { 
+                                    parentCommentId = Integer.parseInt(rawId); 
+                                } catch (NumberFormatException e) {}
+                            }
+                        }
+                        
+                        boolean success = PostSystem.createPost(username, content, media, parentPostId, parentCommentId);
                         String response = success ? "SUCCESS" : "FAILURE";
                         
                         exchange.sendResponseHeaders(200, response.length());
@@ -523,7 +551,10 @@ SettingsSystem.removeGhostFollowers();
                     }
                 }
             });
+
+            /* ========================================= */
             /* --- 21. THE CLEAR NOTIFICATIONS ENDPOINT --- */
+            /* ========================================= */
             server.createContext("/api/markNotificationsRead", new HttpHandler() {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
@@ -534,7 +565,6 @@ SettingsSystem.removeGhostFollowers();
                         
                         String username = extractJsonValue(body, "username");
                         
-                        // Execute the clearing logic
                         NotificationSystem.markNotificationsAsRead(username);
                         
                         String response = "SUCCESS";
@@ -544,6 +574,7 @@ SettingsSystem.removeGhostFollowers();
                     }
                 }
             });
+
             /* ========================================= */
             /* --- 22. THE PASSWORD UPDATE ENDPOINT --- */
             /* ========================================= */
@@ -591,108 +622,370 @@ SettingsSystem.removeGhostFollowers();
                     }
                 }
             });
-            // Inside your Main.java, add this context alongside your other API routes
-server.createContext("/", new HttpHandler() {
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        // [URI Path: The specific address requested after the domain name, such as /index.html]
-        String path = exchange.getRequestURI().getPath();
-        if (path.equals("/")) path = "/index.html"; // Default to index
 
-        // This points to your 'static' folder in your project resources
-        File file = new File("src/main/resources/static" + path);
+            /* ========================================= */
+            /* --- 24. THE QUOTES ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/getPostQuotes", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String postId = extractJsonValue(body, "postId");
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = PostSystem.getPostQuotes(postId, currentUser);
+                        
+                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(jsonResponse.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-        if (file.exists()) {
-            byte[] bytes = Files.readAllBytes(file.toPath());
-            
-            // Set the correct [MIME Type: A label used to tell the browser what kind of file it is receiving, such as 'text/html' or 'text/css']
-            String contentType = "text/html";
-            if (path.endsWith(".css")) contentType = "text/css";
-            if (path.endsWith(".js")) contentType = "application/javascript";
-            
-            exchange.getResponseHeaders().set("Content-Type", contentType);
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        } else {
-            // [404 Error: The standard HTTP response code used to indicate that the requested file could not be found on the server]
-            String error = "404 Not Found";
-            exchange.sendResponseHeaders(404, error.length());
-            exchange.getResponseBody().write(error.getBytes());
-            exchange.getResponseBody().close();
-        }
-    }
-});
-server.createContext("/", new HttpHandler() {
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        String path = exchange.getRequestURI().getPath();
-        if (path.equals("/")) path = "/index.html";
+            /* ========================================= */
+            /* --- 25. THE USER QUOTES ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/getUserQuotes", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String targetUser = extractJsonValue(body, "targetUser");
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = PostSystem.getUserQuotes(targetUser, currentUser);
+                        
+                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(jsonResponse.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-        // [File Pathing: The process of telling the computer exactly where to find a file on your hard drive]
-        File file = new File("src/main/resources/static" + path);
+            /* ========================================= */
+            /* --- 26. THE USER REPOSTS ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/getUserReposts", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String targetUser = extractJsonValue(body, "targetUser");
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = PostSystem.getUserReposts(targetUser, currentUser);
+                        
+                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(jsonResponse.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-        if (file.exists()) {
-            byte[] bytes = Files.readAllBytes(file.toPath());
-            String contentType = "text/html";
-            if (path.endsWith(".css")) contentType = "text/css";
-            if (path.endsWith(".js")) contentType = "application/javascript";
-            
-            exchange.getResponseHeaders().set("Content-Type", contentType);
-            exchange.sendResponseHeaders(200, bytes.length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        } else {
-            exchange.sendResponseHeaders(404, -1);
-        }
-    }
-});
-// [Context Creation]: Telling the server to listen for any request starting with "/"
-server.createContext("/", new HttpHandler() {
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-        // 1. Get the path from the URL (e.g., "/settings.html")
-        String path = exchange.getRequestURI().getPath();
-        
-        // 2. Default to index.html if the path is just "/"
-        if (path.equals("/")) {
-            path = "/index.html";
-        }
+            /* ========================================= */
+            /* --- 27. THE EDIT POST ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/editPost", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        int postId = Integer.parseInt(extractJsonValue(body, "postId"));
+                        String content = extractJsonValue(body, "content");
+                        
+                        boolean success = PostSystem.editPost(username, postId, content);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-        // 3. Point to your static folder
-        // [Relative Path: A file location based on the current working directory of the program]
-        File file = new File("src/main/resources/static" + path);
+            /* ========================================= */
+            /* --- 28. THE DELETE POST ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/deletePost", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        int postId = Integer.parseInt(extractJsonValue(body, "postId"));
+                        
+                        boolean success = PostSystem.deletePost(username, postId);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-        if (file.exists() && !file.isDirectory()) {
-            // [Byte Array: A collection of raw data bits that represent the contents of a file]
-            byte[] bytes = Files.readAllBytes(file.toPath());
+            /* ========================================= */
+            /* --- 29. THE EDIT COMMENT ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/editComment", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        int commentId = Integer.parseInt(extractJsonValue(body, "commentId"));
+                        String content = extractJsonValue(body, "content");
+                        
+                        boolean success = PostSystem.editComment(username, commentId, content);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-            // 4. Set the correct MIME Type so the browser knows how to render the file
-            String contentType = "text/html";
-            if (path.endsWith(".css")) contentType = "text/css";
-            else if (path.endsWith(".js")) contentType = "application/javascript";
-            else if (path.endsWith(".png")) contentType = "image/png";
-            else if (path.endsWith(".jpg")) contentType = "image/jpeg";
+            /* ========================================= */
+            /* --- 30. THE DELETE COMMENT ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/deleteComment", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        int commentId = Integer.parseInt(extractJsonValue(body, "commentId"));
+                        
+                        boolean success = PostSystem.deleteComment(username, commentId);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
 
-            exchange.getResponseHeaders().set("Content-Type", contentType);
-            exchange.sendResponseHeaders(200, bytes.length);
-            
-            // [Output Stream: The 'pipe' used to send data from the server back to the client]
-            OutputStream os = exchange.getResponseBody();
-            os.write(bytes);
-            os.close();
-        } else {
-            // [404 Not Found: The standard error code for a requested resource that does not exist]
-            String response = "404 File Not Found";
-            exchange.sendResponseHeaders(404, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-});
+            /* ========================================= */
+            /* --- 31. THE TOGGLE COMMENT LIKE ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/toggleCommentLike", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        int commentId = Integer.parseInt(extractJsonValue(body, "commentId"));
+                        
+                        String response = PostSystem.toggleCommentLike(username, commentId);
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 32. THE COMMENT QUOTES ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/getCommentQuotes", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String commentId = extractJsonValue(body, "commentId");
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = PostSystem.getCommentQuotes(commentId, currentUser);
+                        
+                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(jsonResponse.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 33. THE SEND MESSAGE ENDPOINT ---     */
+            /* ========================================= */
+            server.createContext("/api/sendMessage", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String sender = extractJsonValue(body, "sender");
+                        String receiver = extractJsonValue(body, "receiver");
+                        String content = extractJsonValue(body, "content");
+                        String media = extractJsonValue(body, "media"); // Extracting the image!
+                        
+                        String response = MessageSystem.sendMessage(sender, receiver, content, media);
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 34. THE CHAT HISTORY ENDPOINT ---     */
+            /* ========================================= */
+            server.createContext("/api/getChatHistory", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String targetUser = extractJsonValue(body, "targetUser");
+                        
+                        String jsonResponse = MessageSystem.getChatHistory(currentUser, targetUser);
+                        
+                        exchange.getResponseHeaders().add("Content-Type", "application/json");
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 35. THE INBOX (ACTIVE CHATS) ENDPOINT */
+            /* ========================================= */
+            server.createContext("/api/getInbox", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = MessageSystem.getInbox(currentUser);
+                        
+                        exchange.getResponseHeaders().add("Content-Type", "application/json");
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 36. THE UNREAD MESSAGE COUNT ENDPOINT */
+            /* ========================================= */
+            server.createContext("/api/getUnreadCount", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        
+                        String jsonResponse = MessageSystem.getGlobalUnreadCount(currentUser);
+                        
+                        exchange.getResponseHeaders().add("Content-Type", "application/json");
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 37. THE STATIC FILE ROUTER (CLEANED) --- */
+            /* ========================================= */
+            server.createContext("/", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    String path = exchange.getRequestURI().getPath();
+                    
+                    if (path.equals("/")) {
+                        path = "/index.html";
+                    }
+
+                    File file = new File("src/main/resources/static" + path);
+
+                    if (file.exists() && !file.isDirectory()) {
+                        byte[] bytes = Files.readAllBytes(file.toPath());
+
+                        String contentType = "text/html";
+                        if (path.endsWith(".css")) contentType = "text/css";
+                        else if (path.endsWith(".js")) contentType = "application/javascript";
+                        else if (path.endsWith(".png")) contentType = "image/png";
+                        else if (path.endsWith(".jpg")) contentType = "image/jpeg";
+
+                        exchange.getResponseHeaders().set("Content-Type", contentType);
+                        exchange.sendResponseHeaders(200, bytes.length);
+                        
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(bytes);
+                        os.close();
+                    } else {
+                        String response = "404 File Not Found";
+                        exchange.sendResponseHeaders(404, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+                     
 
             server.setExecutor(null);
             server.start();

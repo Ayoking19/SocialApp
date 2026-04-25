@@ -5,65 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications - SocialApp</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <!-- 1. The Head: Access to the Icon Library -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<!-- THE HIDDEN MENU (Must exist for the button to work!) -->
-<div class="overlay-menu" id="fullMenu">
-    <div style="display: flex; justify-content: flex-end;">
-        <span class="material-icons" style="color:#ff3366; cursor:pointer; font-size:40px;" onclick="toggleOverlayMenu()">close</span>
-    </div>
-    <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
-        <li><a href="index.html">Home</a></li>
-        <li><a href="profile.html">Profile</a></li>
-        <li><a href="search.html">Search</a></li>
-        <li><a href="following.html">Following</a></li>        
-        <li><a href="notifications.html">Notifications</a></li>
-        <li><a href="settings.html">Settings</a></li>
-        <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
-    </ul>
-</div>
-
-<header class="top-bar">
-    <div class="menu-trigger" onclick="toggleOverlayMenu()">
-        <span class="material-icons">menu</span>
-        <span>Menu</span>
-    </div>
-    <div class="logo">Social<span>App</span></div>
-    <div style="width: 50px;"></div> <!-- Placeholder for balance -->
-</header>
-<!-- 2. The Top Bar -->
-<header class="top-bar">
-    <div class="menu-trigger" onclick="toggleOverlayMenu()">
-        <span class="material-icons">menu</span>
-        <span>Menu</span>
-    </div>
     
-    <div class="logo">Social<span>App</span></div>
-    
-    <!-- Empty div for grid symmetry -->
-    <div></div>
-</header>
+    <div class="overlay-menu" id="fullMenu">
+        <div style="display: flex; justify-content: flex-end;">
+            <span class="material-icons" style="color:#ff3366; cursor:pointer; font-size:40px;" onclick="toggleOverlayMenu()">close</span>
+        </div>
+        <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            <li><a href="search.html">Search</a></li>
+            <li><a href="following.html">Following</a></li>    
+            <li><a href="messages.html">Messages</a></li>    
+            <li><a href="notifications.html">Notifications</a></li>
+            <li><a href="settings.html">Settings</a></li>
+            <li><a href="#" class="logout" onclick="openLogoutModal()">Log Out</a></li>
+        </ul>
+    </div>
 
-<!-- 3. The Bottom Nav -->
-<nav class="bottom-nav">
-    <a href="index.html">
-        <span class="material-icons">home</span>
-    </a>
-    <a href="search.html">
-        <span class="material-icons">search</span>
-    </a>
-    <a href="notifications.html" id="nav-bell">
-        <span class="material-icons">notifications</span>
-        <!-- Badge will be injected here by shared.js -->
-    </a>
-    <a href="profile.html"><span class="material-icons">person</span></a>
-</nav>
+    <header class="top-bar">
+        <div class="menu-trigger" onclick="toggleOverlayMenu()">
+            <span class="material-icons">menu</span>
+            <span>Menu</span>
+        </div>
+        <div class="logo">Social<span>App</span></div>
+        <div style="width: 50px;"></div> 
+    </header>
+
+    <nav class="bottom-nav">
+        <a href="index.html">
+            <span class="material-icons">home</span>
+        </a>
+        <a href="search.html">
+            <span class="material-icons">search</span>
+        </a>
+        <a href="messages.html" id="nav-mail"><span class="material-icons">mail</span></a>
+        <a href="notifications.html" id="nav-bell">
+            <span class="material-icons">notifications</span>
+        </a>
+        <a href="profile.html"><span class="material-icons">person</span></a>
+    </nav>
+    
     <div class="container">
-        
         <main class="feed">
             <div class="feed-header"><h2>Notifications</h2></div>
             <div id="notificationList" class="feed-container">
@@ -72,18 +57,28 @@
         </main>
     </div>
 
+    <div class="modal-overlay" id="logoutModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon"><span class="material-icons" style="font-size: 40px; color: #ffeb3b;">warning</span></div>
+            <h3>Leaving so soon?</h3>
+            <p>Are you absolutely sure you want to log out of your account?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-confirm-btn" onclick="executeLogout()">Yes, Log Out</button>
+            </div>
+        </div>
+    </div>
+
     <script src="shared.js"></script>
     <script>
-        checkSecurity(); // Global check from shared.js
+        checkSecurity(); 
 
-        /* [The Janitor]: This function tells the server to clear the badge count */
         function markAsRead() {
-            fetch('http://localhost:8080/api/markNotificationsRead', {
+            fetch(`${API_BASE}/api/markNotificationsRead`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser })
             })
             .then(() => {
-                // After clearing the DB, we tell shared.js to refresh the bell icon immediately
                 if (typeof checkNotifications === "function") {
                     checkNotifications();
                 }
@@ -94,7 +89,7 @@
         function loadNotifications() {
             const list = document.getElementById('notificationList');
             
-            fetch('http://localhost:8080/api/getNotifications', {
+            fetch(`${API_BASE}/api/getNotifications`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser })
             })
@@ -105,11 +100,13 @@
                     return;
                 }
                 
-                list.innerHTML = "";
+                // Batch injection fix to prevent scrolling lag
+                let notifHTML = "";
                 data.forEach(n => {
                     let message = "";
-                    let link = `profile.html?user=${n.actor}`;
+                    let link = `profile.html?user=${n.actor}`; 
                     
+                    // [Control Flow Expansion]: Handling the granular notifications!
                     if (n.type === 'LIKE') {
                         message = `liked your post.`;
                         link = `post.html?id=${n.postId}`;
@@ -118,12 +115,32 @@
                     } else if (n.type === 'COMMENT') {
                         message = `commented on your post.`;
                         link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'COMMENT_REPLY') {
+                        message = `replied to a comment you made on a post.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'COMMENT_THREAD') {
+                        message = `also commented on a post you replied to.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'QUOTE') {
+                        message = `quoted your post.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'REPOST') {
+                        message = `reposted your post.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'REPOST_REPOST') {
+                        message = `reposted your repost.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'QUOTE_REPOST') {
+                        message = `quoted your repost.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'MENTION') { // <-- THE NEW TRANSLATOR!
+                        message = `mentioned you in a post.`;
+                        link = `post.html?id=${n.postId}`;
                     }
 
-                    // We use a slight green border for "New" (unread) notifications
                     const borderStyle = n.isRead ? 'border-left: 4px solid transparent' : 'border-left: 4px solid #00e676';
 
-                    list.innerHTML += `
+                    notifHTML += `
                         <div class="post" onclick="window.location.href='${link}'" style="cursor: pointer; ${borderStyle}">
                             <p><strong style="color: #00e676;">@${n.actor}</strong> ${message}</p>
                             <span style="font-size: 11px; color: gray;">${n.timestamp}</span>
@@ -131,7 +148,7 @@
                     `;
                 });
 
-                /* --- CRITICAL: After displaying the list, we mark them as read! --- */
+                list.innerHTML = notifHTML;
                 markAsRead();
             });
         }

@@ -79,21 +79,20 @@ body {
     background: #0b0f1a; 
     border-bottom: 2px solid #00e676; 
     display: flex; 
-    align-items: center; /* Vertically centers the Menu trigger */
+    align-items: center; 
     padding: 0 20px;
     z-index: 2000;
 }
 
-/* THE FIX: Vertical & Horizontal Centering */
 .top-bar .logo {
     position: absolute; 
     left: 50%;
-    top: 50%; /* Moves it to the vertical center of the bar */
-    transform: translate(-50%, -50%); /* Centers it on both X and Y axes */
+    top: 50%; 
+    transform: translate(-50%, -50%); 
     font-size: 24px;
     font-weight: bold;
     white-space: nowrap; 
-    margin-bottom: 0; /* Clears any margins that might push it up or down */
+    margin-bottom: 0; 
     z-index: 10; 
 }
 
@@ -115,7 +114,6 @@ body {
     width: 100%;
     height: 100vh;
     background: rgba(11, 15, 26, 0.98);
-    /* HIGHEST Z-INDEX: Ensures it covers the header and close button is visible */
     z-index: 5000; 
     transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
@@ -132,7 +130,7 @@ body {
     display: flex; 
     justify-content: flex-end; 
     margin-bottom: 30px;
-    padding-top: 10px; /* Pushes the close button away from the very top edge */
+    padding-top: 10px; 
 }
 
 .close-btn { 
@@ -183,7 +181,7 @@ body {
     border: 2px solid #0f172a;
 }
 
-/* --- 6. The Feed & Glassmorphism Posts (Identical to your original) --- */
+/* --- 6. The Feed & Glassmorphism Posts --- */
 .feed {
     flex: 1;
     max-width: 700px; 
@@ -254,20 +252,6 @@ body {
     margin-bottom: 20px;
 }
 
-.post-stats {
-    display: flex;
-    gap: 20px;
-}
-
-.post-stats span {
-    color: #00e676;
-    font-size: 14px;
-    font-weight: 600;
-    background: rgba(0, 230, 118, 0.1);
-    padding: 5px 12px;
-    border-radius: 20px; 
-}
-
 /* --- Comment Section Styling --- */
 .comment-section {
     margin-top: 20px;
@@ -317,7 +301,7 @@ body {
     margin-right: 5px;
 }
 
-/* --- Create Post Box Styling (Identical to your original) --- */
+/* --- Create Post Box Styling --- */
 .create-post-box {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
@@ -436,7 +420,7 @@ textarea {
 }
 
 /* ========================================= */
-/* --- PROFILE PAGE SPECIFIC STYLES (Identical to your original) --- */
+/* --- PROFILE PAGE SPECIFIC STYLES --- */
 /* ========================================= */
 
 .profile-card {
@@ -598,7 +582,7 @@ textarea {
 }
 
 /* ========================================= */
-/* --- MODAL POP-UP STYLES (Identical to your original) --- */
+/* --- MODAL POP-UP STYLES --- */
 /* ========================================= */
 
 .modal-overlay {
@@ -691,7 +675,7 @@ textarea {
 }
 
 /* ========================================= */
-/* --- SEARCH PAGE STYLES (Identical to your original) --- */
+/* --- SEARCH PAGE STYLES --- */
 /* ========================================= */
 
 .search-container {
@@ -758,7 +742,7 @@ textarea {
 }
 
 /* ========================================= */
-/* --- COMMENT SECTION INTERACTIVITY (Identical to your original) --- */
+/* --- COMMENT SECTION INTERACTIVITY --- */
 /* ========================================= */
 
 .comment-input-area:hover,
@@ -796,8 +780,11 @@ textarea {
     transform: translateY(-2px); 
 }
 
-/* --- ENGAGEMENT BUTTONS (LIKE & COMMENT) --- */
-.like-btn, .comment-btn {
+/* ========================================= */
+/* --- ENGAGEMENT BUTTONS (LIKE, COMMENT, REPOST, QUOTE) --- */
+/* ========================================= */
+
+.like-btn, .comment-btn, .repost-btn, .quote-btn {
     padding: 8px 16px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -810,6 +797,7 @@ textarea {
     gap: 5px;
 }
 
+/* Base Shadow Effects */
 .like-btn:hover {
     background: rgba(255, 51, 102, 0.1);
     box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
@@ -821,18 +809,31 @@ textarea {
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
     transform: translateY(-2px);
 }
+
+/* [CSS Pseudo-classes]: The new shadows for the sharing engine! */
+.repost-btn:hover {
+    background: rgba(0, 229, 255, 0.1);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+    color: #00e5ff;
+    transform: translateY(-2px);
+}
+
+.quote-btn:hover {
+    background: rgba(255, 235, 59, 0.1);
+    box-shadow: 0 0 12px rgba(255, 235, 59, 0.4);
+    color: #ffeb3b;
+    transform: translateY(-2px);
+}
+
 /* --- SMART NAVIGATION HIGHLIGHTING --- */
 
-/* This turns the active icon neon green and adds a subtle glow */
 .nav-link-active {
-    color: #00e676 !important; /* Forces the color to neon green */
-    /* [Text-Shadow: A CSS property that adds a glow or shadow effect to text or icons] */
+    color: #00e676 !important; 
     text-shadow: 0 0 10px rgba(0, 230, 118, 0.6); 
-    transform: scale(1.1); /* Makes the active icon slightly larger */
+    transform: scale(1.1); 
     transition: 0.3s ease;
 }
 
-/* Adds a small green dot under the active icon for a premium feel */
 .nav-link-active::after {
     content: '';
     position: absolute;
@@ -872,7 +873,6 @@ textarea {
         z-index: 100; 
     }
 
-    /* THE MOBILE LOGO FIX: It remains centered and aligned */
     .top-bar .logo {
         display: block; 
         font-size: 20px;
