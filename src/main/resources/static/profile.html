@@ -57,7 +57,7 @@
 
                 <div class="profile-details">
                     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <h1 class="profile-display-name" id="displayName" style="margin: 0;">Loading...</h1>
+                        <h1 class="profile-display-name" id="displayName" style="margin: 0;"></h1>
                         
                         <button id="profileFollowBtn" class="media-control-btn" style="display: none;" onclick="executeProfileFollow()">Follow</button>
                         
@@ -68,29 +68,29 @@
                         <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2);">Follows you</span>
                     </div>
 
-                    <p class="profile-username" id="displayUsername" style="margin-top: 5px;">@loading</p>
+                    <p class="profile-username" id="displayUsername" style="margin-top: 5px;"></p>
                     
                     <div class="bio-section">
-                        <p class="bio-text" id="displayBio">Loading bio...</p>
+                        <p class="bio-text" id="displayBio"></p>
                         <button class="edit-bio-btn" id="editBioBtn" onclick="openBioModal()">Edit Bio</button>
                     </div>
 
                     <div class="profile-stats-bar">
                         <div class="stat-box" onclick="openRelationModal('followers')" style="cursor: pointer;">
-                            <span class="stat-number" id="followerCount">0</span>
+                            <span class="stat-number" id="followerCount">-</span>
                             <span class="stat-label">Followers</span>
                         </div>
                         <div class="stat-box" onclick="openRelationModal('following')" style="cursor: pointer;">
-                            <span class="stat-number" id="followingCount">0</span>
+                            <span class="stat-number" id="followingCount">-</span>
                             <span class="stat-label">Following</span>
                         </div>
                         <div class="stat-box">
-                            <span class="stat-number" id="postCount">0</span>
+                            <span class="stat-number" id="postCount">-</span>
                             <span class="stat-label">Posts</span>
                         </div>
                     </div>
                     
-                    <div class="profile-tabs" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                    <div class="profile-tabs">
                         <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
                         <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
                         <button id="tab-replies" class="tab-btn" onclick="showReplies()">Replies</button>
@@ -100,7 +100,7 @@
 
                     <div style="margin-bottom: 20px;">
                         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                            <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; min-width: 0; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
                             <button onclick="executeProfileSearch()" class="media-control-btn" style="display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">search</span></button>
                             <button onclick="clearProfileSearch()" class="media-control-btn" style="background:rgba(255,51,102,0.1); color:#ff3366; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">close</span></button>
                         </div>
@@ -384,8 +384,9 @@
                 document.getElementById("displayName").textContent = profile.username;
                 document.getElementById("displayUsername").textContent = "@" + profile.username;
                 document.getElementById("displayBio").textContent = profile.bio;
-                document.getElementById("followerCount").textContent = profile.followers;
-                document.getElementById("followingCount").textContent = profile.following;
+                
+                // THE FIX: We only update the static Post Count here! 
+                // Followers/Following are handled by loadRelations() to stop the glitch.
                 document.getElementById("postCount").textContent = profile.postCount;
                 document.getElementById("profileImage").src = profile.avatar;
             })
@@ -426,12 +427,13 @@
             })
             .then(response => response.json())
             .then(data => {
+                // THE FIX: This is now the single source of truth for the numbers!
                 document.getElementById("followerCount").textContent = data.followers;
                 document.getElementById("followingCount").textContent = data.following;
                 
                 if (profileUser !== currentUser) {
                     const followBtn = document.getElementById("profileFollowBtn");
-                    const messageBtn = document.getElementById("profileMessageBtn"); // Revealing the Message UI!
+                    const messageBtn = document.getElementById("profileMessageBtn"); 
                     
                     followBtn.style.display = "inline-block";
                     messageBtn.style.display = "inline-block";
