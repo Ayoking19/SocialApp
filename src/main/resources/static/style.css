@@ -14,7 +14,7 @@ body {
     min-height: 100vh;
     padding-top: 70px;
     padding-bottom: 80px;
-    overflow-x: hidden; /* THE FAIL-SAFE: Strictly prevents the page from ever stretching sideways */
+    overflow-x: hidden; 
 }
 
 /* --- 3. The Neon Green Welcome Message --- */
@@ -41,6 +41,7 @@ body {
     cursor: pointer;
     font-weight: bold;
     transition: 0.3s ease;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .welcome-message button:hover {
@@ -55,7 +56,6 @@ body {
 }
 
 /* --- 5. The Glassmorphism Sidebar --- */
-
 .logo {
     font-size: 28px;
     font-weight: 900;
@@ -69,8 +69,6 @@ body {
 }
 
 /* --- THE NAVIGATION OVERHAUL --- */
-
-/* --- THE TOP BAR ENGINE --- */
 .top-bar {
     position: fixed;
     top: 0;
@@ -107,7 +105,7 @@ body {
     z-index: 2100; 
 }
 
-/* --- THE OVERLAY MENU (CLEANED & FIXED) --- */
+/* --- THE OVERLAY MENU --- */
 .overlay-menu {
     position: fixed;
     top: 0;
@@ -138,6 +136,7 @@ body {
     color: #ff3366; 
     cursor: pointer; 
     font-size: 35px; 
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .overlay-links { list-style: none; padding: 0; }
@@ -145,7 +144,7 @@ body {
 .overlay-links a { color: white; text-decoration: none; font-size: 22px; font-weight: bold; transition: 0.2s; }
 .overlay-links a:hover { color: #00e676; padding-left: 10px; }
 
-/* 4. Bottom Nav Icon Fix */
+/* Bottom Nav Icon Fix */
 .bottom-nav {
     position: fixed;
     bottom: 0; left: 0;
@@ -164,12 +163,12 @@ body {
     text-decoration: none;
     position: relative;
 }
-/* PC Hover Effect for Bottom Icons */
+
 .bottom-nav a:hover {
-    color: #00e676; /* Changes the icon color to neon green */
-    text-shadow: 0 0 15px rgba(0, 230, 118, 0.8); /* Creates the glowing shadow */
-    transform: scale(1.1); /* Slightly enlarges the icon */
-    transition: all 0.3s ease; /* Makes the animation smooth */
+    color: #00e676; 
+    text-shadow: 0 0 15px rgba(0, 230, 118, 0.8); 
+    transform: scale(1.1); 
+    transition: all 0.3s ease; 
 }
 
 .bottom-nav .material-icons {
@@ -281,6 +280,7 @@ body {
     border-radius: 10px;
     color: white;
     outline: none; 
+    min-width: 0; /* GEOMETRY LOCK */
 }
 
 .comment-input:focus {
@@ -294,6 +294,7 @@ body {
     border-radius: 10px;
     font-weight: bold;
     cursor: pointer;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .individual-comment {
@@ -328,6 +329,7 @@ body {
     height: 50px;
     border-radius: 50%; 
     object-fit: cover;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 textarea {
@@ -380,6 +382,7 @@ textarea {
     transition: 0.2s;
     padding: 8px;
     border-radius: 50%;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .icon-btn:hover {
@@ -396,6 +399,7 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     transition: 0.3s;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .main-post-btn:hover {
@@ -420,6 +424,7 @@ textarea {
     align-items: center;
     box-shadow: 0 4px 10px rgba(255, 51, 102, 0.4); 
     transition: 0.2s ease;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .remove-media-btn:hover {
@@ -480,6 +485,7 @@ textarea {
     cursor: pointer;
     font-size: 14px;
     transition: 0.3s;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .edit-pic-btn:hover {
@@ -521,6 +527,7 @@ textarea {
     cursor: pointer;
     font-size: 14px;
     transition: 0.3s;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .edit-bio-btn:hover {
@@ -558,8 +565,13 @@ textarea {
     overflow-x: auto; 
     -webkit-overflow-scrolling: touch; 
     scrollbar-width: none; 
-    flex-wrap: nowrap; /* STRICT OVERRIDE: Forbids dropping to a new line */
-    white-space: nowrap; /* STRICT OVERRIDE: Forces text into one horizontal row */
+    flex-wrap: nowrap; 
+    white-space: nowrap; 
+}
+
+/* Chrome/Safari scrollbar hide */
+.profile-tabs::-webkit-scrollbar {
+    display: none; 
 }
 
 .tab-btn {
@@ -571,6 +583,8 @@ textarea {
     padding: 10px 0;
     cursor: pointer;
     transition: 0.3s;
+    flex-shrink: 0; /* GEOMETRY LOCK: STOPS TABS FROM SQUISHING/WRAPPING */
+    white-space: nowrap;
 }
 
 .active-tab {
@@ -663,6 +677,7 @@ textarea {
     cursor: pointer;
     transition: 0.2s;
     flex: 1; 
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .modal-cancel-btn:hover {
@@ -680,6 +695,7 @@ textarea {
     transition: 0.2s;
     flex: 1;
     box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .modal-confirm-btn:hover {
@@ -725,7 +741,7 @@ textarea {
     color: #ffffff;
     font-size: 16px;
     outline: none; 
-    min-width: 0; /* THE OVERRIDE: Forces the input to shrink dynamically on any screen size */
+    min-width: 0; 
 }
 
 .search-btn {
@@ -737,6 +753,7 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     transition: 0.3s;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
 .search-btn:hover {
@@ -773,7 +790,7 @@ textarea {
     transition: 0.3s ease-in-out;
 }
 
-/* --- IMAGE CONTROLS (DOWNLOAD & FULLSCREEN) --- */
+/* --- IMAGE CONTROLS & UNIVERSAL BUTTON FIXES --- */
 .media-control-btn {
     background: rgba(255, 255, 255, 0.05);
     color: #00e676;
@@ -784,8 +801,11 @@ textarea {
     font-weight: bold;
     border: 1px solid rgba(0, 230, 118, 0.3);
     cursor: pointer;
-    display: inline-block; 
+    display: inline-flex; /* Fix alignment */
+    align-items: center;
+    justify-content: center;
     transition: all 0.3s ease; 
+    flex-shrink: 0; /* GEOMETRY LOCK: STOPS PROFILE 'X' AND MESSAGE 'SEND' SQUISHING */
 }
 
 .media-control-btn:hover {
@@ -809,9 +829,9 @@ textarea {
     display: flex;
     align-items: center;
     gap: 5px;
+    flex-shrink: 0; /* GEOMETRY LOCK */
 }
 
-/* Base Shadow Effects */
 .like-btn:hover {
     background: rgba(255, 51, 102, 0.1);
     box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
@@ -824,7 +844,6 @@ textarea {
     transform: translateY(-2px);
 }
 
-/* [CSS Pseudo-classes]: The new shadows for the sharing engine! */
 .repost-btn:hover {
     background: rgba(0, 229, 255, 0.1);
     box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
@@ -838,8 +857,6 @@ textarea {
     color: #ffeb3b;
     transform: translateY(-2px);
 }
-
-/* --- SMART NAVIGATION HIGHLIGHTING --- */
 
 .nav-link-active {
     color: #00e676 !important; 
@@ -862,14 +879,14 @@ textarea {
 }
 
 /* ========================================= */
-/* --- MOBILE RESPONSIVENESS FIXES --- */
+/* --- STRICT MOBILE RESPONSIVENESS --- */
 /* ========================================= */
 
 @media (max-width: 768px) {
     
     .container {
         flex-direction: column; 
-        width: 100%; /* Forces container to match screen width */
+        width: 100%; 
         max-width: 100vw;
     }
 
@@ -914,44 +931,54 @@ textarea {
     }
 
     .feed {
-                height: 100vh;
-                padding-top: 65px;
-                padding-bottom: 70px;
-                display: flex;
-                flex-direction: column;
-                box-sizing: border-box;
-                width: 100%;
-                max-width: 100vw;
-            }
+        height: 100vh;
+        padding-top: 65px;
+        padding-bottom: 70px;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
     .chat-container {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                margin-bottom: 0;
-                border-radius: 0;
-                border: none;
-                height: 100%;
-            }
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0;
+        border-radius: 0;
+        border: none;
+        height: 100%;
+    }
+    
     #chatView {
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-            }
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
     .chat-history {
-                flex: 1;
-                overflow-y: auto;
-                padding-bottom: 20px;
-            }
+        flex: 1;
+        overflow-y: auto;
+        padding-bottom: 20px;
+    }
+    
     .chat-input-area {
-                position: sticky;
-                bottom: 0;
-                background: #0b0f1a;
-                z-index: 10;
-                padding: 10px;
-                width: 100%;
-                box-sizing: border-box;
-            }
+        position: sticky;
+        bottom: 0;
+        background: #0b0f1a;
+        z-index: 10;
+        padding: 10px;
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .chat-input-area input {
+        min-width: 0; /* Ensures input shrinks to give button space */
+    }
 
     .create-post-top {
         flex-direction: column; 
@@ -966,11 +993,13 @@ textarea {
         gap: 15px; 
         justify-content: space-between;
     }
+    
     .profile-tabs {
-        overflow-x: auto; /* Allows wide tabs to scroll horizontally */
-        white-space: nowrap; /* Prevents text from stacking vertically */
+        overflow-x: auto; 
+        white-space: nowrap; 
         padding-bottom: 5px;
     }
+    
     html, body {
         overflow-x: hidden !important;
         max-width: 100vw !important;

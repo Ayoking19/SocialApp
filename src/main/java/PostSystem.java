@@ -8,7 +8,6 @@ import java.util.regex.Pattern;
 
 public class PostSystem {
 
-    // [MACRO]: Automatically redirects interactions from a pure repost to its original parent!
     private static final String TARGET_ID = "(CASE WHEN (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '') AND posts.parent_post_id IS NOT NULL THEN posts.parent_post_id ELSE posts.id END)";
 
     /* ========================================= */
@@ -97,7 +96,6 @@ public class PostSystem {
                     }
                 }
 
-                // [API Upgrade]: We ask the database to return the ID of the post it just created!
                 try (PreparedStatement insertPostStmt = conn.prepareStatement(insertPostSQL, java.sql.Statement.RETURN_GENERATED_KEYS)) {
                     insertPostStmt.setInt(1, userId);
                     insertPostStmt.setString(2, content);
@@ -106,7 +104,6 @@ public class PostSystem {
                     if (parentCommentId != null) insertPostStmt.setInt(5, parentCommentId); else insertPostStmt.setNull(5, java.sql.Types.INTEGER);
                     insertPostStmt.executeUpdate();
 
-                    // --- BACKEND REGEX PARSER: Automatically notify mentioned users! ---
                     try (ResultSet generatedKeys = insertPostStmt.getGeneratedKeys()) {
                         if (generatedKeys.next() && content != null) {
                             int newPostId = generatedKeys.getInt(1);
@@ -150,15 +147,14 @@ public class PostSystem {
     }
 
     /* ========================================= */
-    /* --- FEED & SEARCH UPGRADES ---            */
+    /* --- FEED & SEARCH UPGRADES (OPTIMIZED)--- */
     /* ========================================= */
 
     public static String getFeed(String currentUser, int pageNumber) {
-        
-        // THE PAGINATION MATH
         int limit = 15; 
         int offset = (pageNumber - 1) * limit; 
 
+        // THE UPGRADE: Deferred Join logic. Grabs 15 posts FIRST, then does the heavy lifting.
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
@@ -168,15 +164,40 @@ public class PostSystem {
                           "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
                           "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
                           "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
+                          "FROM (SELECT * FROM posts ORDER BY created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts " +
+                          "JOIN users ON posts.user_id = users.id " +
                           "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
                           "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
                           "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
                           "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "ORDER BY posts.created_at DESC " +
-                          "LIMIT " + limit + " OFFSET " + offset; // THE STRICT DATABASE CONSTRAINT
+                          "ORDER BY posts.created_at DESC";
 
         return executeStandardPostQuery(querySQL, currentUser, null, false);
+    }
+
+    public static String getFollowingFeed(String currentUser, int pageNumber) {
+        int limit = 15; 
+        int offset = (pageNumber - 1) * limit; 
+
+        // THE UPGRADE: Deferred Join logic for Following.
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
+                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
+                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
+                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
+                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
+                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
+                          "1 AS is_following, " + 
+                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
+                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
+                          "FROM (SELECT posts.* FROM posts JOIN followers ON posts.user_id = followers.following_id WHERE followers.follower_id = (SELECT id FROM users WHERE username = ?) ORDER BY posts.created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts " +
+                          "JOIN users ON posts.user_id = users.id " +
+                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
+                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
+                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
+                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                          "ORDER BY posts.created_at DESC";
+
+        return executeStandardPostQuery(querySQL, currentUser, null, true);
     }
 
     public static String getUserPosts(String targetUsername, String currentUser) {
@@ -241,41 +262,16 @@ public class PostSystem {
         return executeStandardPostQuery(querySQL, currentUser, targetUsername, false);
     }
 
-    public static String getFollowingFeed(String currentUser, int pageNumber) {
-        
-        // THE PAGINATION MATH
-        int limit = 15; 
-        int offset = (pageNumber - 1) * limit; 
-
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "1 AS is_following, " + 
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "JOIN followers ON posts.user_id = followers.following_id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE followers.follower_id = (SELECT id FROM users WHERE username = ?) ORDER BY posts.created_at DESC " +
-                          "LIMIT " + limit + " OFFSET " + offset; // THE STRICT DATABASE CONSTRAINT
-
-        return executeStandardPostQuery(querySQL, currentUser, null, true);
-    }
-
     private static String executeStandardPostQuery(String querySQL, String currentUser, String param3, boolean bypassFollowCheck) {
         StringBuilder jsonBuilder = new StringBuilder("[");
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
             
             if (bypassFollowCheck) {
+                // Modified bound parameters because the Deferred Join changes exactly where the variables sit in the string
                 pstmt.setString(1, currentUser);
                 pstmt.setString(2, currentUser);
                 pstmt.setString(3, currentUser);
+                pstmt.setString(4, currentUser); 
             } else {
                 pstmt.setString(1, currentUser);
                 pstmt.setString(2, currentUser);
@@ -353,7 +349,6 @@ public class PostSystem {
     }
 
     public static String getSinglePost(String postId, String currentUser) {
-        // FIX: Added 'AND p2.parent_comment_id IS NULL' to quote_count and pure_repost_count to prevent comment inflation!
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
@@ -410,7 +405,6 @@ public class PostSystem {
     }
 
     public static String getPostQuotes(String postId, String currentUser) {
-        // FIX: Now explicitly excludes comment quotes by checking parent_comment_id IS NULL
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.is_edited " +
                           "FROM posts JOIN users ON posts.user_id = users.id " +
                           "WHERE posts.parent_post_id = ? AND posts.parent_comment_id IS NULL AND ((posts.content IS NOT NULL AND trim(posts.content) != '') OR (posts.image_url IS NOT NULL AND trim(posts.image_url) != '')) " +
@@ -462,7 +456,6 @@ public class PostSystem {
         StringBuilder jsonBuilder = new StringBuilder("[");
         Pattern strictWordPattern = Pattern.compile("\\b" + Pattern.quote(searchQuery) + "\\b", Pattern.CASE_INSENSITIVE);
         
-        // FIX: Excluded comments from repost_count math!
         String searchSQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                            "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
                            "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
@@ -599,7 +592,6 @@ public class PostSystem {
         StringBuilder jsonBuilder = new StringBuilder("[");
         java.util.regex.Pattern strictWordPattern = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(searchQuery) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
 
-        // FIX: Excluded comments from repost_count math!
         String searchSQL = "SELECT DISTINCT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                            "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
                            "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
@@ -795,7 +787,6 @@ public class PostSystem {
             int affectedRows = pstmt.executeUpdate();
             
             if (affectedRows > 0 && content != null) {
-                // --- BACKEND REGEX PARSER: Notify mentioned users in comments! ---
                 java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@(\\w+)").matcher(content);
                 while (matcher.find()) {
                     String mentionedUser = matcher.group(1);
