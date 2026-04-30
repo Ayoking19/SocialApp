@@ -142,11 +142,13 @@ public class Main {
                         
                         String currentUser = extractJsonValue(body, "currentUser");
                         
-                        // Extract the page number from the frontend (defaulting to Page 1 if missing)
+                        // THE EXTRACTION: Safely pull the requested page number from the JSON
                         String pageStr = extractJsonValue(body, "page");
+                        
+                        // THE FALLBACK: If the frontend doesn't send a page number, default to Page 1
                         int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
                         
-                        // Pass both arguments to the newly updated engine
+                        // THE HANDOFF: Pass both the user and the page number to the newly upgraded engine
                         String jsonResponse = PostSystem.getFeed(currentUser, page);
                         
                         exchange.sendResponseHeaders(200, jsonResponse.length());
@@ -426,7 +428,15 @@ public class Main {
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
                         String currentUser = extractJsonValue(body, "currentUser");
-                        String jsonResponse = PostSystem.getFollowingFeed(currentUser);
+                        
+                        // THE EXTRACTION: Safely pull the requested page number from the JSON
+                        String pageStr = extractJsonValue(body, "page");
+                        
+                        // THE FALLBACK: If the frontend doesn't send a page number, default to Page 1
+                        int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
+                        
+                        // THE HANDOFF: Pass both the user and the page number to the newly upgraded engine
+                        String jsonResponse = PostSystem.getFollowingFeed(currentUser, page);
                         
                         exchange.sendResponseHeaders(200, jsonResponse.length());
                         OutputStream os = exchange.getResponseBody();

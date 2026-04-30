@@ -555,6 +555,11 @@ textarea {
     gap: 20px;
     margin-bottom: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+    scrollbar-width: none; 
+    flex-wrap: nowrap; /* STRICT OVERRIDE: Forbids dropping to a new line */
+    white-space: nowrap; /* STRICT OVERRIDE: Forces text into one horizontal row */
 }
 
 .tab-btn {
@@ -965,5 +970,10 @@ textarea {
         overflow-x: auto; /* Allows wide tabs to scroll horizontally */
         white-space: nowrap; /* Prevents text from stacking vertically */
         padding-bottom: 5px;
+    }
+    html, body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
     }
 }

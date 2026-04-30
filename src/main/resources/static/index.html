@@ -84,9 +84,13 @@
     <script src="shared.js"></script>
 
     <script>
+        /* --- PAGINATION STATE MACHINE --- */
+        let currentPage = 1;
+        let isFetching = false; 
+        let hasMorePosts = true; 
+
         /* --- 1. INITIAL SECURITY & SETUP --- */
         checkSecurity(); 
-        loadFeed();
         loadCurrentUserInfo();
 
         function loadCurrentUserInfo() {
@@ -148,21 +152,33 @@
             document.getElementById('videoUpload').value = ""; 
         }
 
-        /* --- 4. FEED RENDERER (Optimized with DOM Batching) --- */
+        /* --- 4. FEED RENDERER (Optimized with DOM Batching & Pagination) --- */
         function loadFeed() {
+            // THE LOCK: Stop if we are already fetching or if the database is empty
+            if (isFetching || !hasMorePosts) return;
+            isFetching = true;
+
             const feedContainer = document.getElementById("feedContainer");
             
-            // Instantly deploy 3 Skeleton posts while we wait for the database!
-            feedContainer.innerHTML = generateSkeletonHTML(3);
+            // Only deploy skeletons if it is the very first page load
+            if (currentPage === 1) {
+                feedContainer.innerHTML = generateSkeletonHTML(3);
+            }
 
             fetch(`${API_BASE}/api/getFeed`, {
                 method: 'POST',
-                body: JSON.stringify({ currentUser: currentUser })
+                body: JSON.stringify({ currentUser: currentUser, page: currentPage.toString() })
             })
             .then(response => response.json()) 
             .then(posts => {
-                if (posts.length === 0) {
+                // THE BOUNDARY: If Java sends back fewer than 15 posts, we hit the end
+                if (posts.length < 15) {
+                    hasMorePosts = false;
+                }
+
+                if (posts.length === 0 && currentPage === 1) {
                     feedContainer.innerHTML = "<p style='text-align: center; color: #a09eb5;'>No posts yet.</p>";
+                    isFetching = false;
                     return;
                 }
 
@@ -189,11 +205,10 @@
                     }
 
                     const quoteBoxHTML = buildQuoteBox(post.parentPost);
-                    
                     const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
                     const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
-                    
                     const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                    
                     let postEditDeleteHTML = "";
                     if (post.username === currentUser) {
                         postEditDeleteHTML = `
@@ -258,10 +273,30 @@
                         </div>`;
                 });
                 
-                feedContainer.innerHTML = feedHTML;
+                // THE INJECTION: If Page 1, replace. If Page 2+, attach to the bottom.
+                if (currentPage === 1) {
+                    feedContainer.innerHTML = feedHTML;
+                } else {
+                    feedContainer.insertAdjacentHTML('beforeend', feedHTML);
+                }
+
+                isFetching = false; // UNLOCK the system
             })
-            .catch(error => console.error("Feed Error:", error));
+            .catch(error => {
+                console.error("Feed Error:", error);
+                isFetching = false;
+            });
         }
+
+        /* --- THE SCROLL SENSOR --- */
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+                if (!isFetching && hasMorePosts) {
+                    currentPage++; // Math: Advance to the next chunk of 15
+                    loadFeed(); 
+                }
+            }
+        });
 
         /* --- 5. POST CREATION ENGINE (WITH DEBOUNCING) --- */
         let isPosting = false; 
@@ -292,6 +327,10 @@
                 if (data === "SUCCESS") {
                     document.getElementById("postContent").value = "";
                     removeMedia(); 
+                    
+                    // Reset the state machine to pull the fresh list from the top
+                    currentPage = 1;
+                    hasMorePosts = true;
                     loadFeed(); 
                 }
             })
@@ -301,6 +340,9 @@
                 console.error("Posting Error:", error);
             });
         });
+
+        // Start the ignition sequence!
+        loadFeed();
     </script>
 </body>
 </html>

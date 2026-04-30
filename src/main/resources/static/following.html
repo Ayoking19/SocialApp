@@ -91,6 +91,11 @@
     <script src="shared.js"></script>
 
     <script>
+        /* --- PAGINATION STATE MACHINE --- */
+        let currentPage = 1;
+        let isFetching = false; 
+        let hasMorePosts = true; 
+
         /* 1. THE BOUNCER & IDENTITY */
         checkSecurity(); 
 
@@ -152,25 +157,33 @@
             document.getElementById('videoUpload').value = ""; 
         }
 
-        /* --- THE PAINTER: Fetch and Draw the Following Feed --- */
+        /* --- THE PAINTER: Fetch and Draw the Following Feed (Paginated) --- */
         function loadFeed() {
+            if (isFetching || !hasMorePosts) return;
+            isFetching = true;
+
             const feedContainer = document.getElementById("feedContainer");
             
-            // Beautiful async skeleton loader while waiting for backend
-            feedContainer.innerHTML = generateSkeletonHTML(3);
+            if (currentPage === 1) {
+                feedContainer.innerHTML = generateSkeletonHTML(3);
+            }
 
             fetch(`${API_BASE}/api/followingFeed`, {
                 method: 'POST',
-                body: JSON.stringify({ currentUser: currentUser })
+                body: JSON.stringify({ currentUser: currentUser, page: currentPage.toString() })
             })
             .then(response => response.json()) 
             .then(posts => {
-                if (posts.length === 0) {
+                if (posts.length < 15) {
+                    hasMorePosts = false;
+                }
+
+                if (posts.length === 0 && currentPage === 1) {
                     feedContainer.innerHTML = "<p style='text-align: center; color: #a09eb5;'>No posts yet from people you follow.</p>";
+                    isFetching = false;
                     return;
                 }
 
-                // [Asynchronous Hydration]: We build everything in memory first to instantly solve the scrolling lag!
                 let feedHTML = ""; 
 
                 posts.forEach(post => {
@@ -193,15 +206,11 @@
                         }
                     }
 
-                    // [Polymorphic UI Rendering]: Generate the embedded quote box!
                     const quoteBoxHTML = buildQuoteBox(post.parentPost);
-                    
-                    // --- NEW BLUE REPOST BUTTON STYLING ---
                     const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
                     const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
-
-                    // --- NEW CRUD INJECTION ---
                     const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                    
                     let postEditDeleteHTML = "";
                     if (post.username === currentUser) {
                         postEditDeleteHTML = `
@@ -213,7 +222,6 @@
                             </span>
                         `;
                     }
-                    // ---------------------------
 
                     feedHTML += `
                         <div class="post" onclick="window.location.href='post.html?id=${post.id}'" style="cursor: pointer;">
@@ -267,19 +275,35 @@
                         </div>`;
                 });
 
-                // Inject the fully built DOM once!
-                feedContainer.innerHTML = feedHTML;
+                if (currentPage === 1) {
+                    feedContainer.innerHTML = feedHTML;
+                } else {
+                    feedContainer.insertAdjacentHTML('beforeend', feedHTML);
+                }
+
+                isFetching = false;
             })
             .catch(error => {
-                feedContainer.innerHTML = "<p style='text-align: center; color: #ff3366;'>Error loading following feed.</p>";
+                console.error("Following Feed Error:", error);
+                isFetching = false;
             });
         }
 
+        /* --- THE SCROLL SENSOR --- */
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+                if (!isFetching && hasMorePosts) {
+                    currentPage++;
+                    loadFeed(); 
+                }
+            }
+        });
+
         /* --- 5. POST CREATION ENGINE (WITH DEBOUNCING) --- */
-        let isPosting = false; // The Debounce Lock
+        let isPosting = false; 
 
         document.getElementById("postBtn").addEventListener("click", function() {
-            if (isPosting) return; // Prevent double-posting
+            if (isPosting) return; 
 
             const postContent = document.getElementById("postContent").value;
             if (postContent.trim() === "" && attachedMediaBase64 === "") {
@@ -304,6 +328,9 @@
                 if (data === "SUCCESS") {
                     document.getElementById("postContent").value = "";
                     removeMedia(); 
+                    
+                    currentPage = 1;
+                    hasMorePosts = true;
                     loadFeed(); 
                 }
             })
