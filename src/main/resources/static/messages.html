@@ -108,6 +108,52 @@
             color: white;
             font-size: 15px;
         }
+
+        /* ========================================= */
+        /* --- STRICT MOBILE OVERRIDES --- */
+        /* ========================================= */
+        @media (max-width: 768px) {
+            body { overflow: auto; }
+            .feed {
+                height: 100vh;
+                padding-top: 65px;
+                padding-bottom: 70px;
+                display: flex;
+                flex-direction: column;
+                box-sizing: border-box;
+                width: 100%;
+                max-width: 100vw;
+            }
+            .chat-container {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 0;
+                border-radius: 0;
+                border: none;
+                height: 100%;
+            }
+            #chatView {
+            height: 100%;
+            /* Notice that display: flex is permanently removed from here */
+            flex-direction: column;
+            justify-content: space-between;
+        }
+            .chat-history {
+                flex: 1;
+                overflow-y: auto;
+                padding-bottom: 20px;
+            }
+            .chat-input-area {
+                position: sticky;
+                bottom: 0;
+                background: #0b0f1a;
+                z-index: 10;
+                padding: 10px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
     </style>
 </head>
 <body>
@@ -134,7 +180,6 @@
             <span>Menu</span>
         </div>
         <div class="logo">Social<span>App</span></div>
-        <span class="material-icons" style="color: #00e676; cursor: pointer;" onclick="startNewChatPrompt()">edit_square</span>
     </header>
 
     <nav class="bottom-nav">

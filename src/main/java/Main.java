@@ -141,7 +141,13 @@ public class Main {
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
                         String currentUser = extractJsonValue(body, "currentUser");
-                        String jsonResponse = PostSystem.getFeed(currentUser);
+                        
+                        // Extract the page number from the frontend (defaulting to Page 1 if missing)
+                        String pageStr = extractJsonValue(body, "page");
+                        int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
+                        
+                        // Pass both arguments to the newly updated engine
+                        String jsonResponse = PostSystem.getFeed(currentUser, page);
                         
                         exchange.sendResponseHeaders(200, jsonResponse.length());
                         OutputStream os = exchange.getResponseBody();

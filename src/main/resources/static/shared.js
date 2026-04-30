@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "https://socialappwebsite.me";
 const currentUser = localStorage.getItem("loggedInUser");
 /* --- THE UI/UX SKELETON ENGINE --- */
 document.head.insertAdjacentHTML("beforeend", `

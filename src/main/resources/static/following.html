@@ -157,12 +157,7 @@
             const feedContainer = document.getElementById("feedContainer");
             
             // Beautiful async skeleton loader while waiting for backend
-            feedContainer.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #00e676;">
-                    <span class="material-icons" style="font-size: 40px; animation: spin 1s linear infinite;">autorenew</span>
-                    <p style="margin-top: 10px; font-weight: bold;">Loading following feed...</p>
-                </div>
-            `;
+            feedContainer.innerHTML = generateSkeletonHTML(3);
 
             fetch(`${API_BASE}/api/followingFeed`, {
                 method: 'POST',

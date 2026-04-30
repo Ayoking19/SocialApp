@@ -153,7 +153,12 @@ public class PostSystem {
     /* --- FEED & SEARCH UPGRADES ---            */
     /* ========================================= */
 
-    public static String getFeed(String currentUser) {
+    public static String getFeed(String currentUser, int pageNumber) {
+        
+        // THE PAGINATION MATH
+        int limit = 15; 
+        int offset = (pageNumber - 1) * limit; 
+
         // FIX: Added 'AND p2.parent_comment_id IS NULL' to repost_count to exclude comment interactions!
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
@@ -169,7 +174,8 @@ public class PostSystem {
                           "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
                           "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
                           "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "ORDER BY posts.created_at DESC";
+                          "ORDER BY posts.created_at DESC " +
+                          "LIMIT " + limit + " OFFSET " + offset; // THE STRICT DATABASE CONSTRAINT
 
         return executeStandardPostQuery(querySQL, currentUser, null, false);
     }
