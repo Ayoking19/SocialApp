@@ -3,7 +3,10 @@
 /* ========================================= */
 
 const API_BASE = "https://socialappwebsite.me";
-const currentUser = localStorage.getItem("loggedInUser");
+
+// THE FIX: The security guard now correctly looks for the "currentUser" badge!
+const currentUser = localStorage.getItem("currentUser");
+
 /* --- THE UI/UX SKELETON ENGINE --- */
 document.head.insertAdjacentHTML("beforeend", `
     <style>
@@ -115,7 +118,8 @@ function closeLogoutModal() {
 }
 
 function executeLogout() {
-    localStorage.removeItem("loggedInUser"); 
+    // THE FIX: Safely destroy the correct "currentUser" badge!
+    localStorage.removeItem("currentUser"); 
     window.location.href = "login.html"; 
 }
 
@@ -439,7 +443,6 @@ function checkNotifications() {
     .catch(err => console.error("Notification Sync Error:", err));
 }
 
-// --- NEW: THE UNREAD MESSAGE POLLER ---
 function checkUnreadMessages() {
     if (!currentUser) return;
     fetch(`${API_BASE}/api/getUnreadCount`, {
@@ -454,12 +457,11 @@ function checkUnreadMessages() {
             const colorStyle = isMessagesPage ? 'color: #00e676;' : '';
             let mailContent = `<span class="material-icons" style="${colorStyle}">mail</span>`;
             
-            // If there are unread messages, inject the beautiful red UI dot!
             if (data.unread > 0) {
                 mailContent += `<div style="position: absolute; top: 5px; right: 50%; transform: translateX(12px); width: 10px; height: 10px; background-color: #ff3366; border-radius: 50%; border: 2px solid #0f172a; z-index: 10;"></div>`;
             }
             
-            mailBtn.style.position = 'relative'; // Required to keep the dot anchored to the icon
+            mailBtn.style.position = 'relative'; 
             mailBtn.innerHTML = mailContent;
         }
     })
@@ -470,7 +472,6 @@ function checkUnreadMessages() {
 /* --- THE QUOTE & REPOST ENGINE (V2) ---    */
 /* ========================================= */
 
-// [STATEFUL UI]: Menu updates based on isReposted boolean!
 function openRepostMenu(postId, isReposted = false, commentId = null) {
     let existingMenu = document.getElementById('repostMenuOverlay');
     if (existingMenu) existingMenu.remove();
@@ -508,7 +509,6 @@ function openRepostMenu(postId, isReposted = false, commentId = null) {
     document.getElementById('quoteConfirm').onclick = () => { openQuoteEditor(postId, commentId); overlay.remove(); };
 }
 
-// [MEDIA UPGRADE]: Quotes now support Image/Video uploads!
 function openQuoteEditor(postId, commentId = null) {
     let existingMenu = document.getElementById('quoteMenuOverlay');
     if (existingMenu) existingMenu.remove();
@@ -549,7 +549,6 @@ function openQuoteEditor(postId, commentId = null) {
     
     document.getElementById('cancelQuoteBtn').onclick = () => overlay.remove();
 
-    // Internal Media Handler for the Quote Modal
     const handleQuoteMedia = (input, type) => {
         const file = input.files[0];
         if (file) {
@@ -588,7 +587,6 @@ function openQuoteEditor(postId, commentId = null) {
     };
 }
 
-// --- NEW: FETCH AND DISPLAY QUOTES OF A COMMENT ---
 function openCommentQuotesModal(commentId) {
     let existingModal = document.getElementById('commentQuotesModalOverlay');
     if (existingModal) existingModal.remove();
@@ -728,6 +726,7 @@ function buildQuoteBox(parentPost) {
     </div>
     `;
 }
+
 /* ========================================= */
 /* --- THE GLOBAL LIGHTBOX INTERCEPTOR ---   */
 /* ========================================= */
@@ -738,7 +737,7 @@ function openLightbox(imageSrc) {
         overlay.id = 'customLightboxOverlay';
         overlay.className = 'modal-overlay';
         overlay.style.zIndex = '9999';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.9)'; // Deep dark background
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.9)'; 
         overlay.style.display = 'none';
         overlay.style.flexDirection = 'column';
         overlay.style.justifyContent = 'center';
@@ -754,22 +753,17 @@ function openLightbox(imageSrc) {
     document.getElementById('lightboxImg').src = imageSrc;
     overlay.style.display = 'flex';
 }
-/* ========================================= */
-/* --- THE SOCIAL TEXT PARSER (REGEX) ---    */
-/* ========================================= */
-/* ========================================= */
-/* --- THE SOCIAL TEXT PARSER (REGEX) ---    */
-/* ========================================= */
+
 /* ========================================= */
 /* --- THE SOCIAL TEXT PARSER (REGEX) ---    */
 /* ========================================= */
 function parseSocialText(text) {
     if (!text) return "";
     
-    // 1. [Mentions Parser]: Finds @username (Using RGB colors to prevent Regex Collisions!)
+    // 1. [Mentions Parser]: Finds @username 
     let html = text.replace(/@([\w_]+)/g, `<a href="profile.html?user=$1" style="color: rgb(0, 168, 255); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">@$1</a>`);
     
-    // 2. [Hashtag Parser]: Finds #trend (Using RGB colors to prevent Regex Collisions!)
+    // 2. [Hashtag Parser]: Finds #trend 
     html = html.replace(/#([\w_]+)/g, `<a href="search.html?q=%23$1" style="color: rgb(0, 230, 118); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">#$1</a>`);
     
     return html;
@@ -780,22 +774,20 @@ function closeLightbox() {
     if (overlay) overlay.style.display = 'none';
 }
 
-// [Master Hack]: Overriding the browser's native fullscreen so we don't have to edit 4 HTML files!
+// [Master Hack]: Overriding the browser's native fullscreen
 const nativeRequestFullscreen = Element.prototype.requestFullscreen || Element.prototype.webkitRequestFullscreen;
 Element.prototype.requestFullscreen = function() {
     if (this.tagName && this.tagName.toLowerCase() === 'img') {
-        openLightbox(this.src); // Triggers our beautiful custom UI instead!
+        openLightbox(this.src); 
         return Promise.resolve();
     }
     if (nativeRequestFullscreen) {
-        return nativeRequestFullscreen.call(this); // Let videos keep native fullscreen
+        return nativeRequestFullscreen.call(this); 
     }
 };
 
 checkNotifications();
-checkUnreadMessages(); // Starts the polling engine instantly!
+checkUnreadMessages(); 
 highlightActiveNav();
 setInterval(checkNotifications, 30000);
-
-// [UI FIX]: Changed from 10000ms to 1000ms so the dot is instantaneous!
 setInterval(checkUnreadMessages, 1000);
