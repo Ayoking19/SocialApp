@@ -270,8 +270,7 @@ public class PostSystem {
                 // Modified bound parameters because the Deferred Join changes exactly where the variables sit in the string
                 pstmt.setString(1, currentUser);
                 pstmt.setString(2, currentUser);
-                pstmt.setString(3, currentUser);
-                pstmt.setString(4, currentUser); 
+                pstmt.setString(3, currentUser); 
             } else {
                 pstmt.setString(1, currentUser);
                 pstmt.setString(2, currentUser);

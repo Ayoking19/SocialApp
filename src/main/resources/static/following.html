@@ -285,6 +285,13 @@
             })
             .catch(error => {
                 console.error("Following Feed Error:", error);
+                
+                // THE UX FIX: Wipes skeletons and prints an error message if the fetch crashes!
+                if (currentPage === 1) {
+                    document.getElementById("feedContainer").innerHTML = 
+                        "<p style='text-align: center; color: #ff3366;'>Network error. Please refresh the page.</p>";
+                }
+                
                 isFetching = false;
             });
         }
