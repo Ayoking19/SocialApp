@@ -141,19 +141,17 @@ public class Main {
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
                         String currentUser = extractJsonValue(body, "currentUser");
-                        
-                        // THE EXTRACTION: Safely pull the requested page number from the JSON
                         String pageStr = extractJsonValue(body, "page");
-                        
-                        // THE FALLBACK: If the frontend doesn't send a page number, default to Page 1
                         int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
                         
-                        // THE HANDOFF: Pass both the user and the page number to the newly upgraded engine
                         String jsonResponse = PostSystem.getFeed(currentUser, page);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        // THE FIX: UTF-8 Byte Counting
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -173,9 +171,11 @@ public class Main {
                         String targetUser = extractJsonValue(body, "username");
                         String jsonResponse = ProfileSystem.getUserProfile(targetUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -197,9 +197,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getUserPosts(targetUser, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -296,9 +298,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getComments(postId, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -344,9 +348,11 @@ public class Main {
                         
                         String jsonResponse = FollowSystem.getProfileRelations(currentUser, targetUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -393,9 +399,11 @@ public class Main {
                         
                         if (searchQuery == null || searchQuery.trim().isEmpty()) {
                             String emptyResponse = "{\"users\":[],\"posts\":[]}";
-                            exchange.sendResponseHeaders(200, emptyResponse.length());
+                            byte[] emptyBytes = emptyResponse.getBytes(StandardCharsets.UTF_8);
+                            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                            exchange.sendResponseHeaders(200, emptyBytes.length);
                             OutputStream os = exchange.getResponseBody();
-                            os.write(emptyResponse.getBytes());
+                            os.write(emptyBytes);
                             os.close();
                             return;
                         }
@@ -408,9 +416,11 @@ public class Main {
                                 "\"posts\":" + postsJson +
                                 "}";
                         
-                        exchange.sendResponseHeaders(200, combinedJsonResponse.length());
+                        byte[] responseBytes = combinedJsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(combinedJsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -428,19 +438,16 @@ public class Main {
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
                         String currentUser = extractJsonValue(body, "currentUser");
-                        
-                        // THE EXTRACTION: Safely pull the requested page number from the JSON
                         String pageStr = extractJsonValue(body, "page");
-                        
-                        // THE FALLBACK: If the frontend doesn't send a page number, default to Page 1
                         int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
                         
-                        // THE HANDOFF: Pass both the user and the page number to the newly upgraded engine
                         String jsonResponse = PostSystem.getFollowingFeed(currentUser, page);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -462,9 +469,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getSinglePost(postId, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -495,8 +504,8 @@ public class Main {
                         
                         String jsonResponse = PostSystem.searchProfilePosts(query, targetUser, currentUser);
                         
-                        exchange.getResponseHeaders().add("Content-Type", "application/json");
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
                         os.write(responseBytes);
@@ -519,9 +528,11 @@ public class Main {
                         String targetUser = extractJsonValue(body, "targetUser");
                         String jsonResponse = PostSystem.getUserActivity(targetUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -558,8 +569,8 @@ public class Main {
                         String username = extractJsonValue(body, "username");
                         String jsonResponse = NotificationSystem.getNotifications(username);
                         
-                        exchange.getResponseHeaders().add("Content-Type", "application/json");
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
                         os.write(responseBytes);
@@ -655,9 +666,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getPostQuotes(postId, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -679,9 +692,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getUserQuotes(targetUser, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -703,9 +718,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getUserReposts(targetUser, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -853,9 +870,11 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getCommentQuotes(commentId, currentUser);
                         
-                        exchange.sendResponseHeaders(200, jsonResponse.length());
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
-                        os.write(jsonResponse.getBytes());
+                        os.write(responseBytes);
                         os.close();
                     }
                 }
@@ -903,8 +922,8 @@ public class Main {
                         
                         String jsonResponse = MessageSystem.getChatHistory(currentUser, targetUser);
                         
-                        exchange.getResponseHeaders().add("Content-Type", "application/json");
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
                         os.write(responseBytes);
@@ -928,8 +947,8 @@ public class Main {
                         
                         String jsonResponse = MessageSystem.getInbox(currentUser);
                         
-                        exchange.getResponseHeaders().add("Content-Type", "application/json");
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
                         os.write(responseBytes);
@@ -953,8 +972,8 @@ public class Main {
                         
                         String jsonResponse = MessageSystem.getGlobalUnreadCount(currentUser);
                         
-                        exchange.getResponseHeaders().add("Content-Type", "application/json");
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         OutputStream os = exchange.getResponseBody();
                         os.write(responseBytes);
@@ -1039,8 +1058,8 @@ public class Main {
                 FollowSystem.getFollowerList(targetUser, currentUser) : 
                 FollowSystem.getFollowingList(targetUser, currentUser);
 
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
             byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
             exchange.sendResponseHeaders(200, responseBytes.length);
             OutputStream os = exchange.getResponseBody();
             os.write(responseBytes);
