@@ -19,6 +19,7 @@
         </div>
         <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
         <li><a href="index.html">Home</a></li>
+        <li><a href="top.html">Top Posts</a></li>
         <li><a href="profile.html">Profile</a></li>
         <li><a href="search.html">Search</a></li>
         <li><a href="following.html">Following</a></li>
@@ -159,6 +160,8 @@
             isFetching = true;
 
             const feedContainer = document.getElementById("feedContainer");
+            // Trigger the scroll jump!
+            restoreScrollPosition(window.location.pathname);
             
             // Only deploy skeletons if it is the very first page load
             if (currentPage === 1) {
@@ -221,8 +224,13 @@
                         `;
                     }
 
+                    // THE FIX: Detect pure reposts and set the correct URL
+                    const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
+                    const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
+
+                    // THE FIX: Inject targetUrl and saveScrollPosition into the div!
                     feedHTML += `
-                        <div class="post" onclick="window.location.href='post.html?id=${post.id}'" style="cursor: pointer;">
+                        <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
                             <div class="user-info" style="display: flex; align-items: center; width: 100%;">
                                 <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
                                 <div style="display: flex; flex-direction: column;">
@@ -279,6 +287,9 @@
                 } else {
                     feedContainer.insertAdjacentHTML('beforeend', feedHTML);
                 }
+
+                // THE FIX: Trigger the scroll jump AFTER the HTML has actually been painted to the screen!
+                restoreScrollPosition(window.location.pathname);
 
                 isFetching = false; // UNLOCK the system
             })

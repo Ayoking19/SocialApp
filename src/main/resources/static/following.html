@@ -20,6 +20,7 @@
         </div>
         <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
             <li><a href="index.html">Home</a></li>
+            <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
             <li><a href="following.html">Following</a></li> 
@@ -163,6 +164,8 @@
             isFetching = true;
 
             const feedContainer = document.getElementById("feedContainer");
+            // Trigger the scroll jump!
+            restoreScrollPosition(window.location.pathname);
             
             if (currentPage === 1) {
                 feedContainer.innerHTML = generateSkeletonHTML(3);

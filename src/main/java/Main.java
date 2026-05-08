@@ -894,9 +894,15 @@ public class Main {
                         String sender = extractJsonValue(body, "sender");
                         String receiver = extractJsonValue(body, "receiver");
                         String content = extractJsonValue(body, "content");
-                        String media = extractJsonValue(body, "media"); // Extracting the image!
+                        String media = extractJsonValue(body, "media");
                         
-                        String response = MessageSystem.sendMessage(sender, receiver, content, media);
+                        boolean isForwarded = body.contains("\"isForwarded\":true") || body.contains("\"isForwarded\": true");
+                        
+                        // THE FIX: Safely parse the Reply ID
+                        String replyIdStr = extractJsonValue(body, "replyToId");
+                        Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
+                        
+                        String response = MessageSystem.sendMessage(sender, receiver, content, media, isForwarded, replyToId);
                         
                         exchange.sendResponseHeaders(200, response.length());
                         OutputStream os = exchange.getResponseBody();
@@ -1017,6 +1023,132 @@ public class Main {
                         OutputStream os = exchange.getResponseBody();
                         os.write(response.getBytes());
                         os.close();
+                    }
+                }
+            });
+            /* ========================================= */
+            /* --- 38. THE BLOCK SYSTEM ENDPOINTS ---    */
+            /* ========================================= */
+            server.createContext("/api/toggleBlock", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = BlockSystem.toggleBlock(extractJsonValue(body, "currentUser"), extractJsonValue(body, "targetUser"));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/getBlockStatus", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = BlockSystem.getBlockStatus(extractJsonValue(body, "currentUser"), extractJsonValue(body, "targetUser"));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+            /* ========================================= */
+            /* --- 39. EDIT MESSAGE ENDPOINT ---         */
+            /* ========================================= */
+            server.createContext("/api/editMessage", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        String username = extractJsonValue(body, "username");
+                        int messageId = Integer.parseInt(extractJsonValue(body, "messageId"));
+                        String newContent = extractJsonValue(body, "content");
+                        
+                        boolean success = MessageSystem.editMessage(username, messageId, newContent);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        byte[] responseBytes = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 40. DELETE MESSAGE ENDPOINT ---       */
+            /* ========================================= */
+            server.createContext("/api/deleteMessage", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        String username = extractJsonValue(body, "username");
+                        int messageId = Integer.parseInt(extractJsonValue(body, "messageId"));
+                        
+                        boolean success = MessageSystem.deleteMessage(username, messageId);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        byte[] responseBytes = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+            /* ========================================= */
+            /* --- 41. THE TOP POSTS TIME-SERIES ENDPOINT*/
+            /* ========================================= */
+            server.createContext("/api/getTopPosts", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String timeFilter = extractJsonValue(body, "timeFilter");
+                        String customDate = extractJsonValue(body, "customDate");
+                        
+                        String jsonResponse = PostSystem.getTopPosts(currentUser, timeFilter, customDate);
+                        
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+            /* ========================================= */
+            /* --- 42. THE UPDATE USERNAME ENDPOINT ---  */
+            /* ========================================= */
+            server.createContext("/api/updateUsername", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUsername = extractJsonValue(body, "currentUsername");
+                        String newUsername = extractJsonValue(body, "newUsername");
+                        
+                        String response = SettingsSystem.updateUsername(currentUsername, newUsername);
+                        
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
                     }
                 }
             });

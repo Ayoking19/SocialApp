@@ -15,6 +15,7 @@
         </div>
         <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
             <li><a href="index.html">Home</a></li>
+            <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
             <li><a href="following.html">Following</a></li> 
@@ -36,6 +37,15 @@
     <div class="container">
         <main class="feed">
             <div class="feed-header"><h2>Account Settings</h2></div>
+
+            <div class="post">
+                <h3 style="color: #00e676; margin-bottom: 20px;">Change Username</h3>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="text" id="newUsernameInput" placeholder="New Username (no spaces)" class="comment-input" style="width: 100%;">
+                    <button onclick="executeUsernameChange()" class="main-post-btn">Update Username</button>
+                </div>
+                <p id="usernameStatus" style="margin-top: 10px; font-size: 14px;"></p>
+            </div>
 
             <div class="post">
                 <h3 style="color: #00e676; margin-bottom: 20px;">Change Password</h3>
@@ -93,6 +103,49 @@
     <script src="shared.js"></script>
     <script>
         checkSecurity();
+
+        /* --- USERNAME LOGIC --- */
+        function executeUsernameChange() {
+            const newUsername = document.getElementById('newUsernameInput').value.trim();
+            const status = document.getElementById('usernameStatus');
+
+            // [Input Validation: The process of verifying that user-provided data meets the required criteria before sending it to the server]
+            if (!newUsername || newUsername.includes(" ")) {
+                status.innerText = "Username cannot be empty or contain spaces.";
+                status.style.color = "#ff3366";
+                return;
+            }
+
+            fetch(`${API_BASE}/api/updateUsername`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUsername: currentUser, newUsername: newUsername })
+            })
+            .then(res => res.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    // [State Management: The process of keeping the data in your user's browser perfectly synchronized with the data saved in your backend database]
+                    // Here, we must aggressively overwrite the old 'currentUser' variable in the browser's Local Storage. 
+                    // If we skip this step, the frontend will continue making API requests using the old, now-deleted username, which would instantly crash the session.
+                    localStorage.setItem("currentUser", newUsername);
+                    status.innerText = "Username updated successfully! Refreshing...";
+                    status.style.color = "#00e676";
+                    setTimeout(() => window.location.reload(), 1500);
+                } else if (data === "USERNAME_TAKEN") {
+                    status.innerText = "That username is already taken.";
+                    status.style.color = "#ff3366";
+                } else if (data === "SAME_USERNAME") {
+                    status.innerText = "You are already using this username.";
+                    status.style.color = "#ff3366";
+                } else {
+                    status.innerText = "Failed to update username. Invalid format.";
+                    status.style.color = "#ff3366";
+                }
+            })
+            .catch(err => {
+                status.innerText = "Network Error.";
+                status.style.color = "#ff3366";
+            });
+        }
 
         /* --- PASSWORD LOGIC --- */
         function updatePassword() {
@@ -153,7 +206,7 @@
                 if (data === "SUCCESS") {
                     // [Session Termination]: Clearing local data so the user is logged out immediately.
                     sessionStorage.clear();
-                    localStorage.removeItem("loggedInUser");
+                    localStorage.removeItem("currentUser"); // FIXED: Synchronized with shared.js
                     window.location.href = "login.html";
                 } else {
                     alert("Account deletion failed. Please try again or check your server logs.");

@@ -15,6 +15,7 @@
         </div>
         <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
             <li><a href="index.html">Home</a></li>
+            <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
             <li><a href="following.html">Following</a></li>        
@@ -64,56 +65,78 @@
                         <button id="profileMessageBtn" class="media-control-btn" style="display: none; background: rgba(0, 230, 118, 0.1); color: #00e676; padding: 4px 8px; border-color: rgba(0, 230, 118, 0.3);" onclick="window.location.href='messages.html?user=' + profileUser" title="Message User">
                             <span class="material-icons" style="font-size: 18px; vertical-align: middle;">mail</span>
                         </button>
-
+                        <button id="profileBlockBtn" class="media-control-btn" style="display: none; background: rgba(255, 51, 102, 0.1); color: #ff3366; padding: 4px 8px; border-color: rgba(255, 51, 102, 0.3);" onclick="executeBlockToggle()" title="Block User">
+                            <span class="material-icons" style="font-size: 18px; vertical-align: middle;">block</span>
+                        </button>
                         <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2);">Follows you</span>
                     </div>
 
                     <p class="profile-username" id="displayUsername" style="margin-top: 5px;"></p>
                     
-                    <div class="bio-section">
-                        <p class="bio-text" id="displayBio"></p>
-                        <button class="edit-bio-btn" id="editBioBtn" onclick="openBioModal()">Edit Bio</button>
+                    <div id="invisibilityCloak" style="display: none; text-align: center; padding: 50px 20px; background: rgba(255, 255, 255, 0.02); border-radius: 12px; border: 1px solid #334155; margin-top: 20px;">
+                        <span class="material-icons" style="font-size: 60px; color: #334155; margin-bottom: 15px;">lock</span>
+                        <h3 style="color: white; margin-bottom: 10px;">Profile Unavailable</h3>
+                        <p style="color: #a09eb5; font-size: 14px;">You cannot view this user's posts, followers, or bio.</p>
                     </div>
 
-                    <div class="profile-stats-bar">
-                        <div class="stat-box" onclick="openRelationModal('followers')" style="cursor: pointer;">
-                            <span class="stat-number" id="followerCount">-</span>
-                            <span class="stat-label">Followers</span>
+                    <div id="secureProfileContent">
+                        <div class="bio-section">
+                            <p class="bio-text" id="displayBio"></p>
+                            <button class="edit-bio-btn" id="editBioBtn" onclick="openBioModal()">Edit Bio</button>
                         </div>
-                        <div class="stat-box" onclick="openRelationModal('following')" style="cursor: pointer;">
-                            <span class="stat-number" id="followingCount">-</span>
-                            <span class="stat-label">Following</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-number" id="postCount">-</span>
-                            <span class="stat-label">Posts</span>
-                        </div>
-                    </div>
-                    
-                    <div class="profile-tabs">
-                        <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
-                        <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
-                        <button id="tab-replies" class="tab-btn" onclick="showReplies()">Replies</button>
-                        <button id="tab-quotes" class="tab-btn" onclick="showQuotes()">Quotes</button>
-                        <button id="tab-reposts" class="tab-btn" onclick="showReposts()">Reposts</button>
-                    </div>
 
-                    <div style="margin-bottom: 20px;">
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; min-width: 0; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
-                            <button onclick="executeProfileSearch()" class="media-control-btn" style="display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">search</span></button>
-                            <button onclick="clearProfileSearch()" class="media-control-btn" style="background:rgba(255,51,102,0.1); color:#ff3366; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">close</span></button>
+                        <div class="profile-stats-bar">
+                            <div class="stat-box" onclick="openRelationModal('followers')" style="cursor: pointer;">
+                                <span class="stat-number" id="followerCount">-</span>
+                                <span class="stat-label">Followers</span>
+                            </div>
+                            <div class="stat-box" onclick="openRelationModal('following')" style="cursor: pointer;">
+                                <span class="stat-number" id="followingCount">-</span>
+                                <span class="stat-label">Following</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-number" id="postCount">-</span>
+                                <span class="stat-label">Posts</span>
+                            </div>
                         </div>
-                        <div id="profileSearchTabs" style="display: none; justify-content: center; gap: 15px; font-size: 13px;">
-                            <span id="p-tab-latest" onclick="renderProfileSearchResults('latest')" style="cursor:pointer; color:#00e676;">Latest</span>
-                            <span id="p-tab-top" onclick="renderProfileSearchResults('top')" style="cursor:pointer; color:gray;">Top</span>
-                            <span id="p-tab-media" onclick="renderProfileSearchResults('media')" style="cursor:pointer; color:gray;">Media</span>
+                        
+                        <div class="profile-tabs">
+                            <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
+                            <button id="tab-top" class="tab-btn" onclick="showTopPosts()">Top</button>
+                            <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
+                            <button id="tab-replies" class="tab-btn" onclick="showReplies()">Replies</button>
+                            <button id="tab-quotes" class="tab-btn" onclick="showQuotes()">Quotes</button>
+                            <button id="tab-reposts" class="tab-btn" onclick="showReposts()">Reposts</button>
                         </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; min-width: 0; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                <button onclick="executeProfileSearch()" class="media-control-btn" style="display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">search</span></button>
+                                <button onclick="clearProfileSearch()" class="media-control-btn" style="background:rgba(255,51,102,0.1); color:#ff3366; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">close</span></button>
+                            </div>
+                            <div id="profileSearchTabs" style="display: none; justify-content: center; gap: 15px; font-size: 13px;">
+                                <span id="p-tab-latest" onclick="renderProfileSearchResults('latest')" style="cursor:pointer; color:#00e676;">Latest</span>
+                                <span id="p-tab-top" onclick="renderProfileSearchResults('top')" style="cursor:pointer; color:gray;">Top</span>
+                                <span id="p-tab-media" onclick="renderProfileSearchResults('media')" style="cursor:pointer; color:gray;">Media</span>
+                            </div>
+                        </div>
+                        <div id="profileFeedContainer"></div>                  
                     </div>
-                    <div id="profileFeedContainer"></div>                  
-                </div>
             </div> 
         </main>
+    </div>
+
+    <div class="modal-overlay" id="blockModal" style="display: none; z-index: 9999;">
+        <div class="modal-card">
+            <div class="modal-icon"><span class="material-icons" style="font-size: 40px; color: #ff3366;">block</span></div>
+            <h3 id="blockModalTitle">User Blocked</h3>
+            <p id="blockModalText" style="color: #a09eb5;">You blocked this user.</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="window.history.back()">Okay</button>
+                <button class="modal-confirm-btn" id="unblockModalBtn" onclick="executeBlockToggle()">Unblock</button>
+            </div>
+        </div>
     </div>
 
     <div class="modal-overlay" id="logoutModal" style="display: none;">
@@ -210,7 +233,12 @@
                     `;
                 }
 
-                html += `<div class="post ${post.media && post.media.trim() !== '' ? 'has-media' : 'no-media'}" onclick="window.location.href='post.html?id=${post.id}'" style="cursor: pointer; transition: 0.2s; margin-bottom: 20px;">
+                // THE FIX: Detect pure reposts and route to the parent instead
+                const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
+                const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
+
+                html += `
+                    <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer; ...">
                         <div class="user-info" style="display: flex; align-items: center; width: 100%;">
                             <img src="${post.avatar}" onclick="event.stopPropagation();" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
                             <div style="display: flex; flex-direction: column;">
@@ -258,6 +286,75 @@
             return html;
         }
 
+        function checkBlockStatus() {
+            if (profileUser === currentUser) return; 
+            
+            fetch(`${API_BASE}/api/getBlockStatus`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: profileUser })
+            })
+            .then(res => res.text())
+            .then(status => {
+                const blockBtn = document.getElementById("profileBlockBtn");
+                const followBtn = document.getElementById("profileFollowBtn");
+                const messageBtn = document.getElementById("profileMessageBtn");
+                const secureContent = document.getElementById("secureProfileContent");
+                const cloak = document.getElementById("invisibilityCloak");
+
+                if (status === "BLOCKED_BY_YOU") {
+                    // Activate the Cloak!
+                    if (secureContent) secureContent.style.display = "none";
+                    if (cloak) cloak.style.display = "block";
+                    
+                    // Hide Follow/Message buttons
+                    if (followBtn) followBtn.style.display = "none";
+                    if (messageBtn) messageBtn.style.display = "none";
+                    
+                    // Turn Block button into an Unblock button
+                    if (blockBtn) {
+                        blockBtn.style.display = "inline-block";
+                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px; vertical-align: middle;">lock_open</span> Unblock`;
+                        blockBtn.style.color = "#00e676";
+                        blockBtn.style.background = "rgba(0, 230, 118, 0.1)";
+                        blockBtn.style.borderColor = "rgba(0, 230, 118, 0.3)";
+                    }
+                } else if (status === "BLOCKED_YOU") {
+                    // Activate the Cloak!
+                    if (secureContent) secureContent.style.display = "none";
+                    if (cloak) cloak.style.display = "block";
+                    
+                    // Hide EVERYTHING
+                    if (followBtn) followBtn.style.display = "none";
+                    if (messageBtn) messageBtn.style.display = "none";
+                    if (blockBtn) blockBtn.style.display = "none"; 
+                } else {
+                    // Normal Profile State
+                    if (secureContent) secureContent.style.display = "block";
+                    if (cloak) cloak.style.display = "none";
+                    if (blockBtn) {
+                        blockBtn.style.display = "inline-block";
+                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px; vertical-align: middle;">block</span>`;
+                        blockBtn.style.color = "#ff3366";
+                        blockBtn.style.background = "rgba(255, 51, 102, 0.1)";
+                        blockBtn.style.borderColor = "rgba(255, 51, 102, 0.3)";
+                    }
+                }
+            });
+        }
+
+        function executeBlockToggle() {
+            fetch(`${API_BASE}/api/toggleBlock`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: profileUser })
+            })
+            .then(res => res.text())
+            .then(result => {
+                if (result === "BLOCKED" || result === "UNBLOCKED") {
+                    window.location.reload(); 
+                }
+            });
+        }
+
         function loadUserPosts() {
             const feedContainer = document.getElementById("profileFeedContainer");
             feedContainer.innerHTML = generateSkeletonHTML(3);
@@ -274,7 +371,7 @@
         }
 
         function resetTabs(activeTabId) {
-            const tabs = ['tab-posts', 'tab-media', 'tab-replies', 'tab-quotes', 'tab-reposts'];
+            const tabs = ['tab-posts', 'tab-top', 'tab-media', 'tab-replies', 'tab-quotes', 'tab-reposts'];
             tabs.forEach(id => document.getElementById(id).classList.remove('active-tab'));
             document.getElementById(activeTabId).classList.add('active-tab');
         }
@@ -287,6 +384,37 @@
             } else {
                 feedContainer.innerHTML = generatePostHTMLArray(profilePostsBuffer);
             }
+        }
+
+        /* ========================================= */
+        /* --- THE TRENDING ALGORITHM ENGINE ---     */
+        /* ========================================= */
+        function showTopPosts() {
+            resetTabs('tab-top');
+            const feedContainer = document.getElementById("profileFeedContainer");
+            
+            if (profilePostsBuffer.length === 0) {
+                feedContainer.innerHTML = "<p style='text-align: center; color: #a09eb5;'>No posts to rank.</p>";
+                return;
+            }
+
+            // Step 1: Filter out pure reposts, so the same viral post isn't listed multiple times
+            const trendingArray = profilePostsBuffer.filter(p => {
+                const isPureRepost = (!p.content || p.content.trim() === "") && (!p.media || p.media === "") && p.parentPost;
+                return !isPureRepost;
+            });
+            
+            // Step 2: The Mathematical Sorting Engine (Restored!)
+            trendingArray.sort((a, b) => {
+                // Engagement Score = Likes + Comments + Reposts
+                const scoreA = a.likes + a.commentCount + a.repostCount;
+                const scoreB = b.likes + b.commentCount + b.repostCount;
+                
+                if (scoreB !== scoreA) return scoreB - scoreA;
+                else return b.timestamp.localeCompare(a.timestamp);
+            });
+
+            feedContainer.innerHTML = generatePostHTMLArray(trendingArray);
         }
 
         function showOnlyMedia() {
@@ -615,6 +743,7 @@
         loadProfileData();
         loadUserPosts();
         loadRelations(); 
+        checkBlockStatus(); // <--- ADD THIS LINE
     </script>
 </body>
 </html>

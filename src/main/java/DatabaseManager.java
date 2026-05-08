@@ -96,17 +96,31 @@ public class DatabaseManager {
                 + "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
 
-        // --- UPGRADE: Added image_url to messages ---
         String createMessagesTable = "CREATE TABLE IF NOT EXISTS messages ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "sender_id INTEGER NOT NULL,"
                 + "receiver_id INTEGER NOT NULL,"
                 + "content TEXT,"
                 + "image_url TEXT," 
+                + "is_edited BOOLEAN DEFAULT 0,"
+                + "is_forwarded BOOLEAN DEFAULT 0,"
+                + "deleted_by_receiver BOOLEAN DEFAULT 0,"
+                + "reply_to_id INTEGER DEFAULT NULL,"
                 + "is_read BOOLEAN DEFAULT 0,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
                 + "FOREIGN KEY (sender_id) REFERENCES users(id),"
-                + "FOREIGN KEY (receiver_id) REFERENCES users(id)"
+                + "FOREIGN KEY (receiver_id) REFERENCES users(id),"
+                + "FOREIGN KEY (reply_to_id) REFERENCES messages(id)"
+                + ");";
+
+        // --- NEW: THE BLOCKING ENGINE JUNCTION TABLE ---
+        String createBlockedUsersTable = "CREATE TABLE IF NOT EXISTS blocked_users ("
+                + "blocker_id INTEGER NOT NULL,"
+                + "blocked_id INTEGER NOT NULL,"
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "FOREIGN KEY (blocker_id) REFERENCES users(id),"
+                + "FOREIGN KEY (blocked_id) REFERENCES users(id),"
+                + "PRIMARY KEY (blocker_id, blocked_id)"
                 + ");";
 
         try (Connection conn = connect();
@@ -121,6 +135,9 @@ public class DatabaseManager {
             stmt.execute(createNotificationsTable); 
             stmt.execute(createMessagesTable);
             
+            // Execute the new table creation
+            stmt.execute(createBlockedUsersTable);
+            
             /* ========================================= */
             /* --- THE SCHEMA MIGRATION ENGINE ---       */
             /* ========================================= */
@@ -130,8 +147,11 @@ public class DatabaseManager {
             try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_comment_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
             try { 
                 stmt.execute("ALTER TABLE messages ADD COLUMN image_url TEXT"); 
-                System.out.println("MIGRATION SUCCESS: Added 'image_url' to existing messages table.");
             } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN is_forwarded BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN deleted_by_receiver BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
             
             System.out.println("All database tables have been successfully initialized!");
         } catch (SQLException e) {

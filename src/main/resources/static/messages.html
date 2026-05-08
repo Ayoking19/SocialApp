@@ -77,6 +77,15 @@
             font-size: 15px;
             line-height: 1.4;
             word-wrap: break-word;
+            /* --- NEW: Prevent native text highlighting & popups --- */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        .msg-bubble.selected {
+            border: 2px solid #00e676;
+            background-color: rgba(0, 230, 118, 0.2) !important;
         }
         .msg-sent {
             background: #00e676;
@@ -164,6 +173,7 @@
         </div>
         <ul class="overlay-links" style="list-style:none; padding:0; margin-top:50px;">
             <li><a href="index.html">Home</a></li>
+            <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
             <li><a href="following.html">Following</a></li>        
@@ -202,44 +212,106 @@
                 </div>
 
                 <div id="chatView">
-                    <div class="chat-header">
+                    <div class="chat-header" id="normalChatHeader">
                         <span class="material-icons" style="cursor: pointer; color: #00e676; margin-right: 5px;" onclick="closeChat()">arrow_back</span>
                         <img id="chatHeaderAvatar" src="" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; cursor: pointer;" onclick="window.location.href='profile.html?user=' + activeChatUser">
                         <strong id="chatHeaderUsername" style="font-size: 18px; color: white; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='white'" onclick="window.location.href='profile.html?user=' + activeChatUser"></strong>
+                    </div>
+
+                    <div class="chat-header" id="selectionChatHeader" style="display: none; background: #0b0f1a; justify-content: space-between; border-bottom: 1px solid #00e676;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="exitSelectionMode()">close</span>
+                            <strong id="selectionCountText" style="color: white; font-size: 16px;">1 Selected</strong>
+                        </div>
+                        <button class="media-control-btn" style="background: white; color: black;" onclick="showMultiSelectOptions()">Select</button>
                     </div>
                     
                     <div class="chat-history" id="chatHistoryContainer">
                         </div>
                     
                     <div class="chat-input-area">
-                        <div id="msgMediaPreview" style="display: flex; gap: 10px; overflow-x: auto;"></div>
-                        
-                        <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
-                            
-                            <div style="position: relative; display: flex; align-items: center;">
-                                <button onclick="toggleAttachmentMenu()" class="icon-btn" style="background: transparent; border: none; color: #a09eb5; cursor: pointer; display: flex; align-items: center; padding: 0;"><span class="material-icons" style="font-size: 30px;">add_circle</span></button>
-                                
-                                <div id="attachmentMenu" style="display: none; position: absolute; bottom: 130%; left: 0; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; min-width: 140px;">
-                                    <label for="msgImgUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='white'"><span class="material-icons" style="color: #00e676;">image</span> Photo</label>
-                                    <label for="msgVidUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px; transition: 0.2s;" onmouseover="this.style.color='#ff3366'" onmouseout="this.style.color='white'"><span class="material-icons" style="color: #ff3366;">videocam</span> Video</label>
-                                    <label for="msgDocUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px; transition: 0.2s;" onmouseover="this.style.color='#00a8ff'" onmouseout="this.style.color='white'"><span class="material-icons" style="color: #00a8ff;">description</span> Document</label>
-                                </div>
+                        <div id="blockBanner" style="display: none; text-align: center; padding: 15px; color: #ff3366; font-weight: bold; background: rgba(255, 51, 102, 0.1); border-radius: 8px;"></div>
+                        <div id="replyPreviewBar" style="display: none; align-items: center; justify-content: space-between; background: rgba(0, 230, 118, 0.1); border-left: 4px solid #00e676; padding: 10px; border-radius: 4px 4px 0 0; margin-bottom: 5px;">
+                            <div style="flex: 1; overflow: hidden;">
+                                <strong style="color: #00e676; font-size: 13px;" id="replyPreviewSender"></strong>
+                                <p style="color: #a09eb5; font-size: 13px; margin: 2px 0 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="replyPreviewContent"></p>
                             </div>
+                            <span class="material-icons" style="color: #ff3366; cursor: pointer; font-size: 18px; margin-left: 10px;" onclick="cancelReply()">close</span>
+                        </div>
+                        
+                        <div id="chatControls" style="display: flex; flex-direction: column; width: 100%;">
+                            <div id="msgMediaPreview" style="display: flex; gap: 10px; overflow-x: auto;"></div>
+                            
+                            <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
+                                <div style="position: relative; display: flex; align-items: center;">
+                                    <button onclick="toggleAttachmentMenu()" class="icon-btn" style="background: transparent; border: none; color: #a09eb5; cursor: pointer; display: flex; align-items: center; padding: 0;"><span class="material-icons" style="font-size: 30px;">add_circle</span></button>
+                                    
+                                    <div id="attachmentMenu" style="display: none; position: absolute; bottom: 130%; left: 0; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; min-width: 140px;">
+                                        <label for="msgImgUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px;"><span class="material-icons" style="color: #00e676;">image</span> Photo</label>
+                                        <label for="msgVidUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px;"><span class="material-icons" style="color: #ff3366;">videocam</span> Video</label>
+                                        <label for="msgDocUpload" style="cursor: pointer; display: flex; align-items: center; gap: 10px; color: white; font-size: 15px;"><span class="material-icons" style="color: #00a8ff;">description</span> Document</label>
+                                    </div>
+                                </div>
 
-                            <input type="file" id="msgImgUpload" accept="image/*" hidden onchange="previewMsgMedia(this, 'image')">
-                            <input type="file" id="msgVidUpload" accept="video/*" hidden onchange="previewMsgMedia(this, 'video')">
-                            <input type="file" id="msgDocUpload" accept=".pdf,.doc,.docx,.txt" hidden onchange="previewMsgMedia(this, 'document')">
-                            
-                            <input type="text" id="messageInput" placeholder="Start a new message..." onkeypress="handleEnter(event)">
-                            
-                            <button onclick="executeSendMessage()" class="media-control-btn" style="flex-shrink: 0; border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center;">
-    <span class="material-icons">send</span>
-</button>
+                                <input type="file" id="msgImgUpload" accept="image/*" hidden onchange="previewMsgMedia(this, 'image')">
+                                <input type="file" id="msgVidUpload" accept="video/*" hidden onchange="previewMsgMedia(this, 'video')">
+                                <input type="file" id="msgDocUpload" accept=".pdf,.doc,.docx,.txt" hidden onchange="previewMsgMedia(this, 'document')">
+                                
+                                <input type="text" id="messageInput" placeholder="Start a new message..." onkeypress="handleEnter(event)">
+                                
+                                <button onclick="executeSendMessage()" class="media-control-btn" style="flex-shrink: 0; border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                                    <span class="material-icons">send</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
+    </div>
+    <div class="modal-overlay" id="msgContextMenu" style="display: none; z-index: 9999;">
+        <div class="modal-card" style="padding: 20px; width: 250px;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; border-bottom: 1px solid #334155; padding-bottom: 10px;">Message Options</h3>
+            <div id="msgOptionsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            <button class="modal-cancel-btn" style="width: 100%; margin-top: 15px;" onclick="document.getElementById('msgContextMenu').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editMessageModal" style="display: none; z-index: 10000;">
+        <div class="modal-card">
+            <h3>Edit Message</h3>
+            <textarea id="editMessageInput" style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white; margin-bottom: 15px; box-sizing: border-box;"></textarea>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="document.getElementById('editMessageModal').style.display='none'">Cancel</button>
+                <button class="modal-confirm-btn" onclick="confirmEditMessage()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="forwardMessageModal" style="display: none; z-index: 10000;">
+        <div class="modal-card" style="width: 350px; max-width: 90%; padding: 20px;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px;">Forward to...</h3>
+            <div style="position: relative; margin-bottom: 15px;">
+                <span class="material-icons" style="position: absolute; left: 10px; top: 10px; color: gray; font-size: 18px;">search</span>
+                <input type="text" id="forwardSearchInput" placeholder="Search recent chats..." onkeyup="filterForwardList()" style="width: 100%; padding: 10px 10px 10px 35px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white; box-sizing: border-box;">
+            </div>
+            <div id="forwardUserList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+                </div>
+            <button id="multiForwardSendBtn" class="modal-confirm-btn" style="width: 100%; display: none; margin-bottom: 10px;" onclick="executeMultiForward()">Send Forward</button>
+            <button class="modal-cancel-btn" style="width: 100%;" onclick="document.getElementById('forwardMessageModal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteMessageModal" style="display: none; z-index: 10000;">
+        <div class="modal-card">
+            <div class="modal-icon"><span class="material-icons" style="font-size: 40px; color: #ff3366;">delete_forever</span></div>
+            <h3>Delete Message?</h3>
+            <p style="color: #a09eb5;">Are you sure you want to permanently delete this message?</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="document.getElementById('deleteMessageModal').style.display='none'">Cancel</button>
+                <button class="modal-confirm-btn" style="background: #ff3366; color: white; border: none;" onclick="confirmDeleteMessage()">Yes, Delete</button>
+            </div>
+        </div>
     </div>
 
     <div class="modal-overlay" id="spamErrorModal" style="display: none;">
@@ -272,6 +344,14 @@
         let activeChatUser = null;
         let pollInterval = null;
         let msgMediaBase64 = "";
+        let inboxUsersBuffer = []; // NEW: Remembers recent chats for forwarding
+        let currentChatMessages = [];
+        let longPressTimer;
+        // NEW: Multi-Select Memory
+        let isSelectionMode = false;
+        let selectedMsgIds = [];
+        let selectedForwardUsers = [];
+        let replyingToMsgId = null; // NEW: Remembers what message you are replying to
 
         const urlParams = new URLSearchParams(window.location.search);
         const targetFromUrl = urlParams.get('user');
@@ -283,6 +363,7 @@
             })
             .then(res => res.json())
             .then(data => {
+                inboxUsersBuffer = data; // <-- ADD THIS LINE HERE
                 const inbox = document.getElementById("inboxView");
                 if (data.length === 0) {
                     inbox.innerHTML = `<div style="text-align: center; color: #a09eb5; margin-top: 40px;">
@@ -387,6 +468,29 @@
             
             fetchAndRenderChat();
             pollInterval = setInterval(fetchAndRenderChat, 3000);
+
+            // --- NEW: THE CHAT BLOCK SENSOR ---
+            fetch(`${API_BASE}/api/getBlockStatus`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: targetUsername })
+            })
+            .then(res => res.text())
+            .then(status => {
+                const banner = document.getElementById("blockBanner");
+                const controls = document.getElementById("chatControls");
+                if (status === "BLOCKED_BY_YOU") {
+                    banner.textContent = "You blocked this user. You cannot send messages.";
+                    banner.style.display = "block";
+                    controls.style.display = "none";
+                } else if (status === "BLOCKED_YOU") {
+                    banner.textContent = "This user blocked you.";
+                    banner.style.display = "block";
+                    controls.style.display = "none";
+                } else {
+                    banner.style.display = "none";
+                    controls.style.display = "flex";
+                }
+            });
         }
 
         function closeChat() {
@@ -407,6 +511,10 @@
             })
             .then(res => res.json())
             .then(messages => {
+                // THE VIDEO JUMP FIX: If no new messages arrived, do NOT re-render the HTML!
+                if (JSON.stringify(messages) === JSON.stringify(currentChatMessages)) return;
+                
+                currentChatMessages = messages; 
                 const container = document.getElementById("chatHistoryContainer");
                 const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
@@ -420,7 +528,10 @@
                     const isMe = msg.sender === currentUser;
                     const bubbleClass = isMe ? "msg-sent" : "msg-received";
                     
-                    // --- THE SMART PARSER: Decides how to draw the media! ---
+                    // NEW: Check if this message is currently selected
+                    const isSelected = selectedMsgIds.includes(msg.id);
+                    const selectedClass = isSelected ? "selected" : "";
+                    
                     let mediaHtml = "";
                     if (msg.media && msg.media !== "") {
                         if (msg.media.startsWith("data:video")) {
@@ -433,9 +544,35 @@
                         }
                     }
 
+                    const editedTag = msg.isEdited ? `<span style="font-size: 11px; opacity: 0.7; font-style: italic; margin-left: 8px;">(edited)</span>` : "";
+                    const forwardedTag = msg.isForwarded ? `<div style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">forward</span> Forwarded</div>` : "";
+
+                    // THE FIX: Build the Embedded Reply Bubble
+                    // THE FIX: Embedded Reply Bubble with Click-to-Scroll
+                    let replyHtml = "";
+                    if (msg.replyToId > 0 && msg.replySender) {
+                        const replyColor = isMe ? "rgba(255,255,255,0.7)" : "#00e676";
+                        replyHtml = `
+                            <div onclick="event.stopPropagation(); scrollToMessage(${msg.replyToId})" style="background: rgba(0,0,0,0.15); border-left: 3px solid ${replyColor}; padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.3)'" onmouseout="this.style.background='rgba(0,0,0,0.15)'">
+                                <strong style="color: ${replyColor}; font-size: 12px; display: block;">${msg.replySender}</strong>
+                                <span style="font-size: 13px; color: ${isMe ? '#fff' : '#e0e0e0'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 200px;">${msg.replyContent || "Attachment"}</span>
+                            </div>
+                        `;
+                    }
+
                     html += `
-                        <div class="msg-bubble ${bubbleClass}">
+                        <div id="msg-bubble-${msg.id}" class="msg-bubble ${bubbleClass} ${selectedClass}" 
+                             onmousedown="startLongPress(event, ${msg.id})" 
+                             onmouseup="cancelLongPress()" 
+                             onmouseleave="cancelLongPress()"
+                             ontouchstart="startLongPress(event, ${msg.id})" 
+                             ontouchend="cancelLongPress()"
+                             onclick="handleMessageClick(${msg.id})"
+                             oncontextmenu="return false;">
+                            ${forwardedTag}
+                            ${replyHtml} 
                             ${parseSocialText(msg.content)}
+                            ${editedTag}
                             ${mediaHtml}
                         </div>
                         <span style="font-size: 10px; color: gray; margin-top: -5px; ${isMe ? 'align-self: flex-end;' : 'align-self: flex-start;'}">${msg.timestamp}</span>
@@ -443,10 +580,7 @@
                 });
                 
                 container.innerHTML = html;
-
-                if (isAtBottom) {
-                    container.scrollTop = container.scrollHeight;
-                }
+                if (isAtBottom) container.scrollTop = container.scrollHeight;
             });
         }
 
@@ -462,16 +596,16 @@
 
             fetch(`${API_BASE}/api/sendMessage`, {
                 method: 'POST',
-                body: JSON.stringify({ sender: currentUser, receiver: activeChatUser, content: content, media: mediaToSend })
+                // THE FIX: Sending the replyToId string!
+                body: JSON.stringify({ sender: currentUser, receiver: activeChatUser, content: content, media: mediaToSend, isForwarded: false, replyToId: replyingToMsgId ? String(replyingToMsgId) : "" })
             })
             .then(res => res.text())
             .then(data => {
                 if (data === "SUCCESS") {
+                    cancelReply(); // Close the reply bar!
                     fetchAndRenderChat(); 
                 } else if (data === "SPAM_LIMIT_REACHED") {
                     document.getElementById("spamErrorModal").style.display = "flex";
-                } else if (data === "CANNOT_MESSAGE_SELF") {
-                    showToast("You cannot message yourself.");
                 } else {
                     showToast("Error sending message.");
                 }
@@ -488,6 +622,230 @@
             let target = prompt("Enter the username of the person you want to message:");
             if (target && target.trim() !== "") {
                 openChat(target.trim(), "");
+            }
+        }
+        /* ========================================= */
+        /* --- MESSAGE LONG-PRESS ENGINE ---         */
+        /* ========================================= */
+        /* ========================================= */
+        /* --- MULTI-SELECT MESSAGE ENGINE ---       */
+        /* ========================================= */
+        function startLongPress(e, msgId) {
+            if (isSelectionMode) return; 
+            longPressTimer = setTimeout(() => {
+                isSelectionMode = true;
+                selectedMsgIds = [msgId];
+                updateSelectionUI();
+            }, 800); // 800ms is standard mobile UX
+        }
+
+        function cancelLongPress() { clearTimeout(longPressTimer); }
+
+        function handleMessageClick(msgId) {
+            if (!isSelectionMode) return; 
+            const idx = selectedMsgIds.indexOf(msgId);
+            if (idx > -1) selectedMsgIds.splice(idx, 1); 
+            else selectedMsgIds.push(msgId); 
+            
+            if (selectedMsgIds.length === 0) exitSelectionMode();
+            else updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            document.getElementById("normalChatHeader").style.display = "none";
+            document.getElementById("selectionChatHeader").style.display = "flex";
+            document.getElementById("selectionCountText").textContent = selectedMsgIds.length + " Selected";
+            
+            // Force a re-render to apply the green .selected CSS borders
+            const tempMessages = [...currentChatMessages];
+            currentChatMessages = []; 
+            fetchAndRenderChat(); 
+        }
+
+        function exitSelectionMode() {
+            isSelectionMode = false;
+            selectedMsgIds = [];
+            document.getElementById("normalChatHeader").style.display = "flex";
+            document.getElementById("selectionChatHeader").style.display = "none";
+            
+            const tempMessages = [...currentChatMessages];
+            currentChatMessages = []; 
+            fetchAndRenderChat(); 
+        }
+
+        function showMultiSelectOptions() {
+            const container = document.getElementById("msgOptionsContainer");
+            container.innerHTML = "";
+            const btnStyle = "width: 100%; text-align: left; background: rgba(0,0,0,0.3); color: white; border: 1px solid #334155; padding: 10px; border-radius: 8px; cursor: pointer; margin-bottom: 8px;";
+            
+            let allMine = true;
+            selectedMsgIds.forEach(id => {
+                const msg = currentChatMessages.find(m => m.id === id);
+                if (msg && msg.sender !== currentUser) allMine = false;
+            });
+
+            // Exact rules you requested for Single Selection
+            if (selectedMsgIds.length === 1) {
+                if (allMine) {
+                    container.innerHTML += `<button style="${btnStyle}" onclick="promptEditMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">edit</span> Edit</button>`;
+                }
+                container.innerHTML += `<button style="${btnStyle}" onclick="replyToMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">reply</span> Reply</button>`;
+                container.innerHTML += `<button style="${btnStyle}" onclick="copySelectedMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">content_copy</span> Copy</button>`;
+            }
+
+            // Everyone gets Forward & Delete regardless of count
+            container.innerHTML += `<button style="${btnStyle}" onclick="openMultiForwardModal()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">forward</span> Forward</button>`;
+            
+            const deleteText = allMine ? "Delete for everyone" : "Delete for me";
+            container.innerHTML += `<button style="${btnStyle} background: rgba(255,51,102,0.1); color: #ff3366; border-color: rgba(255,51,102,0.3);" onclick="executeMultiDelete()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">delete</span> ${deleteText}</button>`;
+            
+            document.getElementById("msgContextMenu").style.display = "flex";
+        }
+
+        function replyToMessage() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
+            if (msg) {
+                replyingToMsgId = msg.id;
+                document.getElementById("replyPreviewSender").textContent = "Replying to " + msg.sender;
+                document.getElementById("replyPreviewContent").textContent = msg.content || (msg.media ? "Attachment" : "");
+                document.getElementById("replyPreviewBar").style.display = "flex";
+                document.getElementById("messageInput").focus();
+            }
+            exitSelectionMode();
+        }
+
+        function cancelReply() {
+            replyingToMsgId = null;
+            document.getElementById("replyPreviewBar").style.display = "none";
+        }
+
+        function copySelectedMessage() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
+            if (msg) navigator.clipboard.writeText(msg.content).then(() => showToast("Message copied!"));
+            exitSelectionMode();
+        }
+
+        function promptEditMessage() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
+            if (msg) {
+                document.getElementById("editMessageInput").value = msg.content;
+                document.getElementById("editMessageModal").style.display = "flex";
+            }
+        }
+
+        function confirmEditMessage() {
+            const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
+            const newText = document.getElementById("editMessageInput").value.trim();
+            if (msg && newText !== "" && newText !== msg.content) {
+                fetch(`${API_BASE}/api/editMessage`, {
+                    method: 'POST',
+                    body: JSON.stringify({ username: currentUser, messageId: String(selectedMsgIds[0]), content: newText })
+                }).then(() => {
+                    document.getElementById("editMessageModal").style.display = "none";
+                    exitSelectionMode();
+                });
+            }
+        }
+
+        /* --- MULTI-FORWARD ENGINE --- */
+        function openMultiForwardModal() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            selectedForwardUsers = [];
+            document.getElementById("forwardSearchInput").value = "";
+            renderForwardList(""); 
+            document.getElementById("forwardMessageModal").style.display = "flex";
+        }
+
+        function toggleForwardUser(username) {
+            const idx = selectedForwardUsers.indexOf(username);
+            if (idx > -1) selectedForwardUsers.splice(idx, 1);
+            else selectedForwardUsers.push(username);
+            
+            const sendBtn = document.getElementById("multiForwardSendBtn");
+            sendBtn.style.display = selectedForwardUsers.length > 0 ? "block" : "none";
+            sendBtn.textContent = `Forward to ${selectedForwardUsers.length} user(s)`;
+            
+            renderForwardList(document.getElementById("forwardSearchInput").value);
+        }
+
+        function renderForwardList(filterQuery) {
+            const listContainer = document.getElementById("forwardUserList");
+            listContainer.innerHTML = "";
+            const filtered = inboxUsersBuffer.filter(u => u.username.toLowerCase().includes(filterQuery.toLowerCase()));
+            
+            filtered.forEach(u => {
+                const isSel = selectedForwardUsers.includes(u.username);
+                const bg = isSel ? "rgba(0, 230, 118, 0.2)" : "rgba(255,255,255,0.05)";
+                const border = isSel ? "1px solid #00e676" : "1px solid transparent";
+                const icon = isSel ? "check_circle" : "radio_button_unchecked";
+                const iconColor = isSel ? "#00e676" : "gray";
+
+                listContainer.innerHTML += `
+                    <button onclick="toggleForwardUser('${u.username}')" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; background: ${bg}; border: ${border}; border-radius: 8px; cursor: pointer; transition: 0.2s;">
+                        <img src="${u.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+                        <strong style="color: white; font-size: 15px; margin-right: auto;">${u.username}</strong>
+                        <span class="material-icons" style="color: ${iconColor};">${icon}</span>
+                    </button>
+                `;
+            });
+        }
+
+        async function executeMultiForward() {
+            document.getElementById("forwardMessageModal").style.display = "none";
+            let successCount = 0;
+            
+            // Loop through all selected messages, and send them to all selected users!
+            for (let msgId of selectedMsgIds) {
+                const msg = currentChatMessages.find(m => m.id === msgId);
+                if (!msg) continue;
+                const safeMedia = msg.media ? msg.media : "";
+                
+                for (let user of selectedForwardUsers) {
+                    await fetch(`${API_BASE}/api/sendMessage`, {
+                        method: 'POST',
+                        body: JSON.stringify({ sender: currentUser, receiver: user, content: msg.content, media: safeMedia, isForwarded: true, replyToId: "" })
+                    });
+                }
+                successCount++;
+            }
+            showToast(`Sent ${successCount} forwarded message(s)!`);
+            exitSelectionMode();
+        }
+
+        async function executeMultiDelete() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            for (let msgId of selectedMsgIds) {
+                await fetch(`${API_BASE}/api/deleteMessage`, {
+                    method: 'POST',
+                    body: JSON.stringify({ username: currentUser, messageId: String(msgId) })
+                });
+            }
+            exitSelectionMode();
+        }
+
+        /* ========================================= */
+        /* --- CLICK-TO-SCROLL ENGINE ---            */
+        /* ========================================= */
+        function scrollToMessage(msgId) {
+            const targetBubble = document.getElementById(`msg-bubble-${msgId}`);
+            
+            if (targetBubble) {
+                // Smoothly scroll the screen to the target message
+                targetBubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add a cool highlight flash so the user sees exactly what they clicked on
+                targetBubble.style.transition = "background-color 0.4s ease";
+                targetBubble.style.backgroundColor = "rgba(0, 230, 118, 0.5)"; // Green flash
+                
+                // Fade it back to normal after 1 second
+                setTimeout(() => {
+                    targetBubble.style.backgroundColor = ""; 
+                }, 1000);
+            } else {
+                showToast("Original message is no longer in view.");
             }
         }
 

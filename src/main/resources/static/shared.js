@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 // THE FIX: The security guard now correctly looks for the "currentUser" badge!
 const currentUser = localStorage.getItem("currentUser");
@@ -96,6 +96,8 @@ function openEditModal(title, currentContent, onSave) {
             </div>`;
         document.body.appendChild(modal);
     }
+
+    
     document.getElementById('editModalTitle').innerText = title;
     document.getElementById('editModalInput').value = currentContent;
     modal.style.display = 'flex';
@@ -752,6 +754,25 @@ function openLightbox(imageSrc) {
     }
     document.getElementById('lightboxImg').src = imageSrc;
     overlay.style.display = 'flex';
+}
+
+/* ========================================== */
+/* --- GLOBAL SCROLL MEMORY ENGINE            */
+/* ========================================== */
+// Saves your exact pixel depth before you click a post
+function saveScrollPosition(pageIdentifier = 'general') {
+    sessionStorage.setItem(pageIdentifier + 'Scroll', window.scrollY || document.documentElement.scrollTop);
+}
+
+// Forces the browser to jump back down after it finishes loading the feed
+function restoreScrollPosition(pageIdentifier = 'general') {
+    setTimeout(() => {
+        const savedScroll = sessionStorage.getItem(pageIdentifier + 'Scroll');
+        if (savedScroll) {
+            window.scrollTo(0, parseInt(savedScroll));
+            sessionStorage.removeItem(pageIdentifier + 'Scroll');
+        }
+    }, 100); // 100ms delay ensures the new HTML is fully painted before scrolling
 }
 
 /* ========================================= */

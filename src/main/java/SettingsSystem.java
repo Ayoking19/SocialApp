@@ -170,4 +170,42 @@ public class SettingsSystem {
             System.out.println("Ghost Activity Cleanup Error: " + e.getMessage());
         }
     }
+    /* ========================================= */
+    /* --- METHOD 5: CHANGE USERNAME ---         */
+    /* ========================================= */
+    public static String updateUsername(String currentUsername, String newUsername) {
+        if (currentUsername.equals(newUsername)) return "SAME_USERNAME";
+        if (newUsername == null || newUsername.trim().isEmpty() || newUsername.contains(" ")) return "INVALID_FORMAT";
+
+        // Step 1: Ensure the new username isn't already taken
+        String checkSql = "SELECT 1 FROM users WHERE username = ?";
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setString(1, newUsername);
+            if (checkStmt.executeQuery().next()) {
+                return "USERNAME_TAKEN";
+            }
+        } catch (SQLException e) { return "ERROR"; }
+
+        // Step 2: Update the Users table and the Notifications table seamlessly
+        String updateUsers = "UPDATE users SET username = ? WHERE username = ?";
+        String updateNotifActor = "UPDATE notifications SET actor_user = ? WHERE actor_user = ?";
+        String updateNotifRecipient = "UPDATE notifications SET recipient_user = ? WHERE recipient_user = ?";
+
+        try (Connection conn = DatabaseManager.connect()) {
+            try (PreparedStatement stmt1 = conn.prepareStatement(updateUsers)) {
+                stmt1.setString(1, newUsername); stmt1.setString(2, currentUsername); stmt1.executeUpdate();
+            }
+            try (PreparedStatement stmt2 = conn.prepareStatement(updateNotifActor)) {
+                stmt2.setString(1, newUsername); stmt2.setString(2, currentUsername); stmt2.executeUpdate();
+            }
+            try (PreparedStatement stmt3 = conn.prepareStatement(updateNotifRecipient)) {
+                stmt3.setString(1, newUsername); stmt3.setString(2, currentUsername); stmt3.executeUpdate();
+            }
+            return "SUCCESS";
+        } catch (SQLException e) {
+            System.out.println("Update Username Error: " + e.getMessage());
+            return "ERROR";
+        }
+    }
 }

@@ -106,6 +106,7 @@ body {
 }
 
 /* --- THE OVERLAY MENU --- */
+/* --- THE OVERLAY MENU --- */
 .overlay-menu {
     position: fixed;
     top: 0;
@@ -118,7 +119,9 @@ body {
     display: flex;
     flex-direction: column;
     padding: 40px;
+    padding-bottom: 80px; /* NEW: Extra breathing room for the bottom */
     box-sizing: border-box;
+    overflow-y: auto; /* THE FIX: Enables vertical scrolling on small screens */
 }
 
 .overlay-menu.open {
@@ -770,6 +773,12 @@ textarea {
     color: #a09eb5;
     font-size: 16px;
     margin-top: 40px;
+}
+
+.overlay-menu {
+    /* Your existing properties (width, height, background, etc.) stay here! */
+    overflow-y: auto; /* THE FIX: Enables vertical scrolling */
+    padding-bottom: 30px; /* Gives the Log Out button some breathing room at the bottom */
 }
 
 /* ========================================= */
