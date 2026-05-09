@@ -16,6 +16,8 @@ public class MessageSystem {
             try { stmt.execute("ALTER TABLE messages ADD COLUMN group_id INTEGER DEFAULT NULL"); } catch (Exception e) {}
             try { stmt.execute("ALTER TABLE groups ADD COLUMN avatar TEXT DEFAULT NULL"); } catch (Exception e) {}
             try { stmt.execute("ALTER TABLE group_members ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch (Exception e) {}
+            
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN deleted_by_sender INTEGER DEFAULT 0"); } catch (Exception e) {}
         } catch (Exception e) { System.out.println("Schema Initialization Error: " + e.getMessage()); }
     }
 
@@ -114,9 +116,10 @@ public class MessageSystem {
         return "ERROR";
     }
 
-    public static String getChatHistory(String currentUser, String targetUser) {
+    // THE FIX: Added lastMessageId for Delta Polling
+    public static String getChatHistory(String currentUser, String targetUser, int lastMessageId) {
         ensureSchema();
-        String markReadSQL = "UPDATE messages SET is_read = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND deleted_by_receiver = 0";
+        String markReadSQL = "UPDATE messages SET is_read = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_receiver, 0) = 0";
         
         String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
@@ -124,9 +127,9 @@ public class MessageSystem {
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
                           "(SELECT g.id FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_id " +
                           "FROM messages m JOIN users u ON m.sender_id = u.id " +
-                          "WHERE ((m.sender_id = (SELECT id FROM users WHERE username = ?) AND m.receiver_id = (SELECT id FROM users WHERE username = ?)) " +
-                          "OR (m.sender_id = (SELECT id FROM users WHERE username = ?) AND m.receiver_id = (SELECT id FROM users WHERE username = ?) AND m.deleted_by_receiver = 0)) " +
-                          "AND m.group_id IS NULL " +
+                          "WHERE ((m.sender_id = (SELECT id FROM users WHERE username = ?) AND m.receiver_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(m.deleted_by_sender, 0) = 0) " +
+                          "OR (m.sender_id = (SELECT id FROM users WHERE username = ?) AND m.receiver_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(m.deleted_by_receiver, 0) = 0)) " +
+                          "AND m.group_id IS NULL AND m.id > ? " +
                           "ORDER BY m.created_at ASC";
 
         StringBuilder json = new StringBuilder("[");
@@ -138,6 +141,7 @@ public class MessageSystem {
             try (PreparedStatement fetchStmt = conn.prepareStatement(fetchSQL)) {
                 fetchStmt.setString(1, currentUser); fetchStmt.setString(2, targetUser);
                 fetchStmt.setString(3, targetUser); fetchStmt.setString(4, currentUser); 
+                fetchStmt.setInt(5, lastMessageId); // Delta filter
                 ResultSet rs = fetchStmt.executeQuery();
                 
                 boolean first = true;
@@ -173,12 +177,12 @@ public class MessageSystem {
     public static String getInbox(String currentUser) {
         ensureSchema();
         String inboxSQL = "SELECT u.username, u.profile_pic_url, " +
-                          "(SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND deleted_by_receiver = 0) OR (sender_id = me.id AND receiver_id = u.id)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_message, " +
-                          "(SELECT created_at FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND deleted_by_receiver = 0) OR (sender_id = me.id AND receiver_id = u.id)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_time, " +
-                          "(SELECT COUNT(*) FROM messages WHERE sender_id = u.id AND receiver_id = me.id AND is_read = 0 AND deleted_by_receiver = 0 AND group_id IS NULL) as unread_count " +
+                          "(SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0) OR (sender_id = me.id AND receiver_id = u.id AND COALESCE(deleted_by_sender, 0) = 0)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_message, " +
+                          "(SELECT created_at FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0) OR (sender_id = me.id AND receiver_id = u.id AND COALESCE(deleted_by_sender, 0) = 0)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_time, " +
+                          "(SELECT COUNT(*) FROM messages WHERE sender_id = u.id AND receiver_id = me.id AND is_read = 0 AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL) as unread_count " +
                           "FROM users u " +
                           "JOIN users me ON me.username = ? " +
-                          "WHERE u.id IN (SELECT sender_id FROM messages WHERE receiver_id = me.id AND deleted_by_receiver = 0 AND group_id IS NULL UNION SELECT receiver_id FROM messages WHERE sender_id = me.id AND group_id IS NULL) " +
+                          "WHERE u.id IN (SELECT sender_id FROM messages WHERE receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL UNION SELECT receiver_id FROM messages WHERE sender_id = me.id AND COALESCE(deleted_by_sender, 0) = 0 AND group_id IS NULL) " +
                           "ORDER BY last_time DESC";
 
         StringBuilder json = new StringBuilder("[");
@@ -208,13 +212,29 @@ public class MessageSystem {
     }
 
     public static String getGlobalUnreadCount(String currentUser) {
-        String sql = "SELECT COUNT(*) FROM messages WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND is_read = 0 AND deleted_by_receiver = 0 AND group_id IS NULL";
+        String sql = "SELECT COUNT(*) FROM messages WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND is_read = 0 AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, currentUser);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) return "{\"unread\":" + rs.getInt(1) + "}";
         } catch (Exception e) { System.out.println("Unread Count Error: " + e.getMessage()); }
         return "{\"unread\":0}";
+    }
+
+    public static String clearChatHistory(String currentUser, String targetUser) {
+        ensureSchema();
+        String sql1 = "UPDATE messages SET deleted_by_receiver = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND group_id IS NULL";
+        String sql2 = "UPDATE messages SET deleted_by_sender = 1 WHERE sender_id = (SELECT id FROM users WHERE username = ?) AND receiver_id = (SELECT id FROM users WHERE username = ?) AND group_id IS NULL";
+        
+        try (Connection conn = DatabaseManager.connect()) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql1)) {
+                stmt.setString(1, currentUser); stmt.setString(2, targetUser); stmt.executeUpdate();
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(sql2)) {
+                stmt.setString(1, currentUser); stmt.setString(2, targetUser); stmt.executeUpdate();
+            }
+            return "SUCCESS";
+        } catch (Exception e) { System.out.println("Clear Chat Error: " + e.getMessage()); return "ERROR"; }
     }
 
     public static boolean editMessage(String username, int messageId, String newContent) {
@@ -343,7 +363,8 @@ public class MessageSystem {
         return "ERROR";
     }
 
-    public static String getGroupChatHistory(String currentUser, int groupId) {
+    // THE FIX: Added lastMessageId for Delta Polling
+    public static String getGroupChatHistory(String currentUser, int groupId, int lastMessageId) {
         ensureSchema();
         String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
@@ -351,12 +372,13 @@ public class MessageSystem {
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
                           "(SELECT g.id FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_id " +
                           "FROM messages m JOIN users u ON m.sender_id = u.id " +
-                          "WHERE m.group_id = ? " +
+                          "WHERE m.group_id = ? AND m.id > ? " +
                           "ORDER BY m.created_at ASC";
 
         StringBuilder json = new StringBuilder("[");
         try (Connection conn = DatabaseManager.connect(); PreparedStatement fetchStmt = conn.prepareStatement(fetchSQL)) {
             fetchStmt.setInt(1, groupId);
+            fetchStmt.setInt(2, lastMessageId); // Delta filter
             ResultSet rs = fetchStmt.executeQuery();
             boolean first = true;
             while (rs.next()) {

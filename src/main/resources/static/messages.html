@@ -7,14 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
-        html, body { 
-            overflow: hidden !important; 
-            height: 100vh !important;
-            height: 100dvh !important; 
-            padding: 0 !important; 
-            margin: 0 !important;
-        }
-
         .container { width: 100% !important; max-width: 100vw !important; height: 100% !important; padding: 0 !important; margin: 0 !important; }
 
         .feed {
@@ -22,11 +14,6 @@
             flex-direction: column;
             width: 100% !important;
             max-width: 100vw !important;
-            height: 100% !important; 
-            padding-top: 65px !important; 
-            padding-bottom: 70px !important; 
-            padding-left: 0 !important;
-            padding-right: 0 !important;
             margin: 0 !important;
             box-sizing: border-box;
         }
@@ -43,6 +30,7 @@
         .inbox-item {
             display: flex; align-items: center; gap: 15px; padding: 15px; border-radius: 12px; cursor: pointer;
             transition: 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05); margin: 0 10px;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         }
         .inbox-item:hover { background: rgba(0, 230, 118, 0.05); }
 
@@ -137,7 +125,7 @@
                         <span class="material-icons" style="cursor: pointer; color: #00e676; margin-right: 5px;" onclick="closeChat()">arrow_back</span>
                         <div onclick="openChatInfoModal()" style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
                             <img id="chatHeaderAvatar" src="" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
-                            <strong id="chatHeaderUsername" style="font-size: 18px; color: white; transition: 0.2s;"></strong>
+                            <strong id="chatHeaderUsername" class="truncate-text" style="font-size: 18px; color: white; transition: 0.2s;"></strong>
                         </div>
                         <span class="material-icons" style="cursor: pointer; color: #a09eb5;" onclick="toggleChatSearch()">search</span>
                     </div>
@@ -200,6 +188,14 @@
         </main>
     </div>
     
+    <div class="modal-overlay" id="inboxContextMenu" style="display: none; z-index: 10000;">
+        <div class="modal-card" style="padding: 20px; width: 250px;">
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; border-bottom: 1px solid #334155; padding-bottom: 10px;">Chat Options</h3>
+            <div id="inboxOptionsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            <button class="modal-cancel-btn" style="width: 100%; margin-top: 15px;" onclick="document.getElementById('inboxContextMenu').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="mediaGalleryModal" style="display: none;">
         <div class="modal-card" style="width: 100%; max-width: 500px; height: 80vh; max-height: 80vh; display: flex; flex-direction: column; padding: 20px;">
             <div id="mediaGalleryNormalHeader" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px;">
@@ -361,6 +357,18 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="clearChatHistoryModal" style="display: none; z-index: 10000;">
+        <div class="modal-card">
+            <div class="modal-icon"><span class="material-icons" style="font-size: 40px; color: #ff3366;">delete_sweep</span></div>
+            <h3>Delete Entire Chat?</h3>
+            <p style="color: #a09eb5;">Are you sure you want to permanently delete this chat history? This cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" onclick="document.getElementById('clearChatHistoryModal').style.display='none'">Cancel</button>
+                <button class="modal-confirm-btn" style="background: #ff3366; color: white; border: none;" onclick="executeClearChatHistory()">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script src="shared.js"></script>
 
     <script>
@@ -387,6 +395,8 @@
         let currentSearchMatches = [];
         let currentSearchIndex = -1;
         let searchDebounceTimer = null;
+        
+        let pinnedChats = JSON.parse(localStorage.getItem("pinnedChats")) || [];
 
         const urlParams = new URLSearchParams(window.location.search);
         const targetFromUrl = urlParams.get('user');
@@ -505,13 +515,101 @@
             });
         }
 
+        // --- THE INBOX PIN/DELETE ENGINE --- //
+        let inboxPressTimer;
+        let isInboxLongPress = false;
+        let selectedInboxChat = null;
+
+        function startInboxPress(e, chatId, isGroup, chatName) {
+            isInboxLongPress = false;
+            inboxPressTimer = setTimeout(() => {
+                isInboxLongPress = true;
+                selectedInboxChat = { id: chatId, isGroup: isGroup, name: chatName };
+                openInboxOptionsModal();
+            }, 600);
+        }
+
+        function cancelInboxPress() {
+            clearTimeout(inboxPressTimer);
+        }
+
+        function handleInboxClick(e, clickTargetStr) {
+            if (isInboxLongPress) {
+                e.preventDefault();
+                return;
+            }
+            eval(clickTargetStr);
+        }
+
+        function openInboxOptionsModal() {
+            const container = document.getElementById("inboxOptionsContainer");
+            container.innerHTML = "";
+            const isPinned = pinnedChats.includes(selectedInboxChat.id);
+            const pinText = isPinned ? "Unpin Chat" : "Pin Chat";
+            const pinIcon = isPinned ? "push_pin" : "push_pin"; 
+            
+            container.innerHTML += `<button class="action-sheet-btn" onclick="togglePinChat()"><span class="material-icons">${pinIcon}</span> ${pinText}</button>`;
+            
+            if (!selectedInboxChat.isGroup) {
+                container.innerHTML += `<button class="action-sheet-btn" style="background: rgba(255,51,102,0.1); color: #ff3366; border-color: rgba(255,51,102,0.3);" onclick="deleteInboxChat()"><span class="material-icons">delete</span> Delete Chat</button>`;
+            }
+            document.getElementById("inboxContextMenu").style.display = "flex";
+        }
+
+        function togglePinChat() {
+            document.getElementById("inboxContextMenu").style.display = "none";
+            const id = selectedInboxChat.id;
+            if (pinnedChats.includes(id)) {
+                pinnedChats = pinnedChats.filter(c => c !== id);
+            } else {
+                if (pinnedChats.length >= 3) {
+                    showToast("You can only pin up to 3 chats.");
+                    return;
+                }
+                pinnedChats.push(id);
+            }
+            localStorage.setItem("pinnedChats", JSON.stringify(pinnedChats));
+            loadInbox();
+        }
+
+        function deleteInboxChat() {
+            document.getElementById("inboxContextMenu").style.display = "none";
+            document.getElementById("clearChatHistoryModal").style.display = "flex";
+        }
+
+        function executeClearChatHistory() {
+            document.getElementById("clearChatHistoryModal").style.display = "none";
+            fetch(`${API_BASE}/api/clearChatHistory`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, targetUser: selectedInboxChat.name })
+            }).then(r => r.text()).then(res => {
+                if (res === "SUCCESS") {
+                    showToast("Chat permanently deleted.");
+                    loadInbox();
+                } else {
+                    showToast("Error deleting chat.");
+                }
+            });
+        }
+
         function loadInbox() {
             Promise.all([
                 fetch(`${API_BASE}/api/getInbox`, { method: 'POST', body: JSON.stringify({ currentUser: currentUser }) }).then(r => r.json()),
                 fetch(`${API_BASE}/api/getUserGroups`, { method: 'POST', body: JSON.stringify({ currentUser: currentUser }) }).then(r => r.json())
             ]).then(([directChats, groupChats]) => {
                 let data = [...directChats, ...groupChats];
-                data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                // THE SORT: Pinned Chats on Top!
+                data.sort((a, b) => {
+                    const idA = a.isGroup ? String(a.id) : a.username;
+                    const idB = b.isGroup ? String(b.id) : b.username;
+                    const isPinnedA = pinnedChats.includes(idA);
+                    const isPinnedB = pinnedChats.includes(idB);
+                    if (isPinnedA && !isPinnedB) return -1;
+                    if (!isPinnedA && isPinnedB) return 1;
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                });
+
                 inboxUsersBuffer = data; 
                 const listContainer = document.getElementById("inboxListContainer");
                 if (data.length === 0) {
@@ -528,24 +626,37 @@
 
                 let html = "";
                 data.forEach(chat => {
-                    const unreadDot = chat.unreadCount > 0 ? `<div style="width: 10px; height: 10px; background: #00e676; border-radius: 50%; margin-left: auto;"></div>` : "";
+                    const unreadDot = chat.unreadCount > 0 ? `<div style="width: 10px; height: 10px; background: #00e676; border-radius: 50%; margin-left: auto; flex-shrink: 0;"></div>` : "";
                     const fwBold = chat.unreadCount > 0 ? "font-weight: bold; color: white;" : "color: #a09eb5;";
                     
-                    // Hide the SYS tag from the inbox preview
+                    const chatIdVal = chat.isGroup ? String(chat.id) : chat.username;
+                    const isPinned = pinnedChats.includes(chatIdVal);
+                    const pinnedIcon = isPinned ? `<span class="material-icons" style="color: #00e676; font-size: 14px; margin-left: 5px;">push_pin</span>` : "";
+
                     let cleanLastMessage = chat.lastMessage;
                     if (cleanLastMessage && cleanLastMessage.startsWith("[SYS]")) {
                         cleanLastMessage = cleanLastMessage.substring(5);
                     }
                     
-                    let clickTarget = chat.isGroup ? `openChat('${String(chat.id)}', '${chat.avatar}', true, '${chat.username.replace("'", "\\'")}')` : `openChat('${chat.username.replace("'", "\\'")}', '${chat.avatar}', false, null)`;
+                    let clickTargetStr = chat.isGroup ? `openChat('${String(chat.id)}', '${chat.avatar}', true, '${chat.username.replace("'", "\\'")}')` : `openChat('${chat.username.replace("'", "\\'")}', '${chat.avatar}', false, null)`;
+                    
                     html += `
-                        <div class="inbox-item" onclick="${clickTarget}">
-                            <img src="${chat.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
-                            <div style="flex: 1; overflow: hidden;">
-                                <strong style="color: white; display: block; font-size: 16px;">${chat.username}</strong>
-                                <span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; ${fwBold}">${cleanLastMessage}</span>
+                        <div class="inbox-item" 
+                             onmousedown="startInboxPress(event, '${chatIdVal.replace("'", "\\'")}', ${chat.isGroup ? 'true' : 'false'}, '${chat.username.replace("'", "\\'")}')" 
+                             onmouseup="cancelInboxPress()" 
+                             onmouseleave="cancelInboxPress()"
+                             ontouchstart="startInboxPress(event, '${chatIdVal.replace("'", "\\'")}', ${chat.isGroup ? 'true' : 'false'}, '${chat.username.replace("'", "\\'")}')" 
+                             ontouchend="cancelInboxPress()"
+                             onclick="handleInboxClick(event, \`${clickTargetStr}\`)">
+                            <img src="${chat.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                            <div class="user-info-text-col">
+                                <div style="display: flex; align-items: center; min-width: 0;">
+                                    <strong class="truncate-text" style="color: white; font-size: 16px;">${chat.username}</strong>
+                                    ${pinnedIcon}
+                                </div>
+                                <span class="truncate-text" style="font-size: 14px; display: block; ${fwBold}">${cleanLastMessage}</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0;">
                                 <span style="font-size: 11px; color: gray;">${chat.timestamp.split(' ')[1] || chat.timestamp}</span>
                                 ${unreadDot}
                             </div>
@@ -620,10 +731,12 @@
         }
 
         function openChat(targetId, targetAvatar, isGroup, groupName) {
-            // KILL ALL PREVIOUS POLLS BEFORE STARTING A NEW ONE TO PREVENT ROUTING GLITCHES
             if (pollInterval) clearInterval(pollInterval);
+            
+            currentChatMessages = [];
+            document.getElementById("chatHistoryContainer").innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Loading...</p>";
+            document.body.classList.add('in-chat'); 
 
-            // FORCE ALL IDS TO BE STRINGS FOR JSON PARSER SAFETY
             if (isGroup) {
                 activeGroupId = String(targetId);
                 activeChatUser = null;
@@ -679,6 +792,11 @@
                 activeChatUser = null;
                 activeGroupId = null;
                 if (pollInterval) clearInterval(pollInterval);
+                
+                currentChatMessages = [];
+                document.getElementById("chatHistoryContainer").innerHTML = "";
+                document.body.classList.remove('in-chat'); 
+
                 document.getElementById("chatView").style.display = "none";
                 document.getElementById("chatSearchBar").style.display = "none";
                 document.getElementById("searchNavControls").style.display = "none";
@@ -693,22 +811,30 @@
         function fetchAndRenderChat() {
             if (!activeChatUser && !activeGroupId) return;
 
+            // THE FIX: Smart Delta Polling Tracking
+            const lastMsgId = currentChatMessages.length > 0 ? currentChatMessages[currentChatMessages.length - 1].id : 0;
+
             const endpoint = activeGroupId ? '/api/getGroupChatHistory' : '/api/getChatHistory';
-            const payload = activeGroupId ? { currentUser: currentUser, groupId: activeGroupId } : { currentUser: currentUser, targetUser: activeChatUser };
+            const payload = activeGroupId 
+                ? { currentUser: currentUser, groupId: activeGroupId, lastMessageId: String(lastMsgId) } 
+                : { currentUser: currentUser, targetUser: activeChatUser, lastMessageId: String(lastMsgId) };
 
             fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             })
             .then(res => res.json())
-            .then(messages => {
-                if (JSON.stringify(messages) === JSON.stringify(currentChatMessages)) return;
+            .then(newMessages => {
+                // THE FIX: If there's nothing new, abort the render completely to save processing power!
+                if (newMessages.length === 0) return; 
                 
-                currentChatMessages = messages; 
+                // Append only the newly fetched messages to our active array
+                currentChatMessages = [...currentChatMessages, ...newMessages]; 
+                
                 const container = document.getElementById("chatHistoryContainer");
                 const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
-                if (messages.length === 0) {
+                if (currentChatMessages.length === 0) {
                     container.innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Say hello!</p>";
                     return;
                 }
@@ -716,7 +842,7 @@
                 let html = "";
                 let lastDateLabel = "";
 
-                messages.forEach(msg => {
+                currentChatMessages.forEach(msg => {
                     const isMe = msg.sender === currentUser;
                     const bubbleClass = isMe ? "msg-sent" : "msg-received";
                     const isSelected = selectedMsgIds.includes(msg.id);
@@ -744,7 +870,6 @@
                         lastDateLabel = dateLabel;
                     }
 
-                    // THE FIX: System Message Interceptor & Formatter
                     let contentText = msg.content || "";
                     let isSystem = false;
                     let sysMsgStr = "";
@@ -752,16 +877,6 @@
                     if (contentText.startsWith("[SYS]")) {
                         isSystem = true;
                         sysMsgStr = contentText.substring(5);
-                    } else if (contentText.includes(" added ") && contentText.includes(" to the group.")) {
-                        isSystem = true; sysMsgStr = contentText;
-                    } else if (contentText.includes(" removed ") && contentText.includes(" from the group.")) {
-                        isSystem = true; sysMsgStr = contentText;
-                    } else if (contentText.includes(" made ") && contentText.includes(" an admin.")) {
-                        isSystem = true; sysMsgStr = contentText;
-                    } else if (contentText.includes(" dismissed ") && contentText.includes(" as admin.")) {
-                        isSystem = true; sysMsgStr = contentText;
-                    } else if (contentText.includes(" left the group.")) {
-                        isSystem = true; sysMsgStr = contentText;
                     }
 
                     if (isSystem) {
@@ -771,16 +886,17 @@
                                     ${sysMsgStr}
                                 </div>
                             </div>`;
-                        return; // Skip drawing normal bubble
+                        return; 
                     }
 
                     html += `<div class="msg-wrapper" style="display: flex; flex-direction: column; width: 100%;">`;
 
                     let mediaHtml = "";
                     if (msg.media && msg.media !== "") {
-                        if (msg.media.startsWith("data:video")) {
+                        const mediaLower = msg.media.toLowerCase();
+                        if (mediaLower.startsWith("data:video") || mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm")) {
                             mediaHtml = `<video src="${msg.media}" controls style="display: block; max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px;"></video>`;
-                        } else if (msg.media.startsWith("data:application") || msg.media.startsWith("data:text")) {
+                        } else if (mediaLower.startsWith("data:application") || mediaLower.startsWith("data:text") || mediaLower.endsWith(".pdf") || mediaLower.endsWith(".doc") || mediaLower.endsWith(".txt")) {
                             const btnColor = isMe ? "#000" : "#00a8ff"; 
                             mediaHtml = `<a href="${msg.media}" download="Chat_Attachment" style="display: flex; width: max-content; align-items: center; gap: 5px; color: ${btnColor}; background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; text-decoration: none; margin-top: 8px; font-weight: bold;"><span class="material-icons">download</span> Download File</a>`;
                         } else {
@@ -788,7 +904,7 @@
                         }
                     }
 
-                    const editedTag = msg.isEdited ? `<div style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">edit</span> Edited</div>` : "";
+                    const editedTag = msg.isEdited ? `<span style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">edit</span> Edited</div>` : "";
                     const forwardedTag = msg.isForwarded ? `<div style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">forward</span> Forwarded</div>` : "";
 
                     let replyHtml = "";
@@ -798,7 +914,6 @@
                         const rSender = isDeleted ? "Deleted Message" : msg.replySender;
                         const rContent = isDeleted ? "This post has been deleted." : (msg.replyContent || "Attachment");
                         
-                        // We only show the group name if we are currently in a 1-on-1 private chat AND the message wasn't deleted
                         const groupBadge = (!activeGroupId && msg.replyGroupName && !isDeleted) ? `<span style="font-size: 10px; color: #1e293b; background: rgba(255,255,255,0.7); padding: 2px 5px; border-radius: 4px; margin-left: 5px; font-weight: bold;">${msg.replyGroupName}</span>` : "";
                         const cleanReplyGroupName = msg.replyGroupName ? msg.replyGroupName.replace("'", "\\'") : '';
                         
@@ -942,7 +1057,7 @@
                 container.innerHTML += `<button style="${btnStyle}" onclick="replyToMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">reply</span> Reply</button>`;
                 
                 const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
-                if (activeGroupId && msg && msg.sender !== currentUser && !msg.content.startsWith("[SYS]")) {
+                if (activeGroupId && msg && msg.sender !== currentUser && (!msg.content || !msg.content.startsWith("[SYS]"))) {
                     container.innerHTML += `<button style="${btnStyle}" onclick="replyPrivately()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">reply_all</span> Reply Privately</button>`;
                 }
                 
@@ -1119,7 +1234,6 @@
             exitSelectionMode();
         }
 
-        // THE FIX: The Synchronized Relational Message Router
         function scrollToMessage(msgId, replyGroupId, replyGroupName) {
             document.getElementById('mediaGalleryModal').style.display = 'none';
 
@@ -1133,7 +1247,6 @@
                 let checks = 0;
                 const interval = setInterval(() => {
                     checks++;
-                    // Wait for the new chat to physically render in the DOM before scrolling
                     if (document.getElementById(`msg-bubble-${msgId}`)) {
                         clearInterval(interval);
                         highlightAndScroll(msgId);
@@ -1253,9 +1366,11 @@
                 const isSelected = selectedMsgIds.includes(m.id);
                 const cls = isSelected ? "media-grid-item selected" : "media-grid-item";
                 
+                const mediaLower = m.media.toLowerCase();
+                
                 let el = "";
-                if (m.media.startsWith("data:video")) el = `<video src="${m.media}" class="${cls}"></video>`;
-                else if (m.media.startsWith("data:application") || m.media.startsWith("data:text")) el = `<div class="${cls}" style="display: flex; justify-content: center; align-items: center; background: rgba(0, 168, 255, 0.1); color: #00a8ff; border: 1px solid #00a8ff;"><span class="material-icons" style="font-size: 30px;">description</span></div>`;
+                if (mediaLower.startsWith("data:video") || mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm")) el = `<video src="${m.media}" class="${cls}"></video>`;
+                else if (mediaLower.startsWith("data:application") || mediaLower.startsWith("data:text") || mediaLower.endsWith(".pdf") || mediaLower.endsWith(".txt")) el = `<div class="${cls}" style="display: flex; justify-content: center; align-items: center; background: rgba(0, 168, 255, 0.1); color: #00a8ff; border: 1px solid #00a8ff;"><span class="material-icons" style="font-size: 30px;">description</span></div>`;
                 else el = `<img src="${m.media}" class="${cls}">`;
                 
                 box.innerHTML += `<div style="position: relative;" onclick="handleMediaClick(${m.id})" oncontextmenu="event.preventDefault(); startMediaSelection(${m.id});" onmousedown="startMediaLongPress(event, ${m.id})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startMediaLongPress(event, ${m.id})" ontouchend="cancelLongPress()">${el}</div>`;

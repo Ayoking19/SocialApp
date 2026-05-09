@@ -11,6 +11,8 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Base64;
+import java.util.UUID;
 
 public class Main {
     
@@ -89,7 +91,7 @@ public class Main {
                         
                         String username = extractJsonValue(body, "username");
                         String content = extractJsonValue(body, "content");
-                        String media = extractJsonValue(body, "media");
+                        String media = saveMediaFile(extractJsonValue(body, "media")); 
                         
                         Integer parentPostId = null;
                         if (body.contains("\"parentPostId\":")) {
@@ -370,7 +372,7 @@ public class Main {
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
                         String username = extractJsonValue(body, "username");
-                        String base64Image = extractJsonValue(body, "image");
+                        String base64Image = saveMediaFile(extractJsonValue(body, "image")); 
                         
                         boolean success = ProfileSystem.updateProfilePicture(username, base64Image);
                         String response = success ? "SUCCESS" : "FAILURE";
@@ -894,7 +896,7 @@ public class Main {
                         String sender = extractJsonValue(body, "sender");
                         String receiver = extractJsonValue(body, "receiver");
                         String content = extractJsonValue(body, "content");
-                        String media = extractJsonValue(body, "media");
+                        String media = saveMediaFile(extractJsonValue(body, "media")); 
                         
                         boolean isForwarded = body.contains("\"isForwarded\":true") || body.contains("\"isForwarded\": true");
                         String replyIdStr = extractJsonValue(body, "replyToId");
@@ -924,7 +926,11 @@ public class Main {
                         String currentUser = extractJsonValue(body, "currentUser");
                         String targetUser = extractJsonValue(body, "targetUser");
                         
-                        String jsonResponse = MessageSystem.getChatHistory(currentUser, targetUser);
+                        // THE FIX: Smart Delta Polling Parameter
+                        String lastMsgIdStr = extractJsonValue(body, "lastMessageId");
+                        int lastMessageId = (lastMsgIdStr != null && !lastMsgIdStr.trim().isEmpty() && !lastMsgIdStr.equals("null")) ? Integer.parseInt(lastMsgIdStr) : 0;
+                        
+                        String jsonResponse = MessageSystem.getChatHistory(currentUser, targetUser, lastMessageId);
                         
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
                         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
@@ -985,7 +991,7 @@ public class Main {
                         String sender = extractJsonValue(body, "sender");
                         int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
                         String content = extractJsonValue(body, "content");
-                        String media = extractJsonValue(body, "media");
+                        String media = saveMediaFile(extractJsonValue(body, "media")); 
                         String replyIdStr = extractJsonValue(body, "replyToId");
                         Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
                         
@@ -1006,7 +1012,12 @@ public class Main {
                         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                         String currentUser = extractJsonValue(body, "currentUser");
                         int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
-                        String response = MessageSystem.getGroupChatHistory(currentUser, groupId);
+                        
+                        // THE FIX: Smart Delta Polling Parameter
+                        String lastMsgIdStr = extractJsonValue(body, "lastMessageId");
+                        int lastMessageId = (lastMsgIdStr != null && !lastMsgIdStr.trim().isEmpty() && !lastMsgIdStr.equals("null")) ? Integer.parseInt(lastMsgIdStr) : 0;
+                        
+                        String response = MessageSystem.getGroupChatHistory(currentUser, groupId, lastMessageId);
                         byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         exchange.getResponseBody().write(responseBytes);
@@ -1062,7 +1073,7 @@ public class Main {
                     exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                     if ("POST".equals(exchange.getRequestMethod())) {
                         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                        String response = MessageSystem.updateGroupInfo(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")), extractJsonValue(body, "newName"), extractJsonValue(body, "newAvatar"));
+                        String response = MessageSystem.updateGroupInfo(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")), extractJsonValue(body, "newName"), saveMediaFile(extractJsonValue(body, "newAvatar"))); 
                         byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         exchange.getResponseBody().write(responseBytes);
@@ -1101,7 +1112,6 @@ public class Main {
                     }
                 }
             });
-
 
             /* ========================================= */
             /* --- 35. THE INBOX (ACTIVE CHATS) ENDPOINT */
@@ -1175,6 +1185,9 @@ public class Main {
                         else if (path.endsWith(".js")) contentType = "application/javascript";
                         else if (path.endsWith(".png")) contentType = "image/png";
                         else if (path.endsWith(".jpg")) contentType = "image/jpeg";
+                        else if (path.endsWith(".mp4")) contentType = "video/mp4"; 
+                        else if (path.endsWith(".pdf")) contentType = "application/pdf"; 
+                        else if (path.endsWith(".txt")) contentType = "text/plain"; 
 
                         exchange.getResponseHeaders().set("Content-Type", contentType);
                         exchange.sendResponseHeaders(200, bytes.length);
@@ -1191,6 +1204,7 @@ public class Main {
                     }
                 }
             });
+
             /* ========================================= */
             /* --- 38. THE BLOCK SYSTEM ENDPOINTS ---    */
             /* ========================================= */
@@ -1223,6 +1237,7 @@ public class Main {
                     }
                 }
             });
+
             /* ========================================= */
             /* --- 39. EDIT MESSAGE ENDPOINT ---         */
             /* ========================================= */
@@ -1269,6 +1284,33 @@ public class Main {
                     }
                 }
             });
+
+            /* ========================================= */
+            /* --- [NEW] DELETE ENTIRE CHAT ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/clearChatHistory", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String targetUser = extractJsonValue(body, "targetUser");
+
+                        String response = MessageSystem.clearChatHistory(currentUser, targetUser);
+                        
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().add("Content-Type", "text/plain; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+            
             /* ========================================= */
             /* --- 41. THE TOP POSTS TIME-SERIES ENDPOINT*/
             /* ========================================= */
@@ -1295,6 +1337,7 @@ public class Main {
                     }
                 }
             });
+
             /* ========================================= */
             /* --- 42. THE UPDATE USERNAME ENDPOINT ---  */
             /* ========================================= */
@@ -1318,7 +1361,6 @@ public class Main {
                 }
             });
                      
-
             server.setExecutor(null);
             server.start();
             System.out.println("\n API Server is running live on http://localhost:8080");
@@ -1361,6 +1403,46 @@ public class Main {
             OutputStream os = exchange.getResponseBody();
             os.write(responseBytes);
             os.close();
+        }
+    }
+
+    /* ============================================================== */
+    /* --- THE DATABASE OPTIMIZATION ENGINE (FILE SAVER) ---    */
+    /* ============================================================== */
+    private static String saveMediaFile(String base64Data) {
+        if (base64Data == null || base64Data.trim().isEmpty()) return "";
+        if (!base64Data.startsWith("data:")) return base64Data; 
+        
+        try {
+            int commaIndex = base64Data.indexOf(",");
+            if (commaIndex == -1) return base64Data;
+            
+            String header = base64Data.substring(0, commaIndex);
+            String data = base64Data.substring(commaIndex + 1);
+            
+            String ext = ".png"; 
+            if (header.contains("video/mp4")) ext = ".mp4";
+            else if (header.contains("video/webm")) ext = ".webm";
+            else if (header.contains("image/jpeg")) ext = ".jpg";
+            else if (header.contains("image/gif")) ext = ".gif";
+            else if (header.contains("application/pdf")) ext = ".pdf";
+            else if (header.contains("text/plain")) ext = ".txt";
+            
+            byte[] decodedBytes = Base64.getDecoder().decode(data);
+            
+            String fileName = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+            
+            File dir = new File("src/main/resources/static/uploads");
+            if (!dir.exists()) dir.mkdirs();
+            
+            File file = new File(dir, fileName);
+            Files.write(file.toPath(), decodedBytes);
+            
+            return "uploads/" + fileName;
+            
+        } catch (Exception e) {
+            System.out.println("Media Save Error: " + e.getMessage());
+            return base64Data; 
         }
     }
 }

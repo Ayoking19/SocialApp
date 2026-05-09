@@ -85,12 +85,10 @@
     <script src="shared.js"></script>
 
     <script>
-        /* --- PAGINATION STATE MACHINE --- */
         let currentPage = 1;
         let isFetching = false; 
         let hasMorePosts = true; 
 
-        /* --- 1. INITIAL SECURITY & SETUP --- */
         checkSecurity(); 
         loadCurrentUserInfo();
 
@@ -112,7 +110,6 @@
             .catch(err => console.error("Avatar Load Error:", err));
         }
 
-        /* --- 2. WELCOME MESSAGE LOGIC --- */
         if (sessionStorage.getItem("welcomeAcknowledged") === "true") {
             const welcomeMsg = document.getElementById('welcomeMsg');
             if(welcomeMsg) welcomeMsg.style.display = 'none';
@@ -123,7 +120,6 @@
             sessionStorage.setItem("welcomeAcknowledged", "true");
         }
 
-        /* --- 3. MEDIA UPLOAD ENGINE (Base64) --- */
         let attachedMediaBase64 = ""; 
         let attachedMediaType = "";
 
@@ -153,17 +149,13 @@
             document.getElementById('videoUpload').value = ""; 
         }
 
-        /* --- 4. FEED RENDERER (Optimized with DOM Batching & Pagination) --- */
         function loadFeed() {
-            // THE LOCK: Stop if we are already fetching or if the database is empty
             if (isFetching || !hasMorePosts) return;
             isFetching = true;
 
             const feedContainer = document.getElementById("feedContainer");
-            // Trigger the scroll jump!
             restoreScrollPosition(window.location.pathname);
             
-            // Only deploy skeletons if it is the very first page load
             if (currentPage === 1) {
                 feedContainer.innerHTML = generateSkeletonHTML(3);
             }
@@ -174,7 +166,6 @@
             })
             .then(response => response.json()) 
             .then(posts => {
-                // THE BOUNDARY: If Java sends back fewer than 15 posts, we hit the end
                 if (posts.length < 15) {
                     hasMorePosts = false;
                 }
@@ -224,27 +215,26 @@
                         `;
                     }
 
-                    // THE FIX: Detect pure reposts and set the correct URL
                     const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                     const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
-                    // THE FIX: Inject targetUrl and saveScrollPosition into the div!
+                    // THE FIX: The new mobile-safe flex row implementation
                     feedHTML += `
                         <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
                             <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
-                                <div style="display: flex; flex-direction: column;">
-                                    <div style="display: flex; align-items: center;">
-                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" style="color: white; text-decoration: none;"><strong>${post.username}</strong></a>
+                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
+                                <div class="user-info-text-col">
+                                    <div style="display: flex; align-items: center; min-width: 0;">
+                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" class="truncate-text" style="color: white; text-decoration: none; font-weight: bold;">${post.username}</a>
                                         ${editedTag}
                                         ${postEditDeleteHTML}
                                     </div>
-                                    <span class="time-stamp">${post.timestamp}</span>
+                                    <span class="time-stamp truncate-text" style="font-size: 12px; color: gray;">${post.timestamp.substring(0, 16)}</span>
                                 </div>
                                 ${post.username !== currentUser ? 
                                     (post.isFollowing ? 
-                                        `<button class="media-control-btn" style="margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
-                                        `<button class="media-control-btn" style="margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
+                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
+                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
                                     ) : ''}
                             </div>
                             
@@ -281,17 +271,14 @@
                         </div>`;
                 });
                 
-                // THE INJECTION: If Page 1, replace. If Page 2+, attach to the bottom.
                 if (currentPage === 1) {
                     feedContainer.innerHTML = feedHTML;
                 } else {
                     feedContainer.insertAdjacentHTML('beforeend', feedHTML);
                 }
 
-                // THE FIX: Trigger the scroll jump AFTER the HTML has actually been painted to the screen!
                 restoreScrollPosition(window.location.pathname);
-
-                isFetching = false; // UNLOCK the system
+                isFetching = false; 
             })
             .catch(error => {
                 console.error("Feed Error:", error);
@@ -299,17 +286,15 @@
             });
         }
 
-        /* --- THE SCROLL SENSOR --- */
         window.addEventListener('scroll', () => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
                 if (!isFetching && hasMorePosts) {
-                    currentPage++; // Math: Advance to the next chunk of 15
+                    currentPage++; 
                     loadFeed(); 
                 }
             }
         });
 
-        /* --- 5. POST CREATION ENGINE (WITH DEBOUNCING) --- */
         let isPosting = false; 
 
         document.getElementById("postBtn").addEventListener("click", function() {
@@ -339,7 +324,6 @@
                     document.getElementById("postContent").value = "";
                     removeMedia(); 
                     
-                    // Reset the state machine to pull the fresh list from the top
                     currentPage = 1;
                     hasMorePosts = true;
                     loadFeed(); 
@@ -352,7 +336,6 @@
             });
         });
 
-        // Start the ignition sequence!
         loadFeed();
     </script>
 </body>
