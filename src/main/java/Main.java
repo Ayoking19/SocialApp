@@ -20,6 +20,7 @@ public class Main {
         
         System.out.println("=== Starting Social Media Backend ===");
         DatabaseManager.initializeDatabase();
+        MessageSystem.ensureSchema();
 
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
@@ -146,7 +147,6 @@ public class Main {
                         
                         String jsonResponse = PostSystem.getFeed(currentUser, page);
                         
-                        // THE FIX: UTF-8 Byte Counting
                         byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
                         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                         exchange.sendResponseHeaders(200, responseBytes.length);
@@ -897,8 +897,6 @@ public class Main {
                         String media = extractJsonValue(body, "media");
                         
                         boolean isForwarded = body.contains("\"isForwarded\":true") || body.contains("\"isForwarded\": true");
-                        
-                        // THE FIX: Safely parse the Reply ID
                         String replyIdStr = extractJsonValue(body, "replyToId");
                         Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
                         
@@ -937,6 +935,173 @@ public class Main {
                     }
                 }
             });
+
+            /* ========================================= */
+            /* --- 34.5. THE CREATE GROUP ENDPOINT ---   */
+            /* ========================================= */
+            server.createContext("/api/createGroup", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String creator = extractJsonValue(body, "currentUser");
+                        String groupName = extractJsonValue(body, "groupName");
+                        String membersStr = extractJsonValue(body, "members"); 
+                        String response = MessageSystem.createGroup(creator, groupName, membersStr);
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 34.6. THE USER GROUPS ENDPOINTS ---   */
+            /* ========================================= */
+            server.createContext("/api/getUserGroups", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = MessageSystem.getUserGroups(extractJsonValue(body, "currentUser"));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/sendGroupMessage", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String sender = extractJsonValue(body, "sender");
+                        int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
+                        String content = extractJsonValue(body, "content");
+                        String media = extractJsonValue(body, "media");
+                        String replyIdStr = extractJsonValue(body, "replyToId");
+                        Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
+                        
+                        String response = MessageSystem.sendGroupMessage(sender, groupId, content, media, replyToId);
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/getGroupChatHistory", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
+                        String response = MessageSystem.getGroupChatHistory(currentUser, groupId);
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 34.7. THE CHAT MEDIA ENDPOINTS ---    */
+            /* ========================================= */
+            server.createContext("/api/getChatMedia", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String targetUser = extractJsonValue(body, "targetUser");
+                        String groupIdStr = extractJsonValue(body, "groupId");
+                        Integer groupId = (groupIdStr != null && !groupIdStr.trim().isEmpty() && !groupIdStr.equals("null")) ? Integer.parseInt(groupIdStr) : null;
+                        
+                        String response = MessageSystem.getChatMedia(currentUser, targetUser, groupId);
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 34.8. THE GROUP ADMIN ENDPOINTS ---   */
+            /* ========================================= */
+            server.createContext("/api/getGroupInfo", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = MessageSystem.getGroupInfo(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/updateGroupInfo", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = MessageSystem.updateGroupInfo(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")), extractJsonValue(body, "newName"), extractJsonValue(body, "newAvatar"));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/manageGroupMember", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        String response = MessageSystem.manageGroupMember(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")), extractJsonValue(body, "action"), extractJsonValue(body, "targetUser"));
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
+            server.createContext("/api/leaveGroup", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        boolean deleteGroup = body.contains("\"deleteGroup\":true") || body.contains("\"deleteGroup\": true");
+                        String response = MessageSystem.leaveGroup(extractJsonValue(body, "currentUser"), Integer.parseInt(extractJsonValue(body, "groupId")), deleteGroup);
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        exchange.getResponseBody().write(responseBytes);
+                        exchange.getResponseBody().close();
+                    }
+                }
+            });
+
 
             /* ========================================= */
             /* --- 35. THE INBOX (ACTIVE CHATS) ENDPOINT */
@@ -1156,7 +1321,7 @@ public class Main {
 
             server.setExecutor(null);
             server.start();
-            System.out.println("\n🌐 API Server is running live on http://localhost:8080");
+            System.out.println("\n API Server is running live on http://localhost:8080");
             
         } catch (IOException e) {
             System.out.println("Failed to start server: " + e.getMessage());

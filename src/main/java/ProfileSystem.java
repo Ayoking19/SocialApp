@@ -31,29 +31,27 @@ public class ProfileSystem {
                 }
 
                 if (avatar == null || avatar.trim().isEmpty()) {
-                    avatar = "https://ui-avatars.com/api/?name=" + username + "&background=1e293b&color=00e676";
+                    // THE FIX: Globally linking to our native SVG placeholder
+                    avatar = MessageSystem.DEFAULT_AVATAR;
                 }
 
                 return "{" +
                        "\"username\":\"" + username + "\"," +
-                       "\"bio\":\"" + bio + "\"," +
-                       "\"avatar\":\"" + avatar + "\"," + 
-                       "\"followers\":0," +   
-                       "\"following\":0," +   
+                       "\"bio\":\"" + bio.replace("\"", "\\\"").replace("\n", "\\n") + "\"," +
+                       "\"avatar\":\"" + avatar + "\"," +
                        "\"postCount\":" + postCount +
                        "}";
             }
         } catch (SQLException e) {
             System.out.println("Error fetching profile: " + e.getMessage());
         }
-        
-        return "ERROR";
+        return "{\"error\": \"User not found\"}";
     }
 
     public static boolean updateBio(String username, String newBio) {
-        String updateSQL = "UPDATE users SET bio = ? WHERE username = ?";
+        String sql = "UPDATE users SET bio = ? WHERE username = ?";
         try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(updateSQL)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, newBio);
             pstmt.setString(2, username);
             return pstmt.executeUpdate() > 0;
@@ -64,9 +62,9 @@ public class ProfileSystem {
     }
 
     public static boolean updateProfilePicture(String username, String base64Image) {
-        String updateSQL = "UPDATE users SET profile_pic_url = ? WHERE username = ?";
+        String sql = "UPDATE users SET profile_pic_url = ? WHERE username = ?";
         try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(updateSQL)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, base64Image);
             pstmt.setString(2, username);
             return pstmt.executeUpdate() > 0;
@@ -77,9 +75,8 @@ public class ProfileSystem {
     }
 
     public static String searchUsers(String searchQuery) {
-        String querySQL = "SELECT username, profile_pic_url, bio FROM users WHERE username LIKE ? LIMIT 15";
-        StringBuilder jsonBuilder = new StringBuilder();
-        jsonBuilder.append("[");
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        String querySQL = "SELECT username, profile_pic_url, bio FROM users WHERE username LIKE ?";
 
         try (Connection conn = DatabaseManager.connect();
              PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
@@ -100,7 +97,8 @@ public class ProfileSystem {
                 }
                 
                 if (avatar == null || avatar.trim().isEmpty()) {
-                    avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                    // THE FIX: Globally linking to our native SVG placeholder
+                    avatar = MessageSystem.DEFAULT_AVATAR;
                 }
 
                 jsonBuilder.append("{")

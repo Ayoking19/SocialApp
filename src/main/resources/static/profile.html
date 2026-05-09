@@ -100,27 +100,30 @@
                             </div>
                         </div>
                         
-                        <div class="profile-tabs">
-                            <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
-                            <button id="tab-top" class="tab-btn" onclick="showTopPosts()">Top</button>
-                            <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
-                            <button id="tab-replies" class="tab-btn" onclick="showReplies()">Replies</button>
-                            <button id="tab-quotes" class="tab-btn" onclick="showQuotes()">Quotes</button>
-                            <button id="tab-reposts" class="tab-btn" onclick="showReposts()">Reposts</button>
+                        <div class="sticky-container">
+                            <div class="profile-tabs" style="margin-bottom: 15px;">
+                                <button id="tab-posts" class="tab-btn active-tab" onclick="showAllPosts()">Posts</button>
+                                <button id="tab-top" class="tab-btn" onclick="showTopPosts()">Top</button>
+                                <button id="tab-media" class="tab-btn" onclick="showOnlyMedia()">Media</button>
+                                <button id="tab-replies" class="tab-btn" onclick="showReplies()">Replies</button>
+                                <button id="tab-quotes" class="tab-btn" onclick="showQuotes()">Quotes</button>
+                                <button id="tab-reposts" class="tab-btn" onclick="showReposts()">Reposts</button>
+                            </div>
+
+                            <div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                    <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; min-width: 0; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                    <button onclick="executeProfileSearch()" class="media-control-btn" style="display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">search</span></button>
+                                    <button onclick="clearProfileSearch()" class="media-control-btn" style="background:rgba(255,51,102,0.1); color:#ff3366; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">close</span></button>
+                                </div>
+                                <div id="profileSearchTabs" style="display: none; justify-content: center; gap: 15px; font-size: 13px;">
+                                    <span id="p-tab-latest" onclick="renderProfileSearchResults('latest')" style="cursor:pointer; color:#00e676;">Latest</span>
+                                    <span id="p-tab-top" onclick="renderProfileSearchResults('top')" style="cursor:pointer; color:gray;">Top</span>
+                                    <span id="p-tab-media" onclick="renderProfileSearchResults('media')" style="cursor:pointer; color:gray;">Media</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div style="margin-bottom: 20px;">
-                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <input type="text" id="profileSearchInput" placeholder="Search activity..." style="flex: 1; min-width: 0; padding: 12px; border-radius: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,230,118,0.3); color: white;">
-                                <button onclick="executeProfileSearch()" class="media-control-btn" style="display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">search</span></button>
-                                <button onclick="clearProfileSearch()" class="media-control-btn" style="background:rgba(255,51,102,0.1); color:#ff3366; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 20px;">close</span></button>
-                            </div>
-                            <div id="profileSearchTabs" style="display: none; justify-content: center; gap: 15px; font-size: 13px;">
-                                <span id="p-tab-latest" onclick="renderProfileSearchResults('latest')" style="cursor:pointer; color:#00e676;">Latest</span>
-                                <span id="p-tab-top" onclick="renderProfileSearchResults('top')" style="cursor:pointer; color:gray;">Top</span>
-                                <span id="p-tab-media" onclick="renderProfileSearchResults('media')" style="cursor:pointer; color:gray;">Media</span>
-                            </div>
-                        </div>
                         <div id="profileFeedContainer"></div>                  
                     </div>
             </div> 
@@ -155,7 +158,7 @@
         <div class="modal-card">
             <h3>Edit Your Bio</h3>
             <p>Write something interesting about yourself.</p>
-            <textarea id="newBioInput" class="bio-edit-input" placeholder="Passionate about UI/UX..."></textarea>
+            <textarea id="newBioInput" class="bio-edit-input" placeholder="About..."></textarea>
             <div class="modal-buttons">
                 <button class="modal-cancel-btn" onclick="closeBioModal()">Cancel</button>
                 <button class="modal-confirm-btn" onclick="saveNewBio()" style="background: #00e676; color: black; box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);">Save</button>
@@ -233,7 +236,6 @@
                     `;
                 }
 
-                // THE FIX: Detect pure reposts and route to the parent instead
                 const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                 const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
@@ -302,15 +304,11 @@
                 const cloak = document.getElementById("invisibilityCloak");
 
                 if (status === "BLOCKED_BY_YOU") {
-                    // Activate the Cloak!
                     if (secureContent) secureContent.style.display = "none";
                     if (cloak) cloak.style.display = "block";
-                    
-                    // Hide Follow/Message buttons
                     if (followBtn) followBtn.style.display = "none";
                     if (messageBtn) messageBtn.style.display = "none";
                     
-                    // Turn Block button into an Unblock button
                     if (blockBtn) {
                         blockBtn.style.display = "inline-block";
                         blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px; vertical-align: middle;">lock_open</span> Unblock`;
@@ -319,16 +317,13 @@
                         blockBtn.style.borderColor = "rgba(0, 230, 118, 0.3)";
                     }
                 } else if (status === "BLOCKED_YOU") {
-                    // Activate the Cloak!
                     if (secureContent) secureContent.style.display = "none";
                     if (cloak) cloak.style.display = "block";
                     
-                    // Hide EVERYTHING
                     if (followBtn) followBtn.style.display = "none";
                     if (messageBtn) messageBtn.style.display = "none";
                     if (blockBtn) blockBtn.style.display = "none"; 
                 } else {
-                    // Normal Profile State
                     if (secureContent) secureContent.style.display = "block";
                     if (cloak) cloak.style.display = "none";
                     if (blockBtn) {
@@ -386,9 +381,6 @@
             }
         }
 
-        /* ========================================= */
-        /* --- THE TRENDING ALGORITHM ENGINE ---     */
-        /* ========================================= */
         function showTopPosts() {
             resetTabs('tab-top');
             const feedContainer = document.getElementById("profileFeedContainer");
@@ -398,15 +390,12 @@
                 return;
             }
 
-            // Step 1: Filter out pure reposts, so the same viral post isn't listed multiple times
             const trendingArray = profilePostsBuffer.filter(p => {
                 const isPureRepost = (!p.content || p.content.trim() === "") && (!p.media || p.media === "") && p.parentPost;
                 return !isPureRepost;
             });
             
-            // Step 2: The Mathematical Sorting Engine (Restored!)
             trendingArray.sort((a, b) => {
-                // Engagement Score = Likes + Comments + Reposts
                 const scoreA = a.likes + a.commentCount + a.repostCount;
                 const scoreB = b.likes + b.commentCount + b.repostCount;
                 
@@ -512,9 +501,6 @@
                 document.getElementById("displayName").textContent = profile.username;
                 document.getElementById("displayUsername").textContent = "@" + profile.username;
                 document.getElementById("displayBio").textContent = profile.bio;
-                
-                // THE FIX: We only update the static Post Count here! 
-                // Followers/Following are handled by loadRelations() to stop the glitch.
                 document.getElementById("postCount").textContent = profile.postCount;
                 document.getElementById("profileImage").src = profile.avatar;
             })
@@ -555,7 +541,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                // THE FIX: This is now the single source of truth for the numbers!
                 document.getElementById("followerCount").textContent = data.followers;
                 document.getElementById("followingCount").textContent = data.following;
                 
@@ -739,11 +724,10 @@
             });
         }
 
-        /* Ignition */
         loadProfileData();
         loadUserPosts();
         loadRelations(); 
-        checkBlockStatus(); // <--- ADD THIS LINE
+        checkBlockStatus(); 
     </script>
 </body>
 </html>

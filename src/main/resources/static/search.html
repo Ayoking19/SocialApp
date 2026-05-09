@@ -16,7 +16,7 @@
             <li><a href="index.html">Home</a></li>
             <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
-            <li><a href="search.html">Search</a></li>
+            <li><a href="search.html" style="color: #00e676;">Search</a></li>
             <li><a href="following.html">Following</a></li> 
             <li><a href="messages.html">Messages</a></li>       
             <li><a href="notifications.html">Notifications</a></li>
@@ -41,7 +41,7 @@
             <span class="material-icons">home</span>
         </a>
         <a href="search.html">
-            <span class="material-icons">search</span>
+            <span class="material-icons" style="color: #00e676;">search</span>
         </a>
         <a href="messages.html" id="nav-mail"><span class="material-icons">mail</span></a>
         <a href="notifications.html" id="nav-bell">
@@ -57,20 +57,22 @@
                 <h2>Explore</h2>
             </div>
             
-            <div class="search-container">
-                <div class="search-box">
-                    <span class="search-icon"><span class="material-icons" style="color: gray; vertical-align: middle;">search</span></span>
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search..." onkeyup="executeSearch()">
-                    <button class="search-btn" onclick="executeSearch()">Search</button>
+            <div class="sticky-container">
+                <div class="search-container" style="margin-bottom: 0; padding-bottom: 5px; border-bottom: none;">
+                    <div class="search-box">
+                        <span class="search-icon"><span class="material-icons" style="color: gray; vertical-align: middle;">search</span></span>
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search..." onkeyup="executeSearch()">
+                        <button class="search-btn" onclick="executeSearch()">Search</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="profile-tabs" style="margin-top: 20px; display: flex; justify-content: center; margin-bottom: 20px;">
-                <button id="tab-all" class="tab-btn active-tab" onclick="switchSearchTab('all')">All</button>
-                <button id="tab-users" class="tab-btn" onclick="switchSearchTab('users')">Users</button>
-                <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Latest Posts</button>
-                <button id="tab-top" class="tab-btn" onclick="switchSearchTab('top')">Top</button>
-                <button id="tab-media" class="tab-btn" onclick="switchSearchTab('media')">Media</button>
+                <div class="profile-tabs" style="margin-top: 15px; display: flex; justify-content: center; margin-bottom: 5px; border-bottom: none;">
+                    <button id="tab-all" class="tab-btn active-tab" onclick="switchSearchTab('all')">All</button>
+                    <button id="tab-users" class="tab-btn" onclick="switchSearchTab('users')">Users</button>
+                    <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Latest Posts</button>
+                    <button id="tab-top" class="tab-btn" onclick="switchSearchTab('top')">Top</button>
+                    <button id="tab-media" class="tab-btn" onclick="switchSearchTab('media')">Media</button>
+                </div>
             </div>
 
             <div id="searchResults" class="search-results-area">
@@ -95,19 +97,12 @@
     <script src="shared.js"></script>
 
     <script>
-        /* INITIAL SECURITY CHECK */
         checkSecurity(); 
 
-        /* ========================================= */
-        /* --- GLOBAL SEARCH STATE --- */
-        /* ========================================= */
         let currentSearchUsers = [];
         let currentSearchPosts = [];
         let activeTab = 'all'; 
 
-        /* ========================================= */
-        /* --- 1. THE DATA FETCH ENGINE --- */
-        /* ========================================= */
         function executeSearch() {
             const query = document.getElementById('searchInput').value;
             const resultsArea = document.getElementById('searchResults');
@@ -132,9 +127,6 @@
             .catch(error => console.error("Search Error:", error));
         }
 
-        /* ========================================= */
-        /* --- 2. THE TAB SWITCHING ENGINE --- */
-        /* ========================================= */
         function switchSearchTab(tabName) {
             activeTab = tabName;
             
@@ -144,9 +136,6 @@
             renderResults();
         }
 
-        /* ========================================= */
-        /* --- HTML GENERATOR HELPER --- */
-        /* ========================================= */
         function generatePostHTMLArray(postArray) {
             if (postArray.length === 0) return `<p class="search-placeholder-text">No posts match this search.</p>`;
             
@@ -178,14 +167,11 @@
                     </div>
                 ` : "";
 
-                // [Polymorphic UI Rendering]: Generate the embedded quote box!
                 const quoteBoxHTML = buildQuoteBox(post.parentPost);
                 
-                // --- NEW BLUE REPOST BUTTON STYLING ---
                 const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
                 const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
 
-                // --- NEW CRUD INJECTION ---
                 const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
                 let postEditDeleteHTML = "";
                 if (post.username === currentUser) {
@@ -198,8 +184,6 @@
                         </span>
                     `;
                 }
-                // ---------------------------
-                // THE FIX: Detect pure reposts and route to the parent instead
                 const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                 const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
@@ -252,9 +236,6 @@
             return html;
         }
 
-        /* ========================================= */
-        /* --- 3. THE MASTER RENDERING ENGINE --- */
-        /* ========================================= */
         function renderResults() {
             const resultsArea = document.getElementById('searchResults');
             resultsArea.innerHTML = ""; 
@@ -295,7 +276,6 @@
             let mediaPostsArray = currentSearchPosts.filter(post => post.media && post.media.trim() !== "");
             let mediaHTML = generatePostHTMLArray(mediaPostsArray);
 
-            /* --- DRAW TO SCREEN BASED ON ACTIVE TAB --- */
             if (activeTab === 'all') {
                 resultsArea.innerHTML = `<h3 style="color: white; margin-bottom: 15px;">Users</h3>` + usersHTML + 
                                         `<h3 style="color: white; margin-top: 25px; margin-bottom: 15px;">Posts</h3>` + postsHTML;

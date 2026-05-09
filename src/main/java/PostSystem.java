@@ -179,7 +179,6 @@ public class PostSystem {
         int limit = 15; 
         int offset = (pageNumber - 1) * limit; 
         
-        // --- NEW: The Invisibility Filter ---
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = "WHERE user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 
@@ -207,7 +206,6 @@ public class PostSystem {
         int limit = 15; 
         int offset = (pageNumber - 1) * limit; 
 
-        // THE UPGRADE: Deferred Join logic for Following.
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
@@ -229,12 +227,10 @@ public class PostSystem {
     }
 
     public static String getTopPosts(String currentUser, String timeFilter, String customDate) {
-        // --- The Invisibility Cloak ---
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 
-        // --- The Time-Series Filter Engine ---
-        String timeCondition = "1=1"; // Default: All Time
+        String timeCondition = "1=1"; 
         String queryParam = null;
 
         if ("today".equals(timeFilter)) {
@@ -245,13 +241,13 @@ public class PostSystem {
             timeCondition = "strftime('%Y-%m', posts.created_at) = strftime('%Y-%m', 'now')";
         } else if ("custom_day".equals(timeFilter)) {
             timeCondition = "date(posts.created_at) = ?";
-            queryParam = customDate; // Expects "YYYY-MM-DD"
+            queryParam = customDate; 
         } else if ("custom_month".equals(timeFilter)) {
             timeCondition = "strftime('%Y-%m', posts.created_at) = ?";
-            queryParam = customDate; // Expects "YYYY-MM"
+            queryParam = customDate; 
         } else if ("custom_year".equals(timeFilter)) {
             timeCondition = "strftime('%Y', posts.created_at) = ?";
-            queryParam = customDate; // Expects "YYYY"
+            queryParam = customDate; 
         }
 
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
@@ -269,12 +265,9 @@ public class PostSystem {
                           "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
                           "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
                           "WHERE " + timeCondition + blockFilter +
-                          // THE FIX 1: Ban pure reposts from cluttering the rankings!
                           "AND NOT (posts.parent_post_id IS NOT NULL AND (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '')) " +
-                          // THE FIX 2: Restored repost_count to the engagement math!
                           "ORDER BY (like_count + comment_count + repost_count) DESC, posts.created_at DESC LIMIT 50";
 
-        // param3 brilliantly acts as the dynamic date injector for custom searches!
         return executeStandardPostQuery(querySQL, currentUser, queryParam, false);
     }
 
@@ -345,7 +338,6 @@ public class PostSystem {
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
             
             if (bypassFollowCheck) {
-                // Modified bound parameters because the Deferred Join changes exactly where the variables sit in the string
                 pstmt.setString(1, currentUser);
                 pstmt.setString(2, currentUser);
                 pstmt.setString(3, currentUser); 
@@ -364,7 +356,7 @@ public class PostSystem {
 
                 String user = rs.getString("username");
                 String avatar = rs.getString("profile_pic_url");
-                if (avatar == null || avatar.isEmpty()) avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 String content = rs.getString("content"); if (content == null) content = "";
                 String media = rs.getString("image_url"); if (media == null) media = "";
 
@@ -388,7 +380,7 @@ public class PostSystem {
 
                 if (parentCommentId > 0) {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
 
                     jsonBuilder.append("\"parentPost\":{")
@@ -403,7 +395,7 @@ public class PostSystem {
                                .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
                 } else if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
@@ -452,7 +444,7 @@ public class PostSystem {
 
             if (rs.next()) {
                 String user = rs.getString("username");
-                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 String content = rs.getString("content"); if (content == null) content = "";
                 String media = rs.getString("image_url"); if (media == null) media = "";
 
@@ -462,13 +454,13 @@ public class PostSystem {
 
                 if (parentCommentId > 0) {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
                     
                     parentPostJson = "{\"id\":" + parentCommentId + ",\"postId\":" + rs.getInt("pc_post_id") + ",\"isComment\":true,\"username\":\"" + pUser + "\",\"avatar\":\"" + pAvatar + "\",\"content\":\"" + pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\",\"media\":\"\",\"isEdited\":" + rs.getBoolean("pc_is_edited") + ",\"timestamp\":\"" + rs.getString("pc_timestamp") + "\"}";
                 } else if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
@@ -496,7 +488,7 @@ public class PostSystem {
                 if (!first) jsonBuilder.append(",");
                 first = false;
                 String user = rs.getString("username");
-                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 String content = rs.getString("content"); if (content == null) content = "";
                 
                 jsonBuilder.append("{\"id\":").append(rs.getInt("id")).append(",\"username\":\"").append(user).append("\",\"avatar\":\"").append(avatar).append("\",\"content\":\"").append(content.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",\"media\":\"").append(rs.getString("image_url") == null ? "" : rs.getString("image_url")).append("\",\"isEdited\":").append(rs.getBoolean("is_edited")).append(",\"timestamp\":\"").append(rs.getString("created_at")).append("\"}");
@@ -520,7 +512,7 @@ public class PostSystem {
                 if (!first) jsonBuilder.append(",");
                 first = false;
                 String user = rs.getString("username");
-                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 String content = rs.getString("content"); if (content == null) content = "";
                 
                 jsonBuilder.append("{\"id\":").append(rs.getInt("id")).append(",\"username\":\"").append(user).append("\",\"avatar\":\"").append(avatar).append("\",\"content\":\"").append(content.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",\"media\":\"").append(rs.getString("image_url") == null ? "" : rs.getString("image_url")).append("\",\"isEdited\":").append(rs.getBoolean("is_edited")).append(",\"timestamp\":\"").append(rs.getString("created_at")).append("\"}");
@@ -533,7 +525,6 @@ public class PostSystem {
         StringBuilder jsonBuilder = new StringBuilder("[");
         Pattern strictWordPattern = Pattern.compile("\\b" + Pattern.quote(searchQuery) + "\\b", Pattern.CASE_INSENSITIVE);
         
-        // --- NEW: The Invisibility Filter ---
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
         
@@ -605,7 +596,7 @@ public class PostSystem {
                 boolean isEdited = rs.getBoolean("is_edited");
                 boolean isReposted = rs.getBoolean("is_reposted");
 
-                if (avatar == null || avatar.trim().isEmpty()) avatar = "https://ui-avatars.com/api/?name=" + user + "&background=1e293b&color=00e676";
+                if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 if (media == null) media = "";
 
                 jsonBuilder.append("{")
@@ -629,7 +620,7 @@ public class PostSystem {
 
                 if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
@@ -644,7 +635,7 @@ public class PostSystem {
                                .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
                 } else if (parentCommentId > 0) {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
 
                     jsonBuilder.append("\"parentPost\":{")
@@ -729,10 +720,13 @@ public class PostSystem {
                 if (!first) jsonBuilder.append(",");
                 first = false;
 
+                String avatar = rs.getString("profile_pic_url");
+                if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+
                 jsonBuilder.append("{")
                            .append("\"id\":").append(rs.getInt("id")).append(",")
                            .append("\"username\":\"").append(rs.getString("username")).append("\",")
-                           .append("\"avatar\":\"").append(rs.getString("profile_pic_url")).append("\",")
+                           .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
                            .append("\"content\":\"").append(text.replace("\"", "\\\"").replace("\n", "\\n")).append("\",")
                            .append("\"media\":\"").append(rs.getString("image_url")).append("\",")
                            .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
@@ -750,7 +744,7 @@ public class PostSystem {
 
                 if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
@@ -758,14 +752,14 @@ public class PostSystem {
                                .append("\"id\":").append(parentPostId).append(",")
                                .append("\"isComment\":false,")
                                .append("\"username\":\"").append(pUser).append("\",")
-                               .append("\"avatar\":\"").append(pAvatar).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
                                .append("\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
                                .append("\"media\":\"").append(pMedia).append("\",")
                                .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
                                .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
                 } else if (parentCommentId > 0) {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = "https://ui-avatars.com/api/?name=" + pUser + "&background=1e293b&color=00e676";
+                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
 
                     jsonBuilder.append("\"parentPost\":{")
@@ -773,7 +767,7 @@ public class PostSystem {
                                .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
                                .append("\"isComment\":true,")
                                .append("\"username\":\"").append(pUser).append("\",")
-                               .append("\"avatar\":\"").append(pAvatar).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
                                .append("\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
                                .append("\"media\":\"\",")
                                .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
@@ -935,7 +929,6 @@ public class PostSystem {
     }
 
     public static String getComments(int postId, String currentUser) {
-        // --- NEW: The Invisibility Filter ---
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = " AND comments.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND comments.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 

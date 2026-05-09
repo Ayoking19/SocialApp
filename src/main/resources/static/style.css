@@ -41,7 +41,7 @@ body {
     cursor: pointer;
     font-weight: bold;
     transition: 0.3s ease;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .welcome-message button:hover {
@@ -106,7 +106,6 @@ body {
 }
 
 /* --- THE OVERLAY MENU --- */
-/* --- THE OVERLAY MENU --- */
 .overlay-menu {
     position: fixed;
     top: 0;
@@ -119,9 +118,9 @@ body {
     display: flex;
     flex-direction: column;
     padding: 40px;
-    padding-bottom: 80px; /* NEW: Extra breathing room for the bottom */
+    padding-bottom: 80px; 
     box-sizing: border-box;
-    overflow-y: auto; /* THE FIX: Enables vertical scrolling on small screens */
+    overflow-y: auto; 
 }
 
 .overlay-menu.open {
@@ -139,7 +138,7 @@ body {
     color: #ff3366; 
     cursor: pointer; 
     font-size: 35px; 
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .overlay-links { list-style: none; padding: 0; }
@@ -191,6 +190,87 @@ body {
     border: 2px solid #0f172a;
 }
 
+/* --- STICKY UI COMPONENTS --- */
+.sticky-container {
+    position: sticky;
+    top: 65px; 
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 15px; 
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 15px;
+}
+
+/* --- FLOATING ACTION BUTTON (FAB) --- */
+.fab-container {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 15px;
+}
+
+.fab-menu {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+.fab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: 0.2s;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.fab-menu-item:hover {
+    background: rgba(0, 230, 118, 0.2);
+    color: #00e676;
+}
+
+.fab-main-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #00e676;
+    color: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4);
+    cursor: pointer;
+    border: none;
+    transition: 0.3s;
+}
+
+.fab-main-btn:hover {
+    transform: scale(1.1);
+}
+
+.fab-main-btn .material-icons {
+    font-size: 30px;
+    transition: 0.3s;
+}
+
 /* --- 6. The Feed & Glassmorphism Posts --- */
 .feed {
     flex: 1;
@@ -235,8 +315,10 @@ body {
 .user-info {
     margin-bottom: 15px;
     display: flex;
-    align-items: center;
+    align-items: flex-start; 
+    flex-wrap: wrap; 
     gap: 10px;
+    width: 100%;             
 }
 
 .user-info strong {
@@ -262,7 +344,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* --- Comment Section Styling --- */
 .comment-section {
     margin-top: 20px;
     padding-top: 20px;
@@ -283,7 +364,7 @@ body {
     border-radius: 10px;
     color: white;
     outline: none; 
-    min-width: 0; /* GEOMETRY LOCK */
+    min-width: 0; 
 }
 
 .comment-input:focus {
@@ -297,7 +378,7 @@ body {
     border-radius: 10px;
     font-weight: bold;
     cursor: pointer;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .individual-comment {
@@ -313,7 +394,6 @@ body {
     margin-right: 5px;
 }
 
-/* --- Create Post Box Styling --- */
 .create-post-box {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
@@ -327,12 +407,17 @@ body {
     gap: 15px;
 }
 
+.mini-profile-pic, .large-profile-pic, .inbox-item img, #chatHeaderAvatar, #chatInfoAvatar {
+    object-fit: cover !important;
+    object-position: center !important;
+    background-color: #1e293b; 
+}
+
 .mini-profile-pic {
     width: 50px;
     height: 50px;
     border-radius: 50%; 
-    object-fit: cover;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 textarea {
@@ -385,7 +470,7 @@ textarea {
     transition: 0.2s;
     padding: 8px;
     border-radius: 50%;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .icon-btn:hover {
@@ -402,7 +487,7 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     transition: 0.3s;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .main-post-btn:hover {
@@ -427,7 +512,7 @@ textarea {
     align-items: center;
     box-shadow: 0 4px 10px rgba(255, 51, 102, 0.4); 
     transition: 0.2s ease;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .remove-media-btn:hover {
@@ -469,7 +554,6 @@ textarea {
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    object-fit: cover;
     display: block;
 }
 
@@ -488,7 +572,7 @@ textarea {
     cursor: pointer;
     font-size: 14px;
     transition: 0.3s;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .edit-pic-btn:hover {
@@ -530,7 +614,7 @@ textarea {
     cursor: pointer;
     font-size: 14px;
     transition: 0.3s;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .edit-bio-btn:hover {
@@ -541,6 +625,7 @@ textarea {
     display: flex;
     gap: 30px;
     padding-top: 15px;
+    margin-bottom: 25px; 
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -563,8 +648,6 @@ textarea {
 .profile-tabs {
     display: flex;
     gap: 20px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     overflow-x: auto; 
     -webkit-overflow-scrolling: touch; 
     scrollbar-width: none; 
@@ -572,7 +655,6 @@ textarea {
     white-space: nowrap; 
 }
 
-/* Chrome/Safari scrollbar hide */
 .profile-tabs::-webkit-scrollbar {
     display: none; 
 }
@@ -586,7 +668,7 @@ textarea {
     padding: 10px 0;
     cursor: pointer;
     transition: 0.3s;
-    flex-shrink: 0; /* GEOMETRY LOCK: STOPS TABS FROM SQUISHING/WRAPPING */
+    flex-shrink: 0; 
     white-space: nowrap;
 }
 
@@ -626,7 +708,7 @@ textarea {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000; 
+    z-index: 10000; 
 }
 
 .modal-card {
@@ -680,7 +762,7 @@ textarea {
     cursor: pointer;
     transition: 0.2s;
     flex: 1; 
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .modal-cancel-btn:hover {
@@ -698,7 +780,7 @@ textarea {
     transition: 0.2s;
     flex: 1;
     box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .modal-confirm-btn:hover {
@@ -713,7 +795,6 @@ textarea {
 .search-container {
     padding: 20px;
     margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .search-box {
@@ -756,7 +837,7 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     transition: 0.3s;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
 .search-btn:hover {
@@ -773,12 +854,6 @@ textarea {
     color: #a09eb5;
     font-size: 16px;
     margin-top: 40px;
-}
-
-.overlay-menu {
-    /* Your existing properties (width, height, background, etc.) stay here! */
-    overflow-y: auto; /* THE FIX: Enables vertical scrolling */
-    padding-bottom: 30px; /* Gives the Log Out button some breathing room at the bottom */
 }
 
 /* ========================================= */
@@ -810,11 +885,11 @@ textarea {
     font-weight: bold;
     border: 1px solid rgba(0, 230, 118, 0.3);
     cursor: pointer;
-    display: inline-flex; /* Fix alignment */
+    display: inline-flex; 
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease; 
-    flex-shrink: 0; /* GEOMETRY LOCK: STOPS PROFILE 'X' AND MESSAGE 'SEND' SQUISHING */
+    flex-shrink: 0; 
 }
 
 .media-control-btn:hover {
@@ -824,7 +899,7 @@ textarea {
 }
 
 /* ========================================= */
-/* --- ENGAGEMENT BUTTONS (LIKE, COMMENT, REPOST, QUOTE) --- */
+/* --- ENGAGEMENT BUTTONS --- */
 /* ========================================= */
 
 .like-btn, .comment-btn, .repost-btn, .quote-btn {
@@ -838,180 +913,174 @@ textarea {
     display: flex;
     align-items: center;
     gap: 5px;
-    flex-shrink: 0; /* GEOMETRY LOCK */
+    flex-shrink: 0; 
 }
 
-.like-btn:hover {
-    background: rgba(255, 51, 102, 0.1);
-    box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
-    transform: translateY(-2px);
-}
+.like-btn:hover { background: rgba(255, 51, 102, 0.1); box-shadow: 0 0 12px rgba(255, 51, 102, 0.4); transform: translateY(-2px); }
+.comment-btn:hover { background: rgba(0, 230, 118, 0.1); box-shadow: 0 0 12px rgba(0, 230, 118, 0.4); transform: translateY(-2px); }
+.repost-btn:hover { background: rgba(0, 229, 255, 0.1); box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); color: #00e5ff; transform: translateY(-2px); }
+.quote-btn:hover { background: rgba(255, 235, 59, 0.1); box-shadow: 0 0 12px rgba(255, 235, 59, 0.4); color: #ffeb3b; transform: translateY(-2px); }
 
-.comment-btn:hover {
+.nav-link-active { color: #00e676 !important; text-shadow: 0 0 10px rgba(0, 230, 118, 0.6); transform: scale(1.1); transition: 0.3s ease; }
+.nav-link-active::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; background: #00e676; border-radius: 50%; box-shadow: 0 0 8px #00e676; }
+
+.engagement-badge {
+    margin-left: auto;       
+    flex-shrink: 0;          
+    white-space: nowrap;     
     background: rgba(0, 230, 118, 0.1);
-    box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
-    transform: translateY(-2px);
-}
-
-.repost-btn:hover {
-    background: rgba(0, 229, 255, 0.1);
-    box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
-    color: #00e5ff;
-    transform: translateY(-2px);
-}
-
-.quote-btn:hover {
-    background: rgba(255, 235, 59, 0.1);
-    box-shadow: 0 0 12px rgba(255, 235, 59, 0.4);
-    color: #ffeb3b;
-    transform: translateY(-2px);
-}
-
-.nav-link-active {
-    color: #00e676 !important; 
-    text-shadow: 0 0 10px rgba(0, 230, 118, 0.6); 
-    transform: scale(1.1); 
-    transition: 0.3s ease;
-}
-
-.nav-link-active::after {
-    content: '';
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 5px;
-    height: 5px;
-    background: #00e676;
-    border-radius: 50%;
-    box-shadow: 0 0 8px #00e676;
+    color: #00e676;
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid rgba(0, 230, 118, 0.3);
 }
 
 /* ========================================= */
-/* --- STRICT MOBILE RESPONSIVENESS --- */
+/* --- NEW: MEDIA GALLERY & ADMIN STYLES --- */
 /* ========================================= */
+.media-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 5px; 
+    margin-top: 15px;
+}
 
+.media-grid-item { 
+    width: 100%; 
+    aspect-ratio: 1/1; 
+    object-fit: cover; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    border: 2px solid transparent; 
+    transition: 0.2s;
+}
+
+.media-grid-item.selected { 
+    border-color: #00e676; 
+    filter: brightness(0.6); 
+    transform: scale(0.95);
+}
+
+.group-member-item { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    padding: 10px; 
+    border-bottom: 1px solid rgba(255,255,255,0.05); 
+    transition: 0.2s;
+}
+
+.group-member-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.admin-badge { 
+    background: rgba(0, 230, 118, 0.1); 
+    color: #00e676; 
+    padding: 2px 6px; 
+    border-radius: 8px; 
+    font-size: 10px; 
+    font-weight: bold; 
+    border: 1px solid rgba(0, 230, 118, 0.3); 
+    margin-left: auto; 
+    flex-shrink: 0;
+}
+
+.action-sheet-btn {
+    width: 100%; 
+    text-align: left; 
+    background: rgba(0,0,0,0.3); 
+    color: white; 
+    border: 1px solid #334155; 
+    padding: 12px; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    margin-bottom: 8px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: 0.2s;
+}
+.action-sheet-btn:hover { background: rgba(0, 230, 118, 0.2); border-color: #00e676; }
+
+/* ========================================= */
+/* --- THE NEW IN-CHAT SEARCH BAR ---        */
+/* ========================================= */
+.chat-search-bar {
+    display: flex;
+    align-items: center;
+    background: #0b0f1a;
+    padding: 10px 15px;
+    border-bottom: 1px solid #334155;
+    gap: 10px;
+}
+.chat-search-bar input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+}
+.chat-search-bar input:focus {
+    border-color: #00e676;
+}
+.chat-date-header {
+    text-align: center;
+    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+.chat-date-bubble {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #a09eb5;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+@keyframes searchGlow {
+    0% { box-shadow: 0 0 0px transparent; }
+    50% { box-shadow: 0 0 20px #00e676; background-color: rgba(0, 230, 118, 0.4); }
+    100% { box-shadow: 0 0 0px transparent; }
+}
+.search-glow {
+    animation: searchGlow 2s ease-out;
+}
+.search-highlight {
+    border: 2px solid #00e676 !important;
+    background-color: rgba(0, 230, 118, 0.2) !important;
+}
+
+/* ========================================= */
+/* --- STRICT MOBILE RESPONSIVENESS ---      */
+/* ========================================= */
 @media (max-width: 768px) {
-    
-    .container {
-        flex-direction: column; 
-        width: 100%; 
-        max-width: 100vw;
-    }
-
-    .sidebar {
-        width: 100%;
-        height: 70px;
-        position: fixed; 
-        bottom: 0; 
-        top: auto; 
-        left: 0;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        background: rgba(26, 11, 46, 0.95); 
-        border-right: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.1); 
-        z-index: 100; 
-    }
-
-    .top-bar .logo {
-        display: block; 
-        font-size: 20px;
-    }
-
-    .nav-links {
-        display: flex;
-        width: 100%;
-        justify-content: space-around; 
-    }
-
-    .nav-links li {
-        margin-bottom: 0; 
-    }
-
-    .nav-links a {
-        font-size: 14px; 
-        padding: 10px;
-    }
-    
-    .nav-links a.logout {
-        margin-top: 0; 
-    }
-
-    .feed {
-        height: 100vh;
-        padding-top: 65px;
-        padding-bottom: 70px;
-        display: flex;
-        flex-direction: column;
-        box-sizing: border-box;
-        width: 100%;
-        max-width: 100vw;
-    }
-    
-    .chat-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 0;
-        border-radius: 0;
-        border: none;
-        height: 100%;
-    }
-    
-    #chatView {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    
-    .chat-history {
-        flex: 1;
-        overflow-y: auto;
-        padding-bottom: 20px;
-    }
-    
-    .chat-input-area {
-        position: sticky;
-        bottom: 0;
-        background: #0b0f1a;
-        z-index: 10;
-        padding: 10px;
-        width: 100%;
-        box-sizing: border-box;
-        display: flex;
-        gap: 10px;
-    }
-    
-    .chat-input-area input {
-        min-width: 0; /* Ensures input shrinks to give button space */
-    }
-
-    .create-post-top {
-        flex-direction: column; 
-        align-items: flex-start;
-    }
-
-    .mini-profile-pic {
-        margin-bottom: 10px;
-    }
-
-    .profile-stats-bar {
-        gap: 15px; 
-        justify-content: space-between;
-    }
-    
-    .profile-tabs {
-        overflow-x: auto; 
-        white-space: nowrap; 
-        padding-bottom: 5px;
-    }
-    
-    html, body {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
-        width: 100% !important;
-    }
+    .container { flex-direction: column; width: 100%; max-width: 100vw; }
+    .sidebar { width: 100%; height: 70px; position: fixed; bottom: 0; top: auto; left: 0; padding: 0; display: flex; align-items: center; background: rgba(26, 11, 46, 0.95); border-right: none; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 100; }
+    .top-bar .logo { display: block; font-size: 20px; }
+    .nav-links { display: flex; width: 100%; justify-content: space-around; }
+    .nav-links li { margin-bottom: 0; }
+    .nav-links a { font-size: 14px; padding: 10px; }
+    .nav-links a.logout { margin-top: 0; }
+    .feed { height: 100vh; padding-top: 65px; padding-bottom: 70px; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
+    .chat-container { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; border-radius: 0; border: none; height: 100%; }
+    #chatView { height: 100%; flex-direction: column; justify-content: space-between; }
+    .chat-history { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+    .chat-input-area { position: sticky; bottom: 0; background: #0b0f1a; z-index: 10; padding: 10px; width: 100%; box-sizing: border-box; display: flex; gap: 10px; }
+    .chat-input-area input { min-width: 0; }
+    .create-post-top { flex-direction: column; align-items: flex-start; }
+    .mini-profile-pic { margin-bottom: 10px; }
+    .profile-stats-bar { gap: 15px; justify-content: space-between; }
+    .profile-tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
+    html, body { overflow-x: clip !important; max-width: 100vw !important; width: 100% !important; }
 }

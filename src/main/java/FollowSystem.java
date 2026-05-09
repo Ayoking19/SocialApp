@@ -153,8 +153,8 @@ public class FollowSystem {
                 first = false;
                 
                 String avatar = rs.getString("profile_pic_url");
-                if (avatar == null || avatar.isEmpty()) {
-                    avatar = "https://ui-avatars.com/api/?name=" + rs.getString("username") + "&background=1e293b&color=00e676";
+                if (avatar == null || avatar.trim().isEmpty()) {
+                    avatar = MessageSystem.DEFAULT_AVATAR;
                 }
 
                 jsonBuilder.append("{")

@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 // THE FIX: The security guard now correctly looks for the "currentUser" badge!
 const currentUser = localStorage.getItem("currentUser");
