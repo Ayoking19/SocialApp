@@ -28,51 +28,31 @@ public class Main {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
             /* ========================================= */
-            /* --- 1. THE REGISTRATION ENDPOINT --- */
+            /* --- 1. THE SECURE GOOGLE ENDPOINT ---     */
             /* ========================================= */
-            server.createContext("/api/register", new HttpHandler() {
+            server.createContext("/api/googleLogin", new HttpHandler() {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
+                    // CORS Security Preflight Handshake
                     exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-                    if ("POST".equals(exchange.getRequestMethod())) {
-                        InputStream is = exchange.getRequestBody();
-                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                        
-                        String username = extractJsonValue(body, "username");
-                        String email = extractJsonValue(body, "email");
-                        String password = extractJsonValue(body, "password");
-                        
-                        boolean success = LoginSystem.registerUser(username, email, password);
-                        String response = success ? "SUCCESS" : "FAILURE";
-                        
-                        exchange.sendResponseHeaders(200, response.length());
-                        OutputStream os = exchange.getResponseBody();
-                        os.write(response.getBytes());
-                        os.close();
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                    
+                    if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                        exchange.sendResponseHeaders(204, -1);
+                        return;
                     }
-                }
-            });
 
-            /* ========================================= */
-            /* --- 2. THE LOGIN ENDPOINT --- */
-            /* ========================================= */
-            server.createContext("/api/login", new HttpHandler() {
-                @Override
-                public void handle(HttpExchange exchange) throws IOException {
-                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                     if ("POST".equals(exchange.getRequestMethod())) {
                         InputStream is = exchange.getRequestBody();
-                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        String jwtToken = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
-                        String identifier = extractJsonValue(body, "identifier");
-                        String password = extractJsonValue(body, "password");
+                        // Decode token and get the username
+                        String username = LoginSystem.decodeGoogleJWT(jwtToken);
                         
-                        boolean success = LoginSystem.authenticateUser(identifier, password);
-                        String response = success ? "SUCCESS" : "FAILURE";
-                        
-                        exchange.sendResponseHeaders(200, response.length());
+                        exchange.sendResponseHeaders(200, username.length());
                         OutputStream os = exchange.getResponseBody();
-                        os.write(response.getBytes());
+                        os.write(username.getBytes());
                         os.close();
                     }
                 }
@@ -273,7 +253,21 @@ public class Main {
                         int postId = Integer.parseInt(extractJsonValue(body, "postId"));
                         String content = extractJsonValue(body, "content");
                         
-                        boolean success = PostSystem.addComment(username, postId, content);
+                        Integer parentCommentId = null;
+                        if (body.contains("\"parentCommentId\":")) {
+                            int startIndex = body.indexOf("\"parentCommentId\":") + 18;
+                            int endIndex = body.indexOf(",", startIndex);
+                            if (endIndex == -1) endIndex = body.indexOf("}", startIndex);
+                            
+                            String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
+                            if (!rawId.equals("null") && !rawId.isEmpty()) {
+                                try { 
+                                    parentCommentId = Integer.parseInt(rawId); 
+                                } catch (NumberFormatException e) {}
+                            }
+                        }
+                        
+                        boolean success = PostSystem.addComment(username, postId, content, parentCommentId);
                         String response = success ? "SUCCESS" : "FAILURE";
                         
                         exchange.sendResponseHeaders(200, response.length());

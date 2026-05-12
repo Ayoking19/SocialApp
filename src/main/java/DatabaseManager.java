@@ -51,10 +51,12 @@ public class DatabaseManager {
                 + "post_id INTEGER NOT NULL,"
                 + "user_id INTEGER NOT NULL,"
                 + "content TEXT NOT NULL,"
+                + "parent_comment_id INTEGER DEFAULT NULL," // [NEW]: Threaded Replies
                 + "is_edited BOOLEAN DEFAULT 0,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
                 + "FOREIGN KEY (post_id) REFERENCES posts(id),"
-                + "FOREIGN KEY (user_id) REFERENCES users(id)"
+                + "FOREIGN KEY (user_id) REFERENCES users(id),"
+                + "FOREIGN KEY (parent_comment_id) REFERENCES comments(id)" // [NEW]: Self-Referential Foreign Key
                 + ");";
         
         String createLikesTable = "CREATE TABLE IF NOT EXISTS likes ("
@@ -145,13 +147,12 @@ public class DatabaseManager {
             try { stmt.execute("ALTER TABLE posts ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE comments ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_comment_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
-            try { 
-                stmt.execute("ALTER TABLE messages ADD COLUMN image_url TEXT"); 
-            } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN image_url TEXT"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN is_forwarded BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN deleted_by_receiver BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE comments ADD COLUMN parent_comment_id INTEGER DEFAULT NULL"); } catch (SQLException e) {} // [NEW]: Threaded Replies Migration
             
             System.out.println("All database tables have been successfully initialized!");
         } catch (SQLException e) {

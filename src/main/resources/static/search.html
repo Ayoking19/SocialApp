@@ -57,8 +57,8 @@
                 <h2>Explore</h2>
             </div>
             
-            <div class="sticky-container">
-                <div class="search-container" style="margin-bottom: 0; padding-bottom: 5px; border-bottom: none;">
+            <div class="sticky-header">
+                <div class="search-container" style="margin-bottom: 0; padding-bottom: 5px; width: 100%;">
                     <div class="search-box">
                         <span class="search-icon"><span class="material-icons" style="color: gray; vertical-align: middle;">search</span></span>
                         <input type="text" id="searchInput" class="search-input" placeholder="Search..." onkeyup="executeSearch()">
@@ -66,7 +66,7 @@
                     </div>
                 </div>
 
-                <div class="profile-tabs" style="margin-top: 15px; display: flex; justify-content: center; margin-bottom: 5px; border-bottom: none;">
+                <div class="profile-tabs" style="margin-top: 15px; display: flex; margin-bottom: 5px; width: 100%;">
                     <button id="tab-all" class="tab-btn active-tab" onclick="switchSearchTab('all')">All</button>
                     <button id="tab-users" class="tab-btn" onclick="switchSearchTab('users')">Users</button>
                     <button id="tab-posts" class="tab-btn" onclick="switchSearchTab('posts')">Latest Posts</button>
@@ -188,7 +188,7 @@
                 const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
                 html += `
-                    <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer; ..."> 
+                    <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;"> 
                         <div class="user-info" style="display: flex; align-items: center; width: 100%;">
                             <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
                             <div style="display: flex; align-items: center;">

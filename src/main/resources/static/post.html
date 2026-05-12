@@ -64,7 +64,7 @@
             </div>
             
             <div id="singlePostContainer" style="border-bottom: 1px solid #334155; padding-bottom: 10px;">
-                </div>
+            </div>
         </main>
     </div>
 
@@ -95,10 +95,8 @@
     <script src="shared.js"></script>
 
     <script>
-        /* 1. INITIAL SECURITY CHECK */
         checkSecurity(); 
 
-        /* --- WELCOME MESSAGE LOGIC --- */
         if (sessionStorage.getItem("welcomeAcknowledged") === "true") {
             const welcomeMsg = document.getElementById('welcomeMsg');
             if (welcomeMsg) welcomeMsg.style.display = 'none';
@@ -109,7 +107,6 @@
             sessionStorage.setItem("welcomeAcknowledged", "true");
         }
 
-        /* 2. DYNAMIC ROUTING IGNITION */
         const urlParams = new URLSearchParams(window.location.search);
         const currentPostId = urlParams.get('id');
 
@@ -121,7 +118,6 @@
             }
         };
 
-        /* 3. THE SINGLE POST RENDERER */
         function fetchSinglePost(postId) {
             fetch(`${API_BASE}/api/getSinglePost`, {
                 method: 'POST',
@@ -150,18 +146,16 @@
                     }
                 }
 
-                const quoteBoxHTML = buildQuoteBox(post.parentPost);
-                
-                // [UI FIX]: Ensures the Single Post view highlights Reposts correctly!
+                const quoteBoxHTML = typeof buildQuoteBox === "function" ? buildQuoteBox(post.parentPost) : "";
                 const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
                 const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
 
-                // --- NEW CRUD INJECTION ---
                 const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                
                 let postEditDeleteHTML = "";
                 if (post.username === currentUser) {
                     postEditDeleteHTML = `
-                        <span onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
+                        <span id="edit-btn-${post.id}" onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
                             <span class="material-icons" style="font-size: 14px;">edit</span>
                         </span>
                         <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Post">
@@ -171,7 +165,7 @@
                 }
 
                 const postHTML = `
-                    <div class="post" style="border: none; background: transparent; padding: 0;">
+                    <div id="post-card-${post.id}" class="post" style="border: none; background: transparent; padding: 0;">
                         <div class="user-info" style="display: flex; align-items: center; width: 100%;">
                             <img src="${post.avatar}" onclick="window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; cursor: pointer;">
                             <div style="display: flex; flex-direction: column;">
@@ -186,35 +180,36 @@
                         </div>
                         
                         <div class="post-content" style="font-size: 18px; line-height: 1.5; margin-top: 15px;">
-                            <p>${parseSocialText(post.content)}</p>
+                            <p id="post-content-text-${post.id}">${typeof parseSocialText === "function" ? parseSocialText(post.content) : post.content}</p>
                             ${mediaHTML}
                             ${quoteBoxHTML}
                         </div>
                         
                         <div class="post-actions" style="display: flex; gap: 15px; margin-top: 20px; border-top: 1px solid #334155; padding-top: 15px; color: gray; flex-wrap: wrap;">
-                            <span onclick="toggleLike(this, ${post.id})" class="action-btn like-btn" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; ${likeColorStyle}">
+                            <span id="like-btn-${post.id}" onclick="toggleLike(this, ${post.id})" class="action-btn like-btn" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; ${likeColorStyle}">
                                 <span class="material-icons" style="font-size: 18px;">favorite</span> 
                                 <span class="like-count">${post.likes}</span> Likes
                             </span>
                             
-                            <span class="repost-btn" onclick="openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; border-radius: 20px; ${repostColorStyle}">
+                            <span id="repost-btn-${post.id}" class="repost-btn" onclick="openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; border-radius: 20px; ${repostColorStyle}">
                                 <span class="material-icons" style="font-size: 18px;">repeat</span>
                                 <span class="repost-count">${post.pureRepostCount}</span> Reposts
                             </span>
 
-                            <span class="quote-btn" onclick="openQuotesModal(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; background: rgba(0, 230, 118, 0.05); color: #00e676; border-radius: 20px;">
+                            <span id="quote-btn-${post.id}" class="quote-btn" onclick="openQuotesModal(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; background: rgba(0, 230, 118, 0.05); color: #00e676; border-radius: 20px;">
                                 <span class="material-icons" style="font-size: 18px;">format_quote</span>
                                 <span class="quote-count">${post.quoteCount}</span> Quotes
                             </span>
                         </div>
                         
                         <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                            <div id="comment-list-${post.id}" style="margin-bottom: 10px; max-height: none;">
+                            <div id="comment-list-${post.id}" style="margin-bottom: 15px; max-height: none;">
                                 <p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>
                             </div>
+                            
                             <div style="display: flex; gap: 10px;">
                                 <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
-                                <button onclick="submitComment(${post.id})" class="media-control-btn">Post</button>
+                                <button onclick="submitThreadedComment(${post.id}, null)" class="media-control-btn">Post</button>
                             </div>
                         </div>
                     </div>
@@ -225,19 +220,198 @@
             })
             .catch(error => {
                 console.error("Error fetching single post:", error);
-                document.getElementById('singlePostContainer').innerHTML = "<p style='color: white; padding: 20px;'>Post not found or deleted.</p>";
+            });
+        }
+        
+        function executeQuote(postId, textContent, mediaBase64 = "", commentId = null) {
+            fetch(`${API_BASE}/api/createPost`, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    username: currentUser, 
+                    content: textContent, 
+                    media: mediaBase64, 
+                    parentPostId: postId,
+                    parentCommentId: commentId 
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    showToast("Quote Posted!");
+                    if (!commentId) {
+                        const btn = document.getElementById(`quote-btn-${postId}`);
+                        if (btn) {
+                            const countSpan = btn.querySelector('.quote-count');
+                            if (countSpan) countSpan.textContent = (parseInt(countSpan.textContent) || 0) + 1;
+                        }
+                    } else {
+                        const btn = document.getElementById(`comment-repost-btn-${commentId}`);
+                        if (btn) {
+                            const countSpan = btn.querySelector('.repost-count');
+                            if (countSpan) countSpan.textContent = (parseInt(countSpan.textContent) || 0) + 1;
+                        }
+                    }
+                }
             });
         }
 
-        /* 4. THE QUOTES MODAL ENGINE */
-        function openQuotesModal(postId) {
+        function deletePost(postId) {
+            openConfirmModal("Are you sure you want to permanently delete this post?", () => {
+                fetch(`${API_BASE}/api/deletePost`, {
+                    method: 'POST',
+                    body: JSON.stringify({ username: currentUser, postId: postId.toString() })
+                })
+                .then(res => res.text())
+                .then(data => {
+                    if (data === "SUCCESS") {
+                        showToast("Post deleted. Returning home...");
+                        setTimeout(() => window.location.href = "index.html", 1000);
+                    }
+                });
+            });
+        }
+        
+        let globalCommentsData = [];
+
+        window.loadComments = function(postId) {
+            fetch(`${API_BASE}/api/getComments`, {
+                method: 'POST',
+                body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
+            })
+            .then(res => res.json())
+            .then(comments => {
+                globalCommentsData = comments;
+                renderCommentsLevel(postId, null, `comment-list-${postId}`);
+            })
+            .catch(err => console.error("Error loading comments:", err));
+        };
+
+        function renderCommentsLevel(postId, parentId, containerId) {
+            const container = document.getElementById(containerId);
+            const children = globalCommentsData.filter(c => c.parentCommentId === parentId);
+            
+            if (parentId === null && children.length === 0) {
+                container.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>No comments yet. Be the first!</p>";
+                return;
+            }
+
+            let html = "";
+            children.forEach(c => {
+                const likeStyle = c.isLiked ? 'color: #ff3366; background: rgba(255, 51, 102, 0.1);' : 'color: #a09eb5;';
+                const repostStyle = c.isReposted ? 'color: #00a8ff; background: rgba(0, 168, 255, 0.1);' : 'color: #a09eb5;';
+                const editedText = c.isEdited ? '<span style="font-size: 10px; color: gray; font-style: italic; margin-left: 5px;">(edited)</span>' : '';
+                
+                let editDeleteHTML = "";
+                if (c.username === currentUser) {
+                    editDeleteHTML = `
+                        <span onclick="editComment(${c.id}, '${c.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px;" title="Edit"><span class="material-icons" style="font-size: 12px;">edit</span></span>
+                        <span onclick="deleteComment(${c.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px;" title="Delete"><span class="material-icons" style="font-size: 12px;">delete</span></span>
+                    `;
+                }
+
+                const viewRepliesBtn = c.replyCount > 0 
+                    ? `<span style="cursor: pointer; color: #00e676; font-weight: bold; margin-left: auto;" onclick="toggleReplies(${postId}, ${c.id})">View Replies (${c.replyCount})</span>` 
+                    : '';
+
+                // [THE FIX]: Added the proper CSS classes to ensure these get pill shapes and hover effects
+                html += `
+                    <div class="comment-thread" id="comment-container-${c.id}" style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        
+                        <div style="display: flex; align-items: center;">
+                            <strong style="color: white; cursor: pointer;" onclick="window.location.href='profile.html?user=${c.username}'">@${c.username}</strong>
+                            <span style="font-size: 11px; color: gray; margin-left: 8px;">${c.timestamp}</span>
+                            ${editedText}
+                            ${editDeleteHTML}
+                        </div>
+                        
+                        <p style="font-size: 15px; color: #e0e0e0; margin-top: 8px; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(c.content) : c.content}</p>
+                        
+                        <div style="display: flex; gap: 15px; margin-top: 10px; font-size: 13px; align-items: center; color: #a09eb5;">
+                            <span onclick="toggleCommentLike(this, ${c.id})" class="like-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; ${likeStyle}">
+                                <span class="material-icons" style="font-size: 14px;">favorite</span> <span class="like-count">${c.likes}</span>
+                            </span>
+                            
+                            <span id="comment-repost-btn-${c.id}" onclick="openRepostMenu(${postId}, ${c.isReposted}, ${c.id})" class="repost-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; ${repostStyle}" title="Repost or Quote">
+                                <span class="material-icons" style="font-size: 14px;">repeat</span> <span class="repost-count">${c.repostCount}</span>
+                            </span>
+                            <span onclick="openCommentQuotesModal(${c.id})" class="quote-btn thread-action-btn" style="cursor: pointer; color: #a09eb5; display: flex; align-items: center; gap: 4px;" title="View Quotes">
+                                <span class="material-icons" style="font-size: 14px;">format_quote</span> <span class="quote-count">${c.quoteCount}</span>
+                            </span>
+
+                            <span style="cursor: pointer; color: #a09eb5; font-weight: bold; margin-left: 5px; padding: 4px 8px; border-radius: 20px; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'" onclick="showReplyBox(${postId}, ${c.id})">Reply</span>
+                            
+                            ${viewRepliesBtn}
+                        </div>
+
+                        <div id="reply-box-${c.id}" style="display: none; margin-top: 15px; gap: 10px; align-items: center;">
+                            <input type="text" id="reply-input-${c.id}" placeholder="Reply to @${c.username}..." style="flex: 1; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.4); border: 1px solid #334155; color: white; font-size: 14px;">
+                            <button onclick="submitThreadedComment(${postId}, ${c.id})" class="media-control-btn" style="padding: 6px 12px;">Reply</button>
+                        </div>
+
+                        <div id="replies-container-${c.id}" style="margin-left: 20px; border-left: 2px solid #334155; padding-left: 15px; display: none; margin-top: 10px;">
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        window.toggleReplies = function(postId, commentId) {
+            const container = document.getElementById(`replies-container-${commentId}`);
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                renderCommentsLevel(postId, commentId, `replies-container-${commentId}`);
+            } else {
+                container.style.display = 'none';
+            }
+        };
+
+        window.showReplyBox = function(postId, parentCommentId) {
+            document.querySelectorAll('[id^="reply-box-"]').forEach(box => {
+                box.style.display = 'none';
+            });
+            const box = document.getElementById(`reply-box-${parentCommentId}`);
+            box.style.display = 'flex';
+            document.getElementById(`reply-input-${parentCommentId}`).focus();
+        };
+
+        window.submitThreadedComment = function(postId, parentCommentId = null) {
+            const inputId = parentCommentId ? `reply-input-${parentCommentId}` : `comment-input-${postId}`;
+            const inputEl = document.getElementById(inputId);
+            const text = inputEl.value.trim();
+            
+            if (!text) return;
+
+            fetch(`${API_BASE}/api/addComment`, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    postId: postId.toString(), 
+                    username: currentUser, 
+                    content: text,
+                    parentCommentId: parentCommentId 
+                })
+            })
+            .then(res => res.text())
+            .then(data => {
+                if (data === "SUCCESS") {
+                    inputEl.value = "";
+                    loadComments(postId);
+                } else {
+                    alert("Failed to add comment.");
+                }
+            })
+            .catch(err => console.error("Error submitting threaded comment:", err));
+        };
+
+        window.openCommentQuotesModal = function(commentId) {
             document.getElementById('quotesModal').style.display = 'flex';
             const container = document.getElementById('quotesListContainer');
             container.innerHTML = "<p style='text-align: center; color: #00e676;'>Loading quotes...</p>";
 
-            fetch(`${API_BASE}/api/getPostQuotes`, {
+            fetch(`${API_BASE}/api/getCommentQuotes`, {
                 method: 'POST',
-                body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
+                body: JSON.stringify({ commentId: commentId.toString(), currentUser: currentUser })
             })
             .then(res => res.json())
             .then(posts => {
@@ -245,28 +419,30 @@
                     container.innerHTML = "<p style='text-align: center; color: gray;'>No quotes yet.</p>";
                     return;
                 }
-                
-                // Batch injection fix!
-                let quotesHTML = "";
-                posts.forEach(post => {
-                    let mediaHTML = "";
-                    if (post.media && post.media !== "") {
-                        mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
-                    }
-                    quotesHTML += `
-                        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <img src="${post.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
-                                <strong style="color: white;">${post.username}</strong>
-                                <span style="color: gray; font-size: 12px; margin-left: auto;">${post.timestamp}</span>
-                            </div>
-                            <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
-                            ${mediaHTML}
-                        </div>
-                    `;
-                });
-                container.innerHTML = quotesHTML;
+                renderModalItems(posts, container);
             });
+        };
+
+        function renderModalItems(posts, container) {
+            let quotesHTML = "";
+            posts.forEach(post => {
+                let mediaHTML = "";
+                if (post.media && post.media !== "") {
+                    mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
+                }
+                quotesHTML += `
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <img src="${post.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+                            <strong style="color: white;">${post.username}</strong>
+                            <span style="color: gray; font-size: 12px; margin-left: auto;">${post.timestamp}</span>
+                        </div>
+                        <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
+                        ${mediaHTML}
+                    </div>
+                `;
+            });
+            container.innerHTML = quotesHTML;
         }
 
         function closeQuotesModal() {

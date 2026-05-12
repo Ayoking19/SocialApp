@@ -6,54 +6,65 @@ import java.sql.SQLException;
 
 public class LoginSystem {
 
-    /* Method 1: Registering with an Email */
-    public static boolean registerUser(String username, String email, String password) {
-        String insertSQL = "INSERT INTO users(username, email, password) VALUES(?, ?, ?)";
-
-        try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
+    public static String decodeGoogleJWT(String jwtToken) {
+        try {
+            // Split the token to get the payload
+            String[] parts = jwtToken.split("\\.");
+            if (parts.length < 2) return "ERROR";
             
-            pstmt.setString(1, username);
-            pstmt.setString(2, email); // Saving the email
-            pstmt.setString(3, password);
+            // Decode the Base64 payload
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]), java.nio.charset.StandardCharsets.UTF_8);
             
-            pstmt.executeUpdate();
-            System.out.println("User " + username + " registered successfully!");
-            return true;
-
-        } catch (SQLException e) {
-            System.out.println("Registration failed. Username or Email might already exist.");
-            return false;
-        }
+            String email = extractJWTValue(payload, "email");
+            String name = extractJWTValue(payload, "name");
+            
+            return processGoogleLogin(email, name);
+        } catch (Exception e) { return "ERROR"; }
     }
 
-    /* Method 2: Authenticating with Username OR Email */
-    public static boolean authenticateUser(String identifier, String password) {
-        /* 
-           [Logical OR Operator]: The 'OR' keyword tells the database to find the user 
-           if the text they typed matches the 'username' column OR the 'email' column. 
-        */
-        String querySQL = "SELECT * FROM users WHERE (username = ? OR email = ?) AND password = ?";
+    private static String extractJWTValue(String json, String key) {
+        String searchKey = "\"" + key + "\":\"";
+        int startIndex = json.indexOf(searchKey);
+        if (startIndex == -1) return "";
+        startIndex += searchKey.length();
+        int endIndex = json.indexOf("\"", startIndex);
+        return json.substring(startIndex, endIndex);
+    }
 
-        try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
-            
-            pstmt.setString(1, identifier); // Checks against the username column
-            pstmt.setString(2, identifier); // Checks against the email column
-            pstmt.setString(3, password);
-
+    private static String processGoogleLogin(String email, String name) {
+        // 1. If user already exists, log them in instantly
+        String checkSQL = "SELECT username FROM users WHERE email = ?";
+        try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(checkSQL)) {
+            pstmt.setString(1, email);
             ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getString("username");
+        } catch (SQLException e) { System.out.println(e.getMessage()); }
 
-            if (rs.next()) {
-                System.out.println("Login successful!");
-                return true;
-            } else {
-                return false;
+        // 2. If new user, create a username from their email prefix (e.g., "john.doe" from "john.doe@gmail.com")
+        String baseUsername = email.split("@")[0].replaceAll("[^a-zA-Z0-9_.]", "").toLowerCase();
+        String finalUsername = baseUsername;
+
+        // 3. Ensure the username is completely unique
+        String verifyUniqueSQL = "SELECT 1 FROM users WHERE username = ?";
+        int counter = 1;
+        try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(verifyUniqueSQL)) {
+            while (true) {
+                pstmt.setString(1, finalUsername);
+                if (!pstmt.executeQuery().next()) break; // Username is free!
+                finalUsername = baseUsername + counter;  // If taken, append a number
+                counter++;
             }
+        } catch (SQLException e) {}
 
-        } catch (SQLException e) {
-            System.out.println("Authentication error: " + e.getMessage());
-            return false;
-        }
+        // 4. Register the new user! (We save 'GOOGLE_OAUTH' as the password since they don't need one)
+        String insertSQL = "INSERT INTO users(username, email, password) VALUES(?, ?, 'GOOGLE_OAUTH')";
+        try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
+            pstmt.setString(1, finalUsername);
+            pstmt.setString(2, email);
+            pstmt.executeUpdate();
+            
+            // [THE FIX]: Send a flag to the frontend letting it know this is a brand new account!
+            return "NEW_USER:" + finalUsername; 
+        } catch (SQLException e) { return "ERROR"; }
     }
 }

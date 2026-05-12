@@ -6,64 +6,6 @@
     <title>Messages - Our Social Network</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <style>
-        .container { width: 100% !important; max-width: 100vw !important; height: 100% !important; padding: 0 !important; margin: 0 !important; }
-
-        .feed {
-            display: flex;
-            flex-direction: column;
-            width: 100% !important;
-            max-width: 100vw !important;
-            margin: 0 !important;
-            box-sizing: border-box;
-        }
-
-        .feed-header { display: none !important; }
-
-        .chat-container {
-            display: flex; flex-direction: column; flex: 1; min-height: 0; background: rgba(255, 255, 255, 0.02);
-            border-radius: 0 !important; border: none !important; margin-bottom: 0 !important; overflow: hidden;
-        }
-        
-        #inboxView { flex: 1; overflow-y: auto; min-height: 0; }
-
-        .inbox-item {
-            display: flex; align-items: center; gap: 15px; padding: 15px; border-radius: 12px; cursor: pointer;
-            transition: 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05); margin: 0 10px;
-            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-        }
-        .inbox-item:hover { background: rgba(0, 230, 118, 0.05); }
-
-        #chatView { display: none; flex-direction: column; height: 100%; min-height: 0; position: relative; }
-
-        .chat-header {
-            display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(0, 0, 0, 0.9); 
-            border-bottom: 1px solid #334155; flex-shrink: 0; z-index: 50;
-        }
-
-        .chat-history {
-            flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; min-height: 0;
-        }
-        
-        .chat-input-area {
-            display: flex; flex-direction: column; gap: 5px; padding: 15px; background: #0b0f1a; border-top: 1px solid #334155;
-            flex-shrink: 0; width: 100%; box-sizing: border-box;
-        }
-        
-        .chat-input-area input[type="text"] {
-            flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid rgba(0, 230, 118, 0.3);
-            background: rgba(0,0,0,0.3); color: white; font-size: 15px; min-width: 0;
-        }
-
-        .msg-bubble {
-            max-width: 75%; padding: 10px 15px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word;
-            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-        }
-
-        .msg-bubble.selected { border: 2px solid #00e676; background-color: rgba(0, 230, 118, 0.2) !important; }
-        .msg-sent { background: #00e676; color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .msg-received { background: #334155; color: #fff; align-self: flex-start; border-bottom-left-radius: 4px; }
-    </style>
 </head>
 <body>
 
@@ -99,25 +41,30 @@
         <a href="profile.html"><span class="material-icons">person</span></a>
     </nav>
 
-    <div class="fab-container">
-        <div class="fab-menu" id="fabMenu">
-            <button class="fab-menu-item" onclick="openCreateGroupModal()"><span class="material-icons" style="color: #00a8ff;">group_add</span> Create a Group</button>
-            <button class="fab-menu-item" onclick="window.location.href='search.html'"><span class="material-icons" style="color: #00e676;">person_search</span> Search for Users</button>
-        </div>
-        <button class="fab-main-btn" onclick="toggleFabMenu()"><span class="material-icons" id="fabIcon">add</span></button>
-    </div>
-
-    <div class="container">
-        <main class="feed">
+    <div class="container messages-page-container">
+        <main class="feed messages-feed">
             <div class="chat-container">
                 <div id="inboxView">
-                    <div class="sticky-container" style="top: 0; z-index: 50; border-radius: 0; margin-bottom: 0;">
-                        <div class="search-box" style="background: rgba(0,0,0,0.3);">
-                            <span class="search-icon"><span class="material-icons" style="color: gray; vertical-align: middle;">search</span></span>
-                            <input type="text" id="inboxSearchInput" class="search-input" placeholder="Search your chats..." onkeyup="filterInbox()">
+                    
+                    <div class="messages-sticky-header">
+                        <div style="padding: 0 15px 15px 15px; border-bottom: 1px solid #334155; display: flex; justify-content: center; gap: 10px;">
+                            <button class="action-btn" onclick="document.getElementById('createGroupModal').style.display='flex'">
+                                <span class="material-icons">group_add</span> Create a Group
+                            </button>
+                            <button class="action-btn" onclick="openNewChatModal()">
+                                <span class="material-icons">person_search</span> Search for Users
+                            </button>
+                        </div>
+                        
+                        <div class="chat-search-bar" style="border-bottom: 1px solid #334155;">
+                            <span class="material-icons" style="color: gray;">search</span>
+                            <input type="text" id="chatSearchInput" placeholder="Search your chats..." onkeyup="filterInbox()">
                         </div>
                     </div>
-                    <div id="inboxListContainer"><p style="text-align: center; color: #00e676; margin-top: 20px;">Loading messages...</p></div>
+
+                    <div id="inboxListContainer">
+                        <p style="text-align: center; color: gray; margin-top: 20px;">Loading chats...</p>
+                    </div>
                 </div>
 
                 <div id="chatView">
@@ -281,6 +228,20 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="newChatModal" style="display: none; z-index: 10000;">
+        <div class="modal-card" style="width: 350px; max-width: 90%; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: white;">New Chat</h3>
+                <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="document.getElementById('newChatModal').style.display='none'">close</span>
+            </div>
+            <div style="position: relative; margin-bottom: 15px;">
+                <span class="material-icons" style="position: absolute; left: 10px; top: 10px; color: gray; font-size: 18px;">search</span>
+                <input type="text" id="newChatSearchInput" placeholder="Search followers..." onkeyup="filterNewChatList()" style="width: 100%; padding: 10px 10px 10px 35px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; box-sizing: border-box;">
+            </div>
+            <div id="newChatUserList" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="createGroupModal" style="display: none; z-index: 10000;">
         <div class="modal-card" style="width: 350px; max-width: 90%; padding: 20px;">
             <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px;">Create a Group</h3>
@@ -401,18 +362,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const targetFromUrl = urlParams.get('user');
 
-        function toggleFabMenu() {
-            const menu = document.getElementById("fabMenu");
-            const icon = document.getElementById("fabIcon");
-            if (menu.style.display === "flex") {
-                menu.style.display = "none";
-                icon.style.transform = "rotate(0deg)";
-            } else {
-                menu.style.display = "flex";
-                icon.style.transform = "rotate(45deg)"; 
-            }
-        }
-
         // --- IN-CHAT SEARCH ENGINE --- //
         function toggleChatSearch() {
             const bar = document.getElementById("chatSearchBar");
@@ -506,7 +455,7 @@
         }
 
         function filterInbox() {
-            const query = document.getElementById("inboxSearchInput").value.toLowerCase();
+            const query = document.getElementById("chatSearchInput").value.toLowerCase();
             const items = document.querySelectorAll(".inbox-item");
             items.forEach(item => {
                 const username = item.querySelector("strong").textContent.toLowerCase();
@@ -648,7 +597,10 @@
                              ontouchstart="startInboxPress(event, '${chatIdVal.replace("'", "\\'")}', ${chat.isGroup ? 'true' : 'false'}, '${chat.username.replace("'", "\\'")}')" 
                              ontouchend="cancelInboxPress()"
                              onclick="handleInboxClick(event, \`${clickTargetStr}\`)">
-                            <img src="${chat.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                            <div style="position: relative; flex-shrink: 0; width: 50px; height: 50px;">
+                                <img src="${chat.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                                ${chat.isGroup ? `<span class="material-icons" style="position: absolute; bottom: -2px; right: -2px; font-size: 14px; background: #0b0f1a; border-radius: 50%; color: #00e676; padding: 2px;">groups</span>` : ""}
+                            </div>
                             <div class="user-info-text-col">
                                 <div style="display: flex; align-items: center; min-width: 0;">
                                     <strong class="truncate-text" style="color: white; font-size: 16px;">${chat.username}</strong>
@@ -684,14 +636,8 @@
             if (!menu) return;
             const addBtn = menu.previousElementSibling;
             
-            const fabMenu = document.getElementById("fabMenu");
-            const fabBtn = document.querySelector(".fab-main-btn");
-
             if (menu.style.display === 'flex' && !menu.contains(event.target) && !addBtn.contains(event.target)) {
                 menu.style.display = 'none';
-            }
-            if (fabMenu && fabMenu.style.display === 'flex' && !fabMenu.contains(event.target) && !fabBtn.contains(event.target)) {
-                toggleFabMenu();
             }
         });
 
@@ -734,7 +680,7 @@
             if (pollInterval) clearInterval(pollInterval);
             
             currentChatMessages = [];
-            document.getElementById("chatHistoryContainer").innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Loading...</p>";
+            document.getElementById("chatHistoryContainer").innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Say Hi👋...</p>";
             document.body.classList.add('in-chat'); 
 
             if (isGroup) {
@@ -749,7 +695,6 @@
             
             document.getElementById("inboxView").style.display = "none";
             document.getElementById("chatView").style.display = "flex";
-            document.querySelector(".fab-container").style.display = "none"; 
             
             document.getElementById("chatHeaderAvatar").src = targetAvatar || DEFAULT_AVATAR;
             
@@ -801,8 +746,7 @@
                 document.getElementById("chatSearchBar").style.display = "none";
                 document.getElementById("searchNavControls").style.display = "none";
                 document.getElementById("chatSearchInput").value = "";
-                document.getElementById("inboxView").style.display = "block";
-                document.querySelector(".fab-container").style.display = "flex"; 
+                document.getElementById("inboxView").style.display = "flex";
                 window.history.pushState({}, document.title, window.location.pathname);
                 loadInbox(); 
             }
@@ -1549,8 +1493,6 @@
         let selectedGroupMembers = [];
 
         function openCreateGroupModal() {
-            document.getElementById("fabMenu").style.display = "none";
-            document.getElementById("fabIcon").style.transform = "rotate(0deg)";
             selectedGroupMembers = [];
             document.getElementById("groupNameInput").style.display = "block"; 
             document.getElementById("groupNameInput").value = "";
@@ -1625,6 +1567,59 @@
                 if (data === "SUCCESS") { showToast("Group generated!"); loadInbox(); }
                 else showToast("Failed to establish group.");
             });
+        }
+
+        // --- NEW CHAT / FOLLOWER SEARCH ENGINE ---
+        let followerListCache = [];
+
+        function openNewChatModal() {
+            document.getElementById('newChatModal').style.display = 'flex';
+            document.getElementById('newChatSearchInput').value = '';
+            document.getElementById('newChatUserList').innerHTML = "<p style='text-align:center; color:#00e676;'>Loading followers...</p>";
+            
+            fetch(`${API_BASE}/api/getFollowers`, {
+                method: 'POST',
+                body: JSON.stringify({ targetUser: currentUser, currentUser: currentUser })
+            })
+            .then(res => res.json())
+            .then(users => {
+                followerListCache = users;
+                renderNewChatList("");
+            })
+            .catch(err => {
+                document.getElementById('newChatUserList').innerHTML = "<p style='text-align:center; color:#ff3366;'>Failed to load followers.</p>";
+            });
+        }
+
+        function filterNewChatList() {
+            renderNewChatList(document.getElementById('newChatSearchInput').value);
+        }
+
+        function renderNewChatList(query) {
+            const container = document.getElementById('newChatUserList');
+            container.innerHTML = "";
+            
+            const q = query.toLowerCase().trim();
+            const filtered = followerListCache.filter(u => u.username.toLowerCase().includes(q));
+            
+            if (filtered.length === 0) {
+                container.innerHTML = "<p style='text-align:center; color:gray; padding: 10px;'>No followers found.</p>";
+                return;
+            }
+            
+            filtered.forEach(u => {
+                container.innerHTML += `
+                    <div onclick="startNewChat('${u.username.replace(/'/g, "\\'")}', '${u.avatar}')" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(0,230,118,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <img src="${u.avatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                        <strong style="color: white; font-size: 15px;">${u.username}</strong>
+                    </div>
+                `;
+            });
+        }
+
+        function startNewChat(username, avatar) {
+            document.getElementById('newChatModal').style.display = 'none';
+            openChat(username, avatar, false, null);
         }
 
         loadInbox();

@@ -101,13 +101,11 @@
                     return;
                 }
                 
-                // Batch injection fix to prevent scrolling lag
                 let notifHTML = "";
                 data.forEach(n => {
                     let message = "";
                     let link = `profile.html?user=${n.actor}`; 
                     
-                    // [Control Flow Expansion]: Handling the granular notifications!
                     if (n.type === 'LIKE') {
                         message = `liked your post.`;
                         link = `post.html?id=${n.postId}`;
@@ -117,7 +115,13 @@
                         message = `commented on your post.`;
                         link = `post.html?id=${n.postId}`;
                     } else if (n.type === 'COMMENT_REPLY') {
-                        message = `replied to a comment you made on a post.`;
+                        message = `replied to your comment.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'COMMENT_LIKE') { // [THE FIX]: Added Comment Like Translation
+                        message = `liked your comment.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'COMMENT_MENTION') { // [THE FIX]: Added Comment Mention Translation
+                        message = `mentioned you in a comment.`;
                         link = `post.html?id=${n.postId}`;
                     } else if (n.type === 'COMMENT_THREAD') {
                         message = `also commented on a post you replied to.`;
@@ -134,7 +138,7 @@
                     } else if (n.type === 'QUOTE_REPOST') {
                         message = `quoted your repost.`;
                         link = `post.html?id=${n.postId}`;
-                    } else if (n.type === 'MENTION') { // <-- THE NEW TRANSLATOR!
+                    } else if (n.type === 'MENTION') { 
                         message = `mentioned you in a post.`;
                         link = `post.html?id=${n.postId}`;
                     }

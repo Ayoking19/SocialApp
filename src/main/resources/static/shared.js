@@ -120,7 +120,6 @@ function closeLogoutModal() {
 }
 
 function executeLogout() {
-    // THE FIX: Safely destroy the correct "currentUser" badge!
     localStorage.removeItem("currentUser"); 
     window.location.href = "login.html"; 
 }
@@ -170,7 +169,14 @@ function editPost(postId, currentContent) {
             .then(data => {
                 if (data === "SUCCESS") {
                     showToast("Post updated!");
-                    location.reload(); 
+                    const contentElem = document.getElementById(`post-content-text-${postId}`);
+                    if (contentElem) contentElem.innerHTML = parseSocialText(newContent);
+                    
+                    const editBtn = document.getElementById(`edit-btn-${postId}`);
+                    if (editBtn) {
+                        const escapedContent = newContent.replace(/'/g, "\\'");
+                        editBtn.setAttribute("onclick", `event.stopPropagation(); editPost(${postId}, '${escapedContent}')`);
+                    }
                 }
             });
         }
@@ -187,7 +193,8 @@ function deletePost(postId) {
         .then(data => {
             if (data === "SUCCESS") {
                 showToast("Post deleted.");
-                location.reload();
+                const postElem = document.getElementById(`post-card-${postId}`);
+                if (postElem) postElem.remove();
             }
         });
     });
@@ -270,6 +277,16 @@ function deleteComment(commentId, postId) {
             if (data === "SUCCESS") {
                 showToast("Comment deleted.");
                 loadComments(postId);
+                
+                // [THE FIX]: Instantly update the comment count on the main post
+                const commentBtn = document.getElementById(`comment-btn-${postId}`);
+                if (commentBtn) {
+                    const countSpan = commentBtn.querySelector('.comment-count');
+                    if (countSpan) {
+                        let currentCount = parseInt(countSpan.textContent) || 0;
+                        countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
+                    }
+                }
             }
         });
     });
@@ -323,6 +340,7 @@ function loadComments(postId) {
                 `;
             }
 
+            // [THE FIX]: Added dynamic ID hook to the comment repost button
             commentList.innerHTML += `
                 <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00e676;">
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -339,7 +357,7 @@ function loadComments(postId) {
                             <span class="material-icons" style="font-size: 14px;">favorite</span> ${comment.likes}
                         </span>
                         
-                        <span class="repost-btn" onclick="openRepostMenu(${postId}, false, ${comment.id})" style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px;">
+                        <span id="comment-repost-btn-${comment.id}" class="repost-btn" onclick="openRepostMenu(${postId}, false, ${comment.id})" style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px;">
                             <span class="material-icons" style="font-size: 14px;">repeat</span>
                         </span>
                         
@@ -372,6 +390,15 @@ function submitComment(postId) {
             if (data === "SUCCESS") {
                 inputField.value = ""; 
                 loadComments(postId); 
+                
+                // [THE FIX]: Instantly increment the comment count on the main post
+                const commentBtn = document.getElementById(`comment-btn-${postId}`);
+                if (commentBtn) {
+                    const countSpan = commentBtn.querySelector('.comment-count');
+                    if (countSpan) {
+                        countSpan.textContent = (parseInt(countSpan.textContent) || 0) + 1;
+                    }
+                }
             }
         });
     }
@@ -507,7 +534,8 @@ function openRepostMenu(postId, isReposted = false, commentId = null) {
     overlay.appendChild(menuCard);
     document.body.appendChild(overlay);
 
-    document.getElementById('repostConfirm').onclick = () => { executeRepost(postId, commentId); overlay.remove(); };
+    // [THE FIX]: Mapped the isReposted flag deeply into the execute function
+    document.getElementById('repostConfirm').onclick = () => { executeRepost(postId, isReposted, commentId); overlay.remove(); };
     document.getElementById('quoteConfirm').onclick = () => { openQuoteEditor(postId, commentId); overlay.remove(); };
 }
 
@@ -660,7 +688,8 @@ function openCommentQuotesModal(commentId) {
     });
 }
 
-function executeRepost(postId, commentId = null) {
+// [THE FIX]: Reposting & Undoing Reposts now surgically updates colors and counts without reloading
+function executeRepost(postId, isCurrentlyReposted, commentId = null) {
     fetch(`${API_BASE}/api/createPost`, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -674,12 +703,30 @@ function executeRepost(postId, commentId = null) {
     .then(response => response.text())
     .then(data => {
         if (data === "SUCCESS") {
-            showToast("Success!");
-            if(typeof loadFeed === "function") loadFeed(); 
+            showToast(isCurrentlyReposted ? "Repost Removed" : "Reposted!");
+            
+            const btn = document.getElementById(commentId ? `comment-repost-btn-${commentId}` : `repost-btn-${postId}`);
+            if (btn) {
+                const countSpan = btn.querySelector('.repost-count');
+                let currentCount = countSpan ? (parseInt(countSpan.textContent) || 0) : 0;
+                
+                if (isCurrentlyReposted) {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    if (countSpan) countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
+                    btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, false, ${commentId || 'null'})`);
+                } else {
+                    btn.style.background = 'rgba(0, 168, 255, 0.1)';
+                    btn.style.color = '#00a8ff';
+                    if (countSpan) countSpan.textContent = currentCount + 1;
+                    btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, true, ${commentId || 'null'})`);
+                }
+            }
         }
     });
 }
 
+// [THE FIX]: Quoting instantly increments the counter without reloading
 function executeQuote(postId, textContent, mediaBase64 = "", commentId = null) {
     fetch(`${API_BASE}/api/createPost`, {
         method: 'POST',
@@ -695,7 +742,15 @@ function executeQuote(postId, textContent, mediaBase64 = "", commentId = null) {
     .then(data => {
         if (data === "SUCCESS") {
             showToast("Quote Posted!");
-            if(typeof loadFeed === "function") loadFeed(); 
+            
+            const btn = document.getElementById(commentId ? `comment-repost-btn-${commentId}` : `repost-btn-${postId}`);
+            if (btn) {
+                const countSpan = btn.querySelector('.repost-count');
+                if (countSpan) {
+                    let currentCount = parseInt(countSpan.textContent) || 0;
+                    countSpan.textContent = currentCount + 1;
+                }
+            }
         }
     });
 }
@@ -759,12 +814,82 @@ function openLightbox(imageSrc) {
 /* ========================================== */
 /* --- GLOBAL SCROLL MEMORY ENGINE            */
 /* ========================================== */
-// Saves your exact pixel depth before you click a post
 function saveScrollPosition(pageIdentifier = 'general') {
     sessionStorage.setItem(pageIdentifier + 'Scroll', window.scrollY || document.documentElement.scrollTop);
 }
 
-// Forces the browser to jump back down after it finishes loading the feed
+/* ========================================= */
+/* --- GOOGLE OAUTH 2.0 FRONTEND LOGIC ---   */
+/* ========================================= */
+
+let tempNewUsername = "";
+
+function handleGoogleLogin(response) {
+    fetch(`${API_BASE}/api/googleLogin`, {
+        method: 'POST',
+        body: response.credential
+    })
+    .then(res => res.text())
+    .then(username => {
+        if (username.startsWith("NEW_USER:")) {
+            tempNewUsername = username.split(":")[1];
+            localStorage.setItem("currentUser", tempNewUsername);
+            
+            const modal = document.getElementById('newUsernameModal');
+            if (modal) {
+                document.getElementById('generatedUsernameDisplay').textContent = "@" + tempNewUsername;
+                modal.style.display = 'flex';
+            } else {
+                window.location.href = "index.html"; 
+            }
+        } else if (username !== "ERROR") {
+            localStorage.setItem("currentUser", username);
+            window.location.href = "index.html"; 
+        } else {
+            showToast("Google Authentication Failed. Please try again.");
+        }
+    })
+    .catch(err => {
+        console.error("Google Login Error: ", err);
+        showToast("Network error during Google Login.");
+    });
+}
+
+function keepUsername() {
+    window.location.href = "index.html";
+}
+
+function showCustomUsernameInput() {
+    document.getElementById('modalActionButtons').style.display = 'none';
+    document.getElementById('customUsernameSection').style.display = 'block';
+    document.getElementById('modalSaveButtons').style.display = 'flex';
+    document.getElementById('customUsernameInput').value = tempNewUsername;
+    document.getElementById('customUsernameInput').focus();
+}
+
+function saveCustomUsername() {
+    const newName = document.getElementById('customUsernameInput').value.trim();
+    
+    if (newName === "" || newName === tempNewUsername) {
+        window.location.href = "index.html";
+        return;
+    }
+    
+    fetch(`${API_BASE}/api/updateUsername`, {
+        method: 'POST',
+        body: JSON.stringify({ currentUsername: tempNewUsername, newUsername: newName })
+    })
+    .then(res => res.text())
+    .then(data => {
+        if (data === "SUCCESS") {
+            localStorage.setItem("currentUser", newName); 
+            window.location.href = "index.html";
+        } else {
+            document.getElementById('usernameError').style.display = 'block';
+        }
+    });
+}
+
 function restoreScrollPosition(pageIdentifier = 'general') {
     setTimeout(() => {
         const savedScroll = sessionStorage.getItem(pageIdentifier + 'Scroll');
@@ -772,7 +897,7 @@ function restoreScrollPosition(pageIdentifier = 'general') {
             window.scrollTo(0, parseInt(savedScroll));
             sessionStorage.removeItem(pageIdentifier + 'Scroll');
         }
-    }, 100); // 100ms delay ensures the new HTML is fully painted before scrolling
+    }, 100); 
 }
 
 /* ========================================= */
@@ -781,21 +906,12 @@ function restoreScrollPosition(pageIdentifier = 'general') {
 function parseSocialText(text) {
     if (!text) return "";
     
-    // 1. [Mentions Parser]: Finds @username 
     let html = text.replace(/@([\w_]+)/g, `<a href="profile.html?user=$1" style="color: rgb(0, 168, 255); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">@$1</a>`);
-    
-    // 2. [Hashtag Parser]: Finds #trend 
     html = html.replace(/#([\w_]+)/g, `<a href="search.html?q=%23$1" style="color: rgb(0, 230, 118); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">#$1</a>`);
     
     return html;
 }
 
-function closeLightbox() {
-    const overlay = document.getElementById('customLightboxOverlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-// [Master Hack]: Overriding the browser's native fullscreen
 const nativeRequestFullscreen = Element.prototype.requestFullscreen || Element.prototype.webkitRequestFullscreen;
 Element.prototype.requestFullscreen = function() {
     if (this.tagName && this.tagName.toLowerCase() === 'img') {

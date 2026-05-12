@@ -14,23 +14,16 @@ body {
     min-height: 100dvh;
     padding-top: 70px;
     padding-bottom: 80px;
-    overflow-x: hidden; 
-}
-
-/* --- THE NEW MOBILE FIX: DYNAMIC OVERFLOW & TRUNCATION --- */
-html, body:not(.in-chat) {
-    overflow-y: auto !important;
-    overscroll-behavior-y: auto; /* Allows mobile pull-to-refresh */
 }
 
 body.in-chat {
     overflow: hidden !important;
     height: 100dvh !important;
-    padding-bottom: 0 !important; /* Hides bottom padding so keyboard doesn't squish */
+    padding-bottom: 0 !important; 
 }
 
 body.in-chat .bottom-nav {
-    display: none !important; /* Hides nav in chat for more keyboard room */
+    display: none !important; 
 }
 
 .truncate-text {
@@ -43,11 +36,10 @@ body.in-chat .bottom-nav {
 .user-info-text-col {
     display: flex;
     flex-direction: column;
-    min-width: 0; /* CRITICAL: Allows flex children to truncate */
+    min-width: 0; 
     flex: 1;
     margin-right: 10px;
 }
-/* --------------------------------------------------------- */
 
 /* --- 3. The Neon Green Welcome Message --- */
 .welcome-message {
@@ -178,7 +170,6 @@ body.in-chat .bottom-nav {
 .overlay-links a { color: white; text-decoration: none; font-size: 22px; font-weight: bold; transition: 0.2s; }
 .overlay-links a:hover { color: #00e676; padding-left: 10px; }
 
-/* Bottom Nav Icon Fix */
 .bottom-nav {
     position: fixed;
     bottom: 0; left: 0;
@@ -222,111 +213,74 @@ body.in-chat .bottom-nav {
     border: 2px solid #0f172a;
 }
 
-/* --- STICKY UI COMPONENTS --- */
-.sticky-container {
-    position: sticky;
-    top: 65px; 
-    z-index: 100;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-radius: 15px; 
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    margin-bottom: 15px;
-}
-
-/* --- FLOATING ACTION BUTTON (FAB) --- */
-.fab-container {
-    position: fixed;
-    bottom: 90px;
-    right: 20px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 15px;
-}
-
-.fab-menu {
-    display: none;
-    flex-direction: column;
-    gap: 10px;
-    background: #1e293b;
-    border: 1px solid #334155;
-    padding: 15px;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    animation: slideUp 0.3s ease-out forwards;
-}
-
-.fab-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: white;
-    cursor: pointer;
-    padding: 8px 12px;
-    border-radius: 8px;
-    transition: 0.2s;
-    background: rgba(255, 255, 255, 0.05);
-    border: none;
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.fab-menu-item:hover {
-    background: rgba(0, 230, 118, 0.2);
-    color: #00e676;
-}
-
-.fab-main-btn {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: #00e676;
-    color: black;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4);
-    cursor: pointer;
-    border: none;
-    transition: 0.3s;
-}
-
-.fab-main-btn:hover {
-    transform: scale(1.1);
-}
-
-.fab-main-btn .material-icons {
-    font-size: 30px;
-    transition: 0.3s;
-}
-
-/* --- 6. The Feed & Glassmorphism Posts --- */
-.feed {
-    flex: 1;
-    max-width: 700px; 
-    margin: 0 auto; 
-    padding: 0 20px;
-}
+/* ========================================= */
+/* --- NEW: THE GLOBAL STICKY COMPONENTS --- */
+/* ========================================= */
 
 .feed-header {
-    padding: 30px 0 20px 0;
     position: sticky;
-    top: 0;
-    background: rgba(26, 11, 46, 0.8); 
-    backdrop-filter: blur(10px);
-    z-index: 10;
+    top: 65px; 
+    background: #1a0b2e; 
+    z-index: 100;
+    min-height: 60px;
     display: flex;
     justify-content: center; 
     align-items: center;
+    padding: 15px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 20px;
+    margin-top: 0;
 }
 
 .feed-header h2 {
     font-size: 24px;
     font-weight: 700;
+    margin: 0;
+    text-align: center;
+}
+
+.sticky-header {
+    position: sticky;
+    top: 65px; 
+    background: #1a0b2e;
+    z-index: 100;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.create-post-trigger {
+    position: absolute;
+    right: 20px;
+    background: #00e676;
+    color: #000;
+    border: none;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4);
+    transition: 0.3s ease;
+    flex-shrink: 0;
+}
+
+.create-post-trigger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 230, 118, 0.6);
+}
+
+.feed {
+    flex: 1;
+    max-width: 700px; 
+    margin: 0 auto; 
+    padding: 0 20px;
 }
 
 .post {
@@ -425,12 +379,31 @@ body.in-chat .bottom-nav {
     margin-right: 5px;
 }
 
+.comment-thread {
+    transition: background 0.3s ease;
+}
+
+.comment-thread:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+div[id^="replies-container-"] {
+    transition: border-color 0.3s ease;
+}
+
+div[id^="replies-container-"]:hover {
+    border-left: 2px solid #00e676 !important;
+}
+
+/* ========================================= */
+/* --- CREATE POST MODAL COMPONENTS ---      */
+/* ========================================= */
+
 .create-post-box {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 30px;
+    background: transparent; 
+    border: none;
+    padding: 0;
+    margin-bottom: 0;
 }
 
 .create-post-top {
@@ -905,7 +878,6 @@ textarea {
     transition: 0.3s ease-in-out;
 }
 
-/* --- IMAGE CONTROLS & UNIVERSAL BUTTON FIXES --- */
 .media-control-btn {
     background: rgba(255, 255, 255, 0.05);
     color: #00e676;
@@ -968,6 +940,14 @@ textarea {
     border: 1px solid rgba(0, 230, 118, 0.3);
 }
 
+/* --- THREADED COMMENT REFINEMENTS --- */
+.thread-action-btn {
+    background: transparent;
+    border: none;
+    padding: 4px 10px;
+}
+
+
 /* ========================================= */
 /* --- NEW: MEDIA GALLERY & ADMIN STYLES --- */
 /* ========================================= */
@@ -1017,6 +997,28 @@ textarea {
     border: 1px solid rgba(0, 230, 118, 0.3); 
     margin-left: auto; 
     flex-shrink: 0;
+}
+
+/* --- TOP ACTION BUTTONS (CREATE GROUP & SEARCH) --- */
+.action-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: 0.2s ease;
+}
+
+.action-btn:hover {
+    background: rgba(0, 230, 118, 0.1);
+    color: #00e676;
+    border-color: rgba(0, 230, 118, 0.3);
+    transform: translateY(-2px);
 }
 
 .action-sheet-btn {
@@ -1104,14 +1106,12 @@ textarea {
     .nav-links a { font-size: 14px; padding: 10px; }
     .nav-links a.logout { margin-top: 0; }
     
-    /* Feed allows scrolling normally */
     .feed { height: auto !important; padding-top: 65px !important; padding-bottom: 70px !important; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
     
-    /* When in chat, kill scrolling on the body so keyboard doesn't glitch */
     body.in-chat .feed { height: 100dvh !important; overflow: hidden; }
     
     .chat-container { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; border-radius: 0; border: none; height: calc(100dvh - 135px); }
-    body.in-chat .chat-container { height: calc(100dvh - 65px); } /* Bottom nav is hidden in chat */
+    body.in-chat .chat-container { height: calc(100dvh - 65px); overflow: hidden; } /* Ensure overflow hidden ONLY when chatting */
     
     #chatView { height: 100%; flex-direction: column; justify-content: space-between; }
     .chat-history { flex: 1; overflow-y: auto; padding-bottom: 20px; }
@@ -1123,3 +1123,99 @@ textarea {
     .profile-tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
     html, body { overflow-x: clip !important; max-width: 100vw !important; width: 100% !important; }
 }
+
+/* ========================================= */
+/* --- MESSAGES PAGE STYLES (MIGRATED) ---   */
+/* ========================================= */
+
+.messages-page-container {
+    width: 100% !important; 
+    max-width: 100vw !important; 
+    height: 100% !important; 
+    padding: 0 !important; 
+    margin: 0 !important; 
+}
+
+.messages-feed {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important; /* Ensures mobile chats stretch edge-to-edge */
+    box-sizing: border-box;
+    height: calc(100vh - 70px); /* [THE FIX]: Explicitly locks height on PC so chat scrolls internally */
+    display: flex;
+    flex-direction: column;
+}
+
+.messages-feed .feed-header { 
+    display: none !important; 
+}
+
+.chat-container {
+    display: flex; 
+    flex-direction: column; 
+    flex: 1; 
+    min-height: 0; 
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 0 !important; 
+    border: none !important; 
+    margin-bottom: 0 !important; 
+    height: 100%; /* [THE FIX]: Ensures the container fills the locked feed height */
+}
+
+#inboxView { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 0; 
+}
+
+.messages-sticky-header {
+    position: sticky;
+    top: 65px; /* Sticks precisely under the top navigation bar */
+    z-index: 100;
+    background: #0b0f1a;
+}
+
+.inbox-item {
+    display: flex; align-items: center; gap: 15px; padding: 15px; border-radius: 12px; cursor: pointer;
+    transition: 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05); margin: 0 10px;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.inbox-item:hover { background: rgba(0, 230, 118, 0.05); }
+
+#chatView { 
+    display: none; 
+    flex-direction: column; 
+    height: 100%; 
+    min-height: 0; 
+    position: relative; 
+}
+
+.chat-header {
+    display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(0, 0, 0, 0.9); 
+    border-bottom: 1px solid #334155; flex-shrink: 0; z-index: 50;
+}
+
+.chat-history {
+    flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; min-height: 0;
+}
+
+.chat-input-area {
+    display: flex; flex-direction: column; gap: 5px; padding: 15px; background: #0b0f1a; border-top: 1px solid #334155;
+    flex-shrink: 0; width: 100%; box-sizing: border-box;
+}
+
+.chat-input-area input[type="text"] {
+    flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid rgba(0, 230, 118, 0.3);
+    background: rgba(0,0,0,0.3); color: white; font-size: 15px; min-width: 0;
+}
+
+.msg-bubble {
+    max-width: 75%; padding: 10px 15px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+
+.msg-bubble.selected { border: 2px solid #00e676; background-color: rgba(0, 230, 118, 0.2) !important; }
+.msg-sent { background: #00e676; color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg-received { background: #334155; color: #fff; align-self: flex-start; border-bottom-left-radius: 4px; }

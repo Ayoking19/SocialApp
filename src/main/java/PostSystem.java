@@ -768,7 +768,7 @@ public class PostSystem {
                                .append("\"isComment\":true,")
                                .append("\"username\":\"").append(pUser).append("\",")
                                .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
-                               .append("\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
+                               .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
                                .append("\"media\":\"\",")
                                .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
                                .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
@@ -851,21 +851,64 @@ public class PostSystem {
         return "ERROR";
     }
 
+    // --- NEW: Overloaded Method for Backwards Compatibility ---
     public static boolean addComment(String identifier, int postId, String content) {
-        String sql = "INSERT INTO comments(post_id, user_id, content) VALUES(?, (SELECT id FROM users WHERE username = ? OR email = ?), ?)";
+        return addComment(identifier, postId, content, null);
+    }
+
+    // --- NEW: Core Threaded Comment Engine ---
+    public static boolean addComment(String identifier, int postId, String content, Integer parentCommentId) {
+        String sql = "INSERT INTO comments(post_id, user_id, content, parent_comment_id) VALUES(?, (SELECT id FROM users WHERE username = ? OR email = ?), ?, ?)";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setInt(1, postId);
             pstmt.setString(2, identifier);
             pstmt.setString(3, identifier);
             pstmt.setString(4, content);
+            
+            if (parentCommentId != null) {
+                pstmt.setInt(5, parentCommentId);
+            } else {
+                pstmt.setNull(5, java.sql.Types.INTEGER);
+            }
+            
             int affectedRows = pstmt.executeUpdate();
             
             if (affectedRows > 0 && content != null) {
+                // [NEW LOGIC 1]: Notify the Post Owner (Only if it's a top-level comment)
+                if (parentCommentId == null) {
+                    String getOwnerSql = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
+                    try (PreparedStatement ownerStmt = conn.prepareStatement(getOwnerSql)) {
+                        ownerStmt.setInt(1, postId);
+                        ResultSet rs = ownerStmt.executeQuery();
+                        if (rs.next()) {
+                            String postOwner = rs.getString("username");
+                            if (!postOwner.equals(identifier)) {
+                                NotificationSystem.createNotification(postOwner, identifier, "COMMENT", postId);
+                            }
+                        }
+                    }
+                } else {
+                    // [NEW LOGIC 2]: Notify the Parent Comment Owner (This is a structural reply)
+                    String getParentOwnerSql = "SELECT users.username FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?";
+                    try (PreparedStatement parentOwnerStmt = conn.prepareStatement(getParentOwnerSql)) {
+                        parentOwnerStmt.setInt(1, parentCommentId);
+                        ResultSet rs = parentOwnerStmt.executeQuery();
+                        if (rs.next()) {
+                            String parentOwner = rs.getString("username");
+                            if (!parentOwner.equals(identifier)) {
+                                NotificationSystem.createNotification(parentOwner, identifier, "COMMENT_REPLY", postId);
+                            }
+                        }
+                    }
+                }
+
+                // [NEW LOGIC 3]: True Mentions (Regex Scan for @username)
                 java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@(\\w+)").matcher(content);
                 while (matcher.find()) {
                     String mentionedUser = matcher.group(1);
+                    // Do not notify if they tag themselves
                     if (!mentionedUser.equals(identifier)) {
-                        NotificationSystem.createNotification(mentionedUser, identifier, "MENTION", postId);
+                        NotificationSystem.createNotification(mentionedUser, identifier, "COMMENT_MENTION", postId);
                     }
                 }
                 return true;
@@ -893,6 +936,7 @@ public class PostSystem {
         } catch (Exception e) { System.out.println("Error deleting comment: " + e.getMessage()); return false; }
     }
 
+    // --- THE FIX: Integrated the Notification Fix from the previous Phase ---
     public static String toggleCommentLike(String identifier, int commentId) {
         String findUserSQL = "SELECT id FROM users WHERE username = ?";
         String checkLikeSQL = "SELECT id FROM comment_likes WHERE user_id = ? AND comment_id = ?";
@@ -919,6 +963,22 @@ public class PostSystem {
                             addStmt.setInt(1, userId); 
                             addStmt.setInt(2, commentId); 
                             addStmt.executeUpdate(); 
+                            
+                            // [NEW LOGIC]: Fetch the comment owner and notify them
+                            String getCommentOwnerSql = "SELECT users.username, comments.post_id FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?";
+                            try (PreparedStatement cOwnerStmt = conn.prepareStatement(getCommentOwnerSql)) {
+                                cOwnerStmt.setInt(1, commentId);
+                                ResultSet rs = cOwnerStmt.executeQuery();
+                                
+                                if (rs.next()) {
+                                    String commentOwner = rs.getString("username");
+                                    int pId = rs.getInt("post_id"); // Need the post ID for the notification link
+                                    
+                                    if (!commentOwner.equals(identifier)) {
+                                        NotificationSystem.createNotification(commentOwner, identifier, "COMMENT_LIKE", pId);
+                                    }
+                                }
+                            }
                             return "LIKED";
                         }
                     }
@@ -928,13 +988,18 @@ public class PostSystem {
         return "ERROR";
     }
 
+    // --- THE FIX: Querying the new Parent/Child Comment structure ---
     public static String getComments(int postId, String currentUser) {
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = " AND comments.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND comments.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 
-        String querySQL = "SELECT comments.id, users.username, comments.content, comments.created_at, comments.is_edited, " +
+        String querySQL = "SELECT comments.id, comments.parent_comment_id, users.username, comments.content, comments.created_at, comments.is_edited, " +
                           "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count, " +
+                          "(SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = comments.id) AS reply_count, " +
+                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
+                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND ((p2.content IS NOT NULL AND trim(p2.content) != '') OR (p2.image_url IS NOT NULL AND trim(p2.image_url) != ''))) AS quote_count, " +
                           "EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND comment_id = comments.id) AS is_liked, " +
+                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = comments.id AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
                           "(SELECT COUNT(*) FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = comments.user_id) AS is_following " +
                           "FROM comments JOIN users ON comments.user_id = users.id " +
                           "WHERE comments.post_id = ? " + blockFilter + " ORDER BY comments.created_at ASC";
@@ -943,7 +1008,8 @@ public class PostSystem {
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
             pstmt.setString(1, currentUser);
             pstmt.setString(2, currentUser);
-            pstmt.setInt(3, postId);
+            pstmt.setString(3, currentUser);
+            pstmt.setInt(4, postId);
             ResultSet rs = pstmt.executeQuery();
 
             boolean isFirstItem = true;
@@ -953,13 +1019,20 @@ public class PostSystem {
                 
                 String user = rs.getString("username");
                 String text = rs.getString("content");
+                int parentCommentId = rs.getInt("parent_comment_id");
+                boolean hasParent = !rs.wasNull();
                 
                 jsonBuilder.append("{")
                            .append("\"id\":").append(rs.getInt("id")).append(",")
+                           .append("\"parentCommentId\":").append(hasParent ? parentCommentId : "null").append(",") 
+                           .append("\"replyCount\":").append(rs.getInt("reply_count")).append(",") 
+                           .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",") 
+                           .append("\"quoteCount\":").append(rs.getInt("quote_count")).append(",") 
                            .append("\"username\":\"").append(escapeJSON(user)).append("\",")
                            .append("\"content\":\"").append(escapeJSON(text)).append("\",")
                            .append("\"likes\":").append(rs.getInt("like_count")).append(",")
                            .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
+                           .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
                            .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
                            .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
                            .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")

@@ -16,8 +16,10 @@ public class MessageSystem {
             try { stmt.execute("ALTER TABLE messages ADD COLUMN group_id INTEGER DEFAULT NULL"); } catch (Exception e) {}
             try { stmt.execute("ALTER TABLE groups ADD COLUMN avatar TEXT DEFAULT NULL"); } catch (Exception e) {}
             try { stmt.execute("ALTER TABLE group_members ADD COLUMN is_admin INTEGER DEFAULT 0"); } catch (Exception e) {}
-            
             try { stmt.execute("ALTER TABLE messages ADD COLUMN deleted_by_sender INTEGER DEFAULT 0"); } catch (Exception e) {}
+            
+            // [THE FIX]: The Watermark Column for tracking Group read receipts!
+            try { stmt.execute("ALTER TABLE group_members ADD COLUMN last_read_message_id INTEGER DEFAULT 0"); } catch (Exception e) {}
         } catch (Exception e) { System.out.println("Schema Initialization Error: " + e.getMessage()); }
     }
 
@@ -116,7 +118,6 @@ public class MessageSystem {
         return "ERROR";
     }
 
-    // THE FIX: Added lastMessageId for Delta Polling
     public static String getChatHistory(String currentUser, String targetUser, int lastMessageId) {
         ensureSchema();
         String markReadSQL = "UPDATE messages SET is_read = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_receiver, 0) = 0";
@@ -141,7 +142,7 @@ public class MessageSystem {
             try (PreparedStatement fetchStmt = conn.prepareStatement(fetchSQL)) {
                 fetchStmt.setString(1, currentUser); fetchStmt.setString(2, targetUser);
                 fetchStmt.setString(3, targetUser); fetchStmt.setString(4, currentUser); 
-                fetchStmt.setInt(5, lastMessageId); // Delta filter
+                fetchStmt.setInt(5, lastMessageId); 
                 ResultSet rs = fetchStmt.executeQuery();
                 
                 boolean first = true;
@@ -212,11 +213,27 @@ public class MessageSystem {
     }
 
     public static String getGlobalUnreadCount(String currentUser) {
-        String sql = "SELECT COUNT(*) FROM messages WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND is_read = 0 AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL";
-        try (Connection conn = DatabaseManager.connect(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, currentUser);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return "{\"unread\":" + rs.getInt(1) + "}";
+        ensureSchema();
+        // 1. Calculate private 1-on-1 unread messages
+        String sqlPrivate = "SELECT COUNT(*) FROM messages WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND is_read = 0 AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL";
+        
+        // [THE FIX]: 2. Calculate Group unread messages by summing messages higher than the watermark
+        String sqlGroup = "SELECT SUM((SELECT COUNT(*) FROM messages m WHERE m.group_id = gm.group_id AND m.id > gm.last_read_message_id AND m.sender_id != gm.user_id)) " +
+                          "FROM group_members gm WHERE gm.user_id = (SELECT id FROM users WHERE username = ?)";
+        
+        int totalUnread = 0;
+        try (Connection conn = DatabaseManager.connect()) {
+            try (PreparedStatement stmt = conn.prepareStatement(sqlPrivate)) {
+                stmt.setString(1, currentUser);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) totalUnread += rs.getInt(1);
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(sqlGroup)) {
+                stmt.setString(1, currentUser);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) totalUnread += rs.getInt(1);
+            }
+            return "{\"unread\":" + totalUnread + "}";
         } catch (Exception e) { System.out.println("Unread Count Error: " + e.getMessage()); }
         return "{\"unread\":0}";
     }
@@ -310,9 +327,12 @@ public class MessageSystem {
 
     public static String getUserGroups(String currentUser) {
         ensureSchema();
+        
+        // [THE FIX]: This query now physically calculates the unread count against the watermark!
         String sql = "SELECT g.id, g.name, g.avatar, " +
                      "COALESCE((SELECT created_at FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), g.created_at) as last_time, " +
-                     "COALESCE((SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), 'Group created') as last_message " +
+                     "COALESCE((SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), 'Group created') as last_message, " +
+                     "(SELECT COUNT(*) FROM messages m WHERE m.group_id = g.id AND m.id > gm.last_read_message_id AND m.sender_id != gm.user_id) as unread_count " +
                      "FROM groups g " +
                      "JOIN group_members gm ON g.id = gm.group_id " +
                      "WHERE gm.user_id = (SELECT id FROM users WHERE username = ?) " +
@@ -336,7 +356,7 @@ public class MessageSystem {
                     .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
                     .append("\"lastMessage\":\"").append(escapeJSON(rs.getString("last_message"))).append("\",")
                     .append("\"timestamp\":\"").append(rs.getString("last_time")).append("\",")
-                    .append("\"unreadCount\":0,")
+                    .append("\"unreadCount\":").append(rs.getInt("unread_count")).append(",")
                     .append("\"isGroup\":true")
                     .append("}");
             }
@@ -363,9 +383,12 @@ public class MessageSystem {
         return "ERROR";
     }
 
-    // THE FIX: Added lastMessageId for Delta Polling
     public static String getGroupChatHistory(String currentUser, int groupId, int lastMessageId) {
         ensureSchema();
+        
+        // [THE FIX]: Updating the user's Watermark every time they view the group chat
+        String updateReadSQL = "UPDATE group_members SET last_read_message_id = COALESCE((SELECT MAX(id) FROM messages WHERE group_id = ?), 0) WHERE group_id = ? AND user_id = (SELECT id FROM users WHERE username = ?)";
+        
         String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
                           "(SELECT m2.content FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_content, " +
@@ -376,34 +399,45 @@ public class MessageSystem {
                           "ORDER BY m.created_at ASC";
 
         StringBuilder json = new StringBuilder("[");
-        try (Connection conn = DatabaseManager.connect(); PreparedStatement fetchStmt = conn.prepareStatement(fetchSQL)) {
-            fetchStmt.setInt(1, groupId);
-            fetchStmt.setInt(2, lastMessageId); // Delta filter
-            ResultSet rs = fetchStmt.executeQuery();
-            boolean first = true;
-            while (rs.next()) {
-                if (!first) json.append(",");
-                first = false;
-                String text = rs.getString("content"); if (text == null) text = "";
-                String img = rs.getString("image_url"); if (img == null) img = "";
+        try (Connection conn = DatabaseManager.connect()) {
+            
+            // Execute the Watermark update
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateReadSQL)) {
+                updateStmt.setInt(1, groupId);
+                updateStmt.setInt(2, groupId);
+                updateStmt.setString(3, currentUser);
+                updateStmt.executeUpdate();
+            } catch (Exception e) { System.out.println("Mark Group Read Error: " + e.getMessage()); }
 
-                int replyGrpId = rs.getInt("reply_group_id");
-                String replyGrpIdStr = rs.wasNull() ? "null" : String.valueOf(replyGrpId);
+            try (PreparedStatement fetchStmt = conn.prepareStatement(fetchSQL)) {
+                fetchStmt.setInt(1, groupId);
+                fetchStmt.setInt(2, lastMessageId); 
+                ResultSet rs = fetchStmt.executeQuery();
+                boolean first = true;
+                while (rs.next()) {
+                    if (!first) json.append(",");
+                    first = false;
+                    String text = rs.getString("content"); if (text == null) text = "";
+                    String img = rs.getString("image_url"); if (img == null) img = "";
 
-                json.append("{")
-                    .append("\"id\":").append(rs.getInt("id")).append(",")
-                    .append("\"sender\":\"").append(escapeJSON(rs.getString("sender"))).append("\",")
-                    .append("\"content\":\"").append(escapeJSON(text)).append("\",")
-                    .append("\"media\":\"").append(escapeJSON(img)).append("\",")
-                    .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
-                    .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
-                    .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
-                    .append("\"replySender\":\"").append(escapeJSON(rs.getString("reply_sender"))).append("\",")
-                    .append("\"replyContent\":\"").append(escapeJSON(rs.getString("reply_content"))).append("\",")
-                    .append("\"replyGroupName\":\"").append(escapeJSON(rs.getString("reply_group_name"))).append("\",")
-                    .append("\"replyGroupId\":").append(replyGrpIdStr).append(",")
-                    .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
-                    .append("}");
+                    int replyGrpId = rs.getInt("reply_group_id");
+                    String replyGrpIdStr = rs.wasNull() ? "null" : String.valueOf(replyGrpId);
+
+                    json.append("{")
+                        .append("\"id\":").append(rs.getInt("id")).append(",")
+                        .append("\"sender\":\"").append(escapeJSON(rs.getString("sender"))).append("\",")
+                        .append("\"content\":\"").append(escapeJSON(text)).append("\",")
+                        .append("\"media\":\"").append(escapeJSON(img)).append("\",")
+                        .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                        .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
+                        .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
+                        .append("\"replySender\":\"").append(escapeJSON(rs.getString("reply_sender"))).append("\",")
+                        .append("\"replyContent\":\"").append(escapeJSON(rs.getString("reply_content"))).append("\",")
+                        .append("\"replyGroupName\":\"").append(escapeJSON(rs.getString("reply_group_name"))).append("\",")
+                        .append("\"replyGroupId\":").append(replyGrpIdStr).append(",")
+                        .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
+                        .append("}");
+                }
             }
         } catch (Exception e) { System.out.println("Group History Error: " + e.getMessage()); }
         json.append("]"); return json.toString();

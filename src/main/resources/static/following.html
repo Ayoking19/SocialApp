@@ -51,9 +51,25 @@
         <main class="feed">
             <div class="feed-header">
                 <h2>Following</h2>
+                <button class="create-post-trigger" onclick="openCreatePostModal()" title="Create Post">
+                    <span class="material-icons">add</span>
+                </button>
             </div>
             
-            <div class="create-post-box">
+            <div id="feedContainer"></div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="createPostModal" style="display: none; z-index: 10001;">
+        <div class="modal-card" style="max-width: 500px; width: 95%; padding: 25px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: white;">Create Post</h3>
+                <button onclick="closeCreatePostModal()" style="background: transparent; border: none; color: #ff3366; cursor: pointer; display: flex; align-items: center;">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            
+            <div class="create-post-box" style="margin-bottom: 0; border: none; background: transparent; padding: 0;">
                 <div class="create-post-top">
                     <img src="" alt="Profile" id="userPostAvatar" class="mini-profile-pic" style="background: #1e293b;">
                     <textarea id="postContent" placeholder="What's on your mind?"></textarea>
@@ -65,16 +81,13 @@
                     <div class="upload-options">
                         <input type="file" id="imageUpload" accept="image/*" hidden onchange="previewMedia(this, 'image')">
                         <input type="file" id="videoUpload" accept="video/*" hidden onchange="previewMedia(this, 'video')">
-                        
                         <label for="imageUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">image</span></label>
                         <label for="videoUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">videocam</span></label>
                     </div>
                     <button id="postBtn" class="main-post-btn">Post</button>
                 </div>
             </div>
-            
-            <div id="feedContainer"></div>
-        </main>
+        </div>
     </div>
 
     <div class="modal-overlay" id="logoutModal" style="display: none;">
@@ -92,12 +105,10 @@
     <script src="shared.js"></script>
 
     <script>
-        /* --- PAGINATION STATE MACHINE --- */
         let currentPage = 1;
         let isFetching = false; 
         let hasMorePosts = true; 
 
-        /* 1. THE BOUNCER & IDENTITY */
         checkSecurity(); 
 
         function loadCurrentUserInfo() {
@@ -128,7 +139,15 @@
             sessionStorage.setItem("welcomeAcknowledged", "true");
         }
 
-        /* --- MEDIA UPLOAD ENGINE --- */
+        function openCreatePostModal() {
+            document.getElementById('createPostModal').style.display = 'flex';
+            document.getElementById('postContent').focus();
+        }
+
+        function closeCreatePostModal() {
+            document.getElementById('createPostModal').style.display = 'none';
+        }
+
         let attachedMediaBase64 = ""; 
         let attachedMediaType = "";
 
@@ -158,13 +177,11 @@
             document.getElementById('videoUpload').value = ""; 
         }
 
-        /* --- THE PAINTER: Fetch and Draw the Following Feed (Paginated) --- */
         function loadFeed() {
             if (isFetching || !hasMorePosts) return;
             isFetching = true;
 
             const feedContainer = document.getElementById("feedContainer");
-            // Trigger the scroll jump!
             restoreScrollPosition(window.location.pathname);
             
             if (currentPage === 1) {
@@ -226,22 +243,25 @@
                         `;
                     }
 
+                    const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
+                    const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
+
                     feedHTML += `
-                        <div class="post" onclick="window.location.href='post.html?id=${post.id}'" style="cursor: pointer;">
+                        <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
                             <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
-                                <div style="display: flex; flex-direction: column;">
-                                    <div style="display: flex; align-items: center;">
-                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" style="color: white; text-decoration: none;"><strong>${post.username}</strong></a>
+                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
+                                <div class="user-info-text-col">
+                                    <div style="display: flex; align-items: center; min-width: 0;">
+                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" class="truncate-text" style="color: white; text-decoration: none; font-weight: bold;">${post.username}</a>
                                         ${editedTag}
                                         ${postEditDeleteHTML}
                                     </div>
-                                    <span class="time-stamp">${post.timestamp}</span>
+                                    <span class="time-stamp truncate-text" style="font-size: 12px; color: gray;">${post.timestamp.substring(0, 16)}</span>
                                 </div>
                                 ${post.username !== currentUser ? 
                                     (post.isFollowing ? 
-                                        `<button class="media-control-btn" style="margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
-                                        `<button class="media-control-btn" style="margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
+                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
+                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
                                     ) : ''}
                             </div>
                             
@@ -257,7 +277,7 @@
                                     <span class="like-count">${post.likes}</span>
                                 </span>
                                 
-                                <span class="repost-btn" onclick="event.stopPropagation(); openRepostMenu(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: color 0.2s; ${repostColorStyle}">
+                                <span class="repost-btn" onclick="event.stopPropagation(); openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: color 0.2s; ${repostColorStyle}">
                                     <span class="material-icons" style="font-size: 20px;">repeat</span>
                                     <span class="repost-count">${post.repostCount}</span> 
                                 </span>
@@ -267,7 +287,7 @@
                                     <span class="comment-count">${post.commentCount}</span>
                                 </span>
                             </div>
-
+                            
                             <div class="comments-section" id="comments-${post.id}" onclick="event.stopPropagation();" style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                                 <div id="comment-list-${post.id}" style="margin-bottom: 10px; max-height: 200px; overflow-y: auto;"></div>
                                 <div style="display: flex; gap: 10px;">
@@ -277,7 +297,7 @@
                             </div>
                         </div>`;
                 });
-
+                
                 if (currentPage === 1) {
                     feedContainer.innerHTML = feedHTML;
                 } else {
@@ -287,19 +307,14 @@
                 isFetching = false;
             })
             .catch(error => {
-                console.error("Following Feed Error:", error);
-                
-                // THE UX FIX: Wipes skeletons and prints an error message if the fetch crashes!
                 if (currentPage === 1) {
                     document.getElementById("feedContainer").innerHTML = 
                         "<p style='text-align: center; color: #ff3366;'>Network error. Please refresh the page.</p>";
                 }
-                
                 isFetching = false;
             });
         }
 
-        /* --- THE SCROLL SENSOR --- */
         window.addEventListener('scroll', () => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
                 if (!isFetching && hasMorePosts) {
@@ -309,7 +324,6 @@
             }
         });
 
-        /* --- 5. POST CREATION ENGINE (WITH DEBOUNCING) --- */
         let isPosting = false; 
 
         document.getElementById("postBtn").addEventListener("click", function() {
@@ -339,6 +353,8 @@
                     document.getElementById("postContent").value = "";
                     removeMedia(); 
                     
+                    closeCreatePostModal(); 
+                    
                     currentPage = 1;
                     hasMorePosts = true;
                     loadFeed(); 
@@ -351,9 +367,6 @@
             });
         });
 
-        /* ========================================= */
-        /* --- IGNITION: Start Engines --- */
-        /* ========================================= */
         loadFeed();
         loadCurrentUserInfo();
     </script>
