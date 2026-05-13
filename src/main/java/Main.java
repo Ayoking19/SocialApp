@@ -24,13 +24,17 @@ public class Main {
         DatabaseManager.initializeDatabase();
         MessageSystem.ensureSchema();
 
-        // [THE FIX]: Instant non-destructive database patch to support media in comments!
+        // [HOT PATCH]: Adds Media Support to Comments
         try (java.sql.Connection conn = DatabaseManager.connect()) {
             conn.createStatement().execute("ALTER TABLE comments ADD COLUMN image_url TEXT");
             System.out.println("[SYSTEM]: Comment Media schema patched successfully.");
-        } catch (Exception e) { 
-            // If the column already exists, it silently ignores the error.
-        }
+        } catch (Exception e) {}
+
+        // [HOT PATCH]: Adds Firebase Push Token Support to Users Table
+        try (java.sql.Connection conn = DatabaseManager.connect()) {
+            conn.createStatement().execute("ALTER TABLE users ADD COLUMN fcm_token TEXT");
+            System.out.println("[SYSTEM]: Firebase Token schema patched successfully.");
+        } catch (Exception e) {}
 
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
@@ -41,7 +45,6 @@ public class Main {
             server.createContext("/api/googleLogin", new HttpHandler() {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
-                    // CORS Security Preflight Handshake
                     exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                     exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
                     exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -55,12 +58,36 @@ public class Main {
                         InputStream is = exchange.getRequestBody();
                         String jwtToken = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                         
-                        // Decode token and get the username
                         String username = LoginSystem.decodeGoogleJWT(jwtToken);
                         
                         exchange.sendResponseHeaders(200, username.length());
                         OutputStream os = exchange.getResponseBody();
                         os.write(username.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 2. DEVICE TOKEN REGISTRATION ---      */
+            /* ========================================= */
+            server.createContext("/api/registerDevice", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        String token = extractJsonValue(body, "token");
+                        
+                        NotificationSystem.saveDeviceToken(username, token);
+                        
+                        String response = "SUCCESS";
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
                         os.close();
                     }
                 }
@@ -89,9 +116,7 @@ public class Main {
                             
                             String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
                             if (!rawId.equals("null") && !rawId.isEmpty()) {
-                                try { 
-                                    parentPostId = Integer.parseInt(rawId); 
-                                } catch (NumberFormatException e) {}
+                                try { parentPostId = Integer.parseInt(rawId); } catch (NumberFormatException e) {}
                             }
                         }
 
@@ -103,9 +128,7 @@ public class Main {
                             
                             String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
                             if (!rawId.equals("null") && !rawId.isEmpty()) {
-                                try { 
-                                    parentCommentId = Integer.parseInt(rawId); 
-                                } catch (NumberFormatException e) {}
+                                try { parentCommentId = Integer.parseInt(rawId); } catch (NumberFormatException e) {}
                             }
                         }
                         
@@ -260,7 +283,7 @@ public class Main {
                         String username = extractJsonValue(body, "username");
                         int postId = Integer.parseInt(extractJsonValue(body, "postId"));
                         String content = extractJsonValue(body, "content");
-                        String media = saveMediaFile(extractJsonValue(body, "media")); // [THE FIX]: Saves comment media
+                        String media = saveMediaFile(extractJsonValue(body, "media")); 
                         
                         Integer parentCommentId = null;
                         if (body.contains("\"parentCommentId\":")) {
@@ -270,13 +293,10 @@ public class Main {
                             
                             String rawId = body.substring(startIndex, endIndex).trim().replace("\"", "");
                             if (!rawId.equals("null") && !rawId.isEmpty()) {
-                                try { 
-                                    parentCommentId = Integer.parseInt(rawId); 
-                                } catch (NumberFormatException e) {}
+                                try { parentCommentId = Integer.parseInt(rawId); } catch (NumberFormatException e) {}
                             }
                         }
                         
-                        // [THE FIX]: Pass the media variable into the PostSystem
                         boolean success = PostSystem.addComment(username, postId, content, media, parentCommentId);
                         String response = success ? "SUCCESS" : "FAILURE";
                         
@@ -930,7 +950,6 @@ public class Main {
                         String currentUser = extractJsonValue(body, "currentUser");
                         String targetUser = extractJsonValue(body, "targetUser");
                         
-                        // THE FIX: Smart Delta Polling Parameter
                         String lastMsgIdStr = extractJsonValue(body, "lastMessageId");
                         int lastMessageId = (lastMsgIdStr != null && !lastMsgIdStr.trim().isEmpty() && !lastMsgIdStr.equals("null")) ? Integer.parseInt(lastMsgIdStr) : 0;
                         
@@ -1017,7 +1036,6 @@ public class Main {
                         String currentUser = extractJsonValue(body, "currentUser");
                         int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
                         
-                        // THE FIX: Smart Delta Polling Parameter
                         String lastMsgIdStr = extractJsonValue(body, "lastMessageId");
                         int lastMessageId = (lastMsgIdStr != null && !lastMsgIdStr.trim().isEmpty() && !lastMsgIdStr.equals("null")) ? Integer.parseInt(lastMsgIdStr) : 0;
                         
