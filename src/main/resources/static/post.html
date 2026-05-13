@@ -164,17 +164,19 @@
                     `;
                 }
 
+                const shortTime = post.timestamp && post.timestamp.length > 16 ? post.timestamp.substring(0, 16) : post.timestamp;
+
                 const postHTML = `
                     <div id="post-card-${post.id}" class="post" style="border: none; background: transparent; padding: 0;">
                         <div class="user-info" style="display: flex; align-items: center; width: 100%;">
                             <img src="${post.avatar}" onclick="window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; cursor: pointer;">
                             <div style="display: flex; flex-direction: column;">
                                 <div style="display: flex; align-items: center;">
-                                    <a href="profile.html?user=${post.username}" style="color: white; text-decoration: none;"><strong>${post.username}</strong></a>
+                                    <a href="profile.html?user=${post.username}" class="username-truncate" style="color: white; text-decoration: none; font-weight: bold;">@${post.username}</a>
                                     ${editedTag}
                                     ${postEditDeleteHTML}
                                 </div>
-                                <span class="time-stamp" style="font-size: 12px; color: gray;">${post.timestamp}</span>
+                                <span class="time-stamp" style="font-size: 12px; color: gray;">${shortTime}</span>
                             </div>
                             ${followBadgeHTML}
                         </div>
@@ -203,13 +205,25 @@
                         </div>
                         
                         <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                            
                             <div id="comment-list-${post.id}" style="margin-bottom: 15px; max-height: none;">
                                 <p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>
                             </div>
                             
-                            <div style="display: flex; gap: 10px;">
-                                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
-                                <button onclick="submitThreadedComment(${post.id}, null)" class="media-control-btn">Post</button>
+                            <div id="reply-banner" style="display: none; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #a09eb5;">
+                                <span id="reply-banner-text"></span>
+                                <span class="material-icons" style="cursor: pointer; font-size: 16px; color: #ff3366;" onclick="cancelReply()">close</span>
+                            </div>
+
+                            <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                            
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
+                                    <span class="material-icons">add_photo_alternate</span>
+                                </label>
+                                <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
+                                <input type="text" id="comment-input-${post.id}" placeholder="Write your reply..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
+                                <button onclick="submitThreadedComment(${post.id})" class="media-control-btn">Post</button>
                             </div>
                         </div>
                     </div>
@@ -271,7 +285,14 @@
             });
         }
         
+        /* ========================================= */
+        /* --- THE X-STYLE DRILL-DOWN ENGINE ---     */
+        /* ========================================= */
+        
         let globalCommentsData = [];
+        let mainCommentMedia = ""; 
+        let globalReplyParentId = null; 
+        let viewStack = []; // Remembers your navigation path
 
         window.loadComments = function(postId) {
             fetch(`${API_BASE}/api/getComments`, {
@@ -281,107 +302,188 @@
             .then(res => res.json())
             .then(comments => {
                 globalCommentsData = comments;
-                renderCommentsLevel(postId, null, `comment-list-${postId}`);
+                renderThreadView(postId);
             })
             .catch(err => console.error("Error loading comments:", err));
         };
 
-        function renderCommentsLevel(postId, parentId, containerId) {
-            const container = document.getElementById(containerId);
-            const children = globalCommentsData.filter(c => c.parentCommentId === parentId);
-            
-            if (parentId === null && children.length === 0) {
-                container.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>No comments yet. Be the first!</p>";
-                return;
+        // THE FIX: Drill-down navigation rendering
+        window.renderThreadView = function(postId) {
+            const container = document.getElementById(`comment-list-${postId}`);
+            let html = "";
+            const currentParentId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+
+            // 1. Draw the "Back" button and the focused parent if we are deep in a thread
+            if (currentParentId !== null) {
+                const parentComment = globalCommentsData.find(c => c.id === currentParentId);
+                if (parentComment) {
+                    html += `
+                        <div style="cursor: pointer; color: #00e676; margin-bottom: 15px; font-weight: bold; display: flex; align-items: center; gap: 5px;" onclick="navigateBackThread(${postId})">
+                            <span class="material-icons">arrow_back</span> Back to thread
+                        </div>
+                    `;
+                    // Render the focused comment large and prominent
+                    html += generateSingleCommentHTML(parentComment, postId, true);
+                    html += `<div style="margin: 15px 0; border-bottom: 1px solid #334155;"></div>`; 
+                }
             }
 
-            let html = "";
-            children.forEach(c => {
-                const likeStyle = c.isLiked ? 'color: #ff3366; background: rgba(255, 51, 102, 0.1);' : 'color: #a09eb5;';
-                const repostStyle = c.isReposted ? 'color: #00a8ff; background: rgba(0, 168, 255, 0.1);' : 'color: #a09eb5;';
-                const editedText = c.isEdited ? '<span style="font-size: 10px; color: gray; font-style: italic; margin-left: 5px;">(edited)</span>' : '';
-                
-                let editDeleteHTML = "";
-                if (c.username === currentUser) {
-                    editDeleteHTML = `
-                        <span onclick="editComment(${c.id}, '${c.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px;" title="Edit"><span class="material-icons" style="font-size: 12px;">edit</span></span>
-                        <span onclick="deleteComment(${c.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px;" title="Delete"><span class="material-icons" style="font-size: 12px;">delete</span></span>
-                    `;
+            // 2. Draw the direct children
+            const children = globalCommentsData.filter(c => c.parentCommentId === currentParentId);
+
+            if (children.length === 0) {
+                html += "<p style='color: gray; font-size: 14px; text-align: center; margin-top: 20px;'>No replies yet. Be the first!</p>";
+            } else {
+                children.forEach(c => {
+                    html += generateSingleCommentHTML(c, postId, false);
+                });
+            }
+
+            container.innerHTML = html;
+        };
+
+        window.viewReplies = function(commentId, postId) {
+            viewStack.push(commentId);
+            renderThreadView(postId);
+        };
+
+        window.navigateBackThread = function(postId) {
+            viewStack.pop();
+            renderThreadView(postId);
+        };
+
+        // THE FIX: HTML Generator separating mobile layout & truncation
+        function generateSingleCommentHTML(c, currentPostId, isFocused) {
+            const likeStyle = c.isLiked ? 'color: #ff3366; background: rgba(255, 51, 102, 0.1);' : '';
+            const repostStyle = c.isReposted ? 'color: #00a8ff; background: rgba(0, 168, 255, 0.1);' : '';
+            const editedText = c.isEdited ? '<span style="font-size: 10px; color: gray; font-style: italic; margin-left: 5px; flex-shrink: 0;">(edited)</span>' : '';
+            
+            let editDeleteHTML = "";
+            if (c.username === currentUser) {
+                editDeleteHTML = `
+                    <span onclick="editComment(${c.id}, '${c.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; flex-shrink: 0;" title="Edit"><span class="material-icons" style="font-size: 14px;">edit</span></span>
+                    <span onclick="deleteComment(${c.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; flex-shrink: 0;" title="Delete"><span class="material-icons" style="font-size: 14px;">delete</span></span>
+                `;
+            }
+
+            // Moved Timestamp to bottom right layout block below
+            const shortCommentTime = c.timestamp && c.timestamp.length > 16 ? c.timestamp.substring(0, 16) : c.timestamp;
+
+            const viewRepliesBtn = (!isFocused && c.replyCount > 0) 
+                ? `<span class="reply-action-btn" style="color: #00e676;" onclick="viewReplies(${c.id}, ${currentPostId})">Replies (${c.replyCount}) <span class="material-icons" style="font-size: 16px; margin-left: 2px;">expand_more</span></span>` 
+                : '';
+
+            let commentMediaHTML = "";
+            if (c.media && c.media !== "") {
+                if (c.media.toLowerCase().endsWith(".mp4") || c.media.startsWith("data:video")) {
+                    commentMediaHTML = `<video src="${c.media}" controls style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px;"></video>`;
+                } else {
+                    commentMediaHTML = `<img src="${c.media}" style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px; object-fit: cover;">`;
                 }
+            }
 
-                const viewRepliesBtn = c.replyCount > 0 
-                    ? `<span style="cursor: pointer; color: #00e676; font-weight: bold; margin-left: auto;" onclick="toggleReplies(${postId}, ${c.id})">View Replies (${c.replyCount})</span>` 
-                    : '';
+            const containerStyle = isFocused ? 'border-left: 4px solid #00e676; background: rgba(255,255,255,0.06); padding: 15px;' : 'background: rgba(255,255,255,0.03); padding: 12px; margin-top: 15px; border: 1px solid rgba(255,255,255,0.05);';
 
-                // [THE FIX]: Added the proper CSS classes to ensure these get pill shapes and hover effects
-                html += `
-                    <div class="comment-thread" id="comment-container-${c.id}" style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                        
-                        <div style="display: flex; align-items: center;">
-                            <strong style="color: white; cursor: pointer;" onclick="window.location.href='profile.html?user=${c.username}'">@${c.username}</strong>
-                            <span style="font-size: 11px; color: gray; margin-left: 8px;">${c.timestamp}</span>
-                            ${editedText}
+            return `
+                <div class="comment-thread" id="comment-container-${c.id}" style="${containerStyle} border-radius: 8px;">
+                    
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <strong class="username-truncate" style="color: white; cursor: pointer; font-size: ${isFocused ? '16px' : '15px'};" onclick="window.location.href='profile.html?user=${c.username}'">@${c.username}</strong>
+                        ${editedText}
+                        <div style="margin-left: auto; display: flex; align-items: center;">
                             ${editDeleteHTML}
                         </div>
-                        
-                        <p style="font-size: 15px; color: #e0e0e0; margin-top: 8px; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(c.content) : c.content}</p>
-                        
-                        <div style="display: flex; gap: 15px; margin-top: 10px; font-size: 13px; align-items: center; color: #a09eb5;">
+                    </div>
+                    
+                    <p style="font-size: ${isFocused ? '17px' : '15px'}; color: #e0e0e0; margin-top: 6px; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(c.content) : c.content}</p>
+                    ${commentMediaHTML}
+                    
+                    <div class="comment-actions-wrapper">
+                        <div class="comment-actions-left">
                             <span onclick="toggleCommentLike(this, ${c.id})" class="like-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; ${likeStyle}">
                                 <span class="material-icons" style="font-size: 14px;">favorite</span> <span class="like-count">${c.likes}</span>
                             </span>
                             
-                            <span id="comment-repost-btn-${c.id}" onclick="openRepostMenu(${postId}, ${c.isReposted}, ${c.id})" class="repost-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; ${repostStyle}" title="Repost or Quote">
+                            <span id="comment-repost-btn-${c.id}" onclick="openRepostMenu(${currentPostId}, ${c.isReposted}, ${c.id})" class="repost-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; ${repostStyle}" title="Repost or Quote">
                                 <span class="material-icons" style="font-size: 14px;">repeat</span> <span class="repost-count">${c.repostCount}</span>
                             </span>
-                            <span onclick="openCommentQuotesModal(${c.id})" class="quote-btn thread-action-btn" style="cursor: pointer; color: #a09eb5; display: flex; align-items: center; gap: 4px;" title="View Quotes">
+                            
+                            <span onclick="openCommentQuotesModal(${c.id})" class="quote-btn thread-action-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px;" title="View Quotes">
                                 <span class="material-icons" style="font-size: 14px;">format_quote</span> <span class="quote-count">${c.quoteCount}</span>
                             </span>
-
-                            <span style="cursor: pointer; color: #a09eb5; font-weight: bold; margin-left: 5px; padding: 4px 8px; border-radius: 20px; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'" onclick="showReplyBox(${postId}, ${c.id})">Reply</span>
-                            
+                        </div>
+                        
+                        <div class="comment-actions-right">
+                            <span class="reply-action-btn" onclick="initiateReply(${c.id}, '${c.username.replace(/'/g, "\\'")}')"><span class="material-icons" style="font-size: 14px;">reply</span> Reply</span>
                             ${viewRepliesBtn}
-                        </div>
-
-                        <div id="reply-box-${c.id}" style="display: none; margin-top: 15px; gap: 10px; align-items: center;">
-                            <input type="text" id="reply-input-${c.id}" placeholder="Reply to @${c.username}..." style="flex: 1; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.4); border: 1px solid #334155; color: white; font-size: 14px;">
-                            <button onclick="submitThreadedComment(${postId}, ${c.id})" class="media-control-btn" style="padding: 6px 12px;">Reply</button>
-                        </div>
-
-                        <div id="replies-container-${c.id}" style="margin-left: 20px; border-left: 2px solid #334155; padding-left: 15px; display: none; margin-top: 10px;">
+                            <span class="timestamp-mobile-right" style="font-size: 11px; color: gray; margin-left: ${isFocused ? '0' : 'auto'};">${shortCommentTime}</span>
                         </div>
                     </div>
-                `;
-            });
-            
-            container.innerHTML = html;
+                </div>
+            `;
         }
 
-        window.toggleReplies = function(postId, commentId) {
-            const container = document.getElementById(`replies-container-${commentId}`);
-            if (container.style.display === 'none') {
-                container.style.display = 'block';
-                renderCommentsLevel(postId, commentId, `replies-container-${commentId}`);
-            } else {
-                container.style.display = 'none';
+        /* ========================================= */
+        /* --- [THE FIX]: GLOBAL REPLY LOGIC     --- */
+        /* ========================================= */
+
+        window.initiateReply = function(commentId, username) {
+            globalReplyParentId = commentId;
+            const banner = document.getElementById('reply-banner');
+            banner.style.display = 'flex';
+            document.getElementById('reply-banner-text').textContent = `Replying to @${username}`;
+            const input = document.getElementById(`comment-input-${currentPostId}`);
+            input.focus();
+        };
+
+        window.cancelReply = function() {
+            globalReplyParentId = null;
+            document.getElementById('reply-banner').style.display = 'none';
+        };
+
+        window.handleMainCommentMedia = function(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    mainCommentMedia = reader.result;
+                    const previewDiv = document.getElementById(`main-comment-media-preview`);
+                    let previewHTML = '';
+                    if (file.type.startsWith('image/')) {
+                        previewHTML = `<img src="${reader.result}" style="max-height: 80px; border-radius: 8px; border: 1px solid #00e676;">`;
+                    } else if (file.type.startsWith('video/')) {
+                        previewHTML = `<video src="${reader.result}" style="max-height: 80px; border-radius: 8px; border: 1px solid #ff3366;"></video>`;
+                    }
+                    previewDiv.innerHTML = `<div style="position: relative; display: inline-block;">
+                        ${previewHTML}
+                        <button onclick="removeMainCommentMedia()" style="position: absolute; top: -5px; right: -5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
+                    </div>`;
+                    previewDiv.style.display = "flex";
+                };
+                reader.readAsDataURL(file);
             }
         };
 
-        window.showReplyBox = function(postId, parentCommentId) {
-            document.querySelectorAll('[id^="reply-box-"]').forEach(box => {
-                box.style.display = 'none';
-            });
-            const box = document.getElementById(`reply-box-${parentCommentId}`);
-            box.style.display = 'flex';
-            document.getElementById(`reply-input-${parentCommentId}`).focus();
+        window.removeMainCommentMedia = function() {
+            mainCommentMedia = "";
+            const previewDiv = document.getElementById(`main-comment-media-preview`);
+            if (previewDiv) {
+                previewDiv.style.display = "none";
+                previewDiv.innerHTML = "";
+            }
+            const input = document.getElementById(`main-comment-upload`);
+            if (input) input.value = "";
         };
 
-        window.submitThreadedComment = function(postId, parentCommentId = null) {
-            const inputId = parentCommentId ? `reply-input-${parentCommentId}` : `comment-input-${postId}`;
-            const inputEl = document.getElementById(inputId);
+        window.submitThreadedComment = function(postId) {
+            const inputEl = document.getElementById(`comment-input-${postId}`);
             const text = inputEl.value.trim();
+            const mediaPayload = mainCommentMedia;
             
-            if (!text) return;
+            // It grabs the parent ID directly from memory, no messy nested boxes!
+            const parentCommentId = globalReplyParentId; 
+            
+            if (!text && !mediaPayload) return;
 
             fetch(`${API_BASE}/api/addComment`, {
                 method: 'POST',
@@ -389,6 +491,7 @@
                     postId: postId.toString(), 
                     username: currentUser, 
                     content: text,
+                    media: mediaPayload, 
                     parentCommentId: parentCommentId 
                 })
             })
@@ -396,6 +499,8 @@
             .then(data => {
                 if (data === "SUCCESS") {
                     inputEl.value = "";
+                    removeMainCommentMedia();
+                    cancelReply(); // Reset the global state
                     loadComments(postId);
                 } else {
                     alert("Failed to add comment.");
@@ -430,12 +535,15 @@
                 if (post.media && post.media !== "") {
                     mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
                 }
+                
+                const shortPostTime = post.timestamp && post.timestamp.length > 16 ? post.timestamp.substring(0, 16) : post.timestamp;
+
                 quotesHTML += `
                     <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <img src="${post.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
                             <strong style="color: white;">${post.username}</strong>
-                            <span style="color: gray; font-size: 12px; margin-left: auto;">${post.timestamp}</span>
+                            <span style="color: gray; font-size: 12px; margin-left: auto;">${shortPostTime}</span>
                         </div>
                         <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
                         ${mediaHTML}

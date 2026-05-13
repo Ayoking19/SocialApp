@@ -26,11 +26,27 @@ body.in-chat .bottom-nav {
     display: none !important; 
 }
 
+/* --- THE NEW GLOBAL TRUNCATION ENGINE --- */
 .truncate-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
+}
+
+.username-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+    display: inline-block;
+    vertical-align: bottom;
+}
+
+@media (min-width: 768px) {
+    .username-truncate {
+        max-width: 250px;
+    }
 }
 
 .user-info-text-col {
@@ -385,14 +401,6 @@ body.in-chat .bottom-nav {
 
 .comment-thread:hover {
     background: rgba(255, 255, 255, 0.05) !important;
-}
-
-div[id^="replies-container-"] {
-    transition: border-color 0.3s ease;
-}
-
-div[id^="replies-container-"]:hover {
-    border-left: 2px solid #00e676 !important;
 }
 
 /* ========================================= */
@@ -940,11 +948,65 @@ textarea {
     border: 1px solid rgba(0, 230, 118, 0.3);
 }
 
-/* --- THREADED COMMENT REFINEMENTS --- */
+/* ========================================= */
+/* --- THREADED COMMENT REFINEMENTS ---      */
+/* ========================================= */
+.comment-actions-wrapper {
+    display: flex;
+    flex-wrap: wrap; 
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #a09eb5;
+}
+
+.comment-actions-left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.comment-actions-right {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-left: auto;
+}
+
 .thread-action-btn {
     background: transparent;
     border: none;
     padding: 4px 10px;
+    border-radius: 20px; 
+    transition: 0.2s ease;
+}
+
+.thread-action-btn:hover { background: rgba(255, 255, 255, 0.05); }
+.like-btn.thread-action-btn:hover { background: rgba(255, 51, 102, 0.1); color: #ff3366; }
+.repost-btn.thread-action-btn:hover { background: rgba(0, 168, 255, 0.1); color: #00a8ff; }
+.quote-btn.thread-action-btn:hover { background: rgba(0, 230, 118, 0.1); color: #00e676; }
+
+.reply-action-btn {
+    cursor: pointer;
+    color: #a09eb5;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 20px;
+    transition: 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.reply-action-btn:hover {
+    color: #00e676;
+    background: rgba(0, 230, 118, 0.1);
+}
+
+.timestamp-mobile-right {
+    font-size: 11px;
+    color: gray;
 }
 
 
@@ -1111,7 +1173,7 @@ textarea {
     body.in-chat .feed { height: 100dvh !important; overflow: hidden; }
     
     .chat-container { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; border-radius: 0; border: none; height: calc(100dvh - 135px); }
-    body.in-chat .chat-container { height: calc(100dvh - 65px); overflow: hidden; } /* Ensure overflow hidden ONLY when chatting */
+    body.in-chat .chat-container { height: calc(100dvh - 65px); overflow: hidden; } 
     
     #chatView { height: 100%; flex-direction: column; justify-content: space-between; }
     .chat-history { flex: 1; overflow-y: auto; padding-bottom: 20px; }
@@ -1122,6 +1184,26 @@ textarea {
     .profile-stats-bar { gap: 15px; justify-content: space-between; }
     .profile-tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
     html, body { overflow-x: clip !important; max-width: 100vw !important; width: 100% !important; }
+    
+    /* [THE FIX]: Mobile specific comment button wrapping & timestamp push */
+    .comment-actions-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px; 
+    }
+    .comment-actions-left {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 12px; 
+    }
+    .comment-actions-right { 
+        width: 100%;
+        margin-left: 0; 
+        justify-content: space-between;
+    }
+    .timestamp-mobile-right {
+        margin-left: auto !important; 
+    }
 }
 
 /* ========================================= */
@@ -1140,9 +1222,9 @@ textarea {
     width: 100% !important;
     max-width: 100vw !important;
     margin: 0 !important;
-    padding: 0 !important; /* Ensures mobile chats stretch edge-to-edge */
+    padding: 0 !important; 
     box-sizing: border-box;
-    height: calc(100vh - 70px); /* [THE FIX]: Explicitly locks height on PC so chat scrolls internally */
+    height: calc(100vh - 70px); 
     display: flex;
     flex-direction: column;
 }
@@ -1160,7 +1242,7 @@ textarea {
     border-radius: 0 !important; 
     border: none !important; 
     margin-bottom: 0 !important; 
-    height: 100%; /* [THE FIX]: Ensures the container fills the locked feed height */
+    height: 100%; 
 }
 
 #inboxView { 
@@ -1172,7 +1254,7 @@ textarea {
 
 .messages-sticky-header {
     position: sticky;
-    top: 65px; /* Sticks precisely under the top navigation bar */
+    top: 65px; 
     z-index: 100;
     background: #0b0f1a;
 }

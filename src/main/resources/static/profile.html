@@ -56,9 +56,9 @@
                     <input type="file" id="avatarUpload" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
                 </div>
 
-                <div class="profile-details">
-                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <h1 class="profile-display-name" id="displayName" style="margin: 0;"></h1>
+                <div class="profile-details" style="display: flex; flex-direction: column; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; width: 100%;">
+                        <h1 class="profile-display-name truncate-text" id="displayName" style="margin: 0; max-width: 100%;"></h1>
                         
                         <button id="profileFollowBtn" class="media-control-btn" style="display: none;" onclick="executeProfileFollow()">Follow</button>
                         
@@ -71,7 +71,7 @@
                         <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2);">Follows you</span>
                     </div>
 
-                    <p class="profile-username" id="displayUsername" style="margin-top: 5px;"></p>
+                    <p class="profile-username truncate-text" id="displayUsername" style="margin-top: 5px; max-width: 100%;"></p>
                     
                     <div id="invisibilityCloak" style="display: none; text-align: center; padding: 50px 20px; background: rgba(255, 255, 255, 0.02); border-radius: 12px; border: 1px solid #334155; margin-top: 20px;">
                         <span class="material-icons" style="font-size: 60px; color: #334155; margin-bottom: 15px;">lock</span>
@@ -219,19 +219,19 @@
                 
                 let snippetHTML = (post.matchedSnippet && post.matchedSnippet !== "") ? `<div style="background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; padding: 8px 12px; margin-top: 10px; border-radius: 4px; font-size: 13px; color: #a09eb5; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="font-size: 16px; color: #00e676;">chat</span> <span style="color: white; font-style: italic;">"${post.matchedSnippet}"</span></div>` : "";
 
-                const quoteBoxHTML = buildQuoteBox(post.parentPost);
+                const quoteBoxHTML = typeof buildQuoteBox === "function" ? buildQuoteBox(post.parentPost) : "";
                 const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
                 const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
 
-                const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px; flex-shrink: 0;"> (edited)</span>` : "";
                 
                 let postEditDeleteHTML = "";
                 if (post.username === currentUser) {
                     postEditDeleteHTML = `
-                        <span id="edit-btn-${post.id}" onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
+                        <span id="edit-btn-${post.id}" onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s; flex-shrink: 0;" title="Edit Post">
                             <span class="material-icons" style="font-size: 14px;">edit</span>
                         </span>
-                        <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Post">
+                        <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s; flex-shrink: 0;" title="Delete Post">
                             <span class="material-icons" style="font-size: 14px;">delete</span>
                         </span>
                     `;
@@ -240,22 +240,23 @@
                 const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                 const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
-                // [THE FIX]: Added ID hooks to all buttons so shared.js can find them
+                // THE FIX: Sync layout with search.html (user-info-text-col, min-width: 0, flex-shrink: 0)
                 html += `
-                    <div id="post-card-${post.id}" class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer; ...">
-                        <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                            <img src="${post.avatar}" onclick="event.stopPropagation();" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px;">
-                            <div style="display: flex; flex-direction: column;">
-                                <div style="display: flex; align-items: center;">
-                                    <strong>${post.username}</strong>
+                    <div id="post-card-${post.id}" class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
+                        <div class="user-info" style="display: flex; align-items: flex-start; flex-wrap: nowrap; width: 100%;">
+                            <img src="${post.avatar}" onclick="event.stopPropagation();" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
+                            
+                            <div class="user-info-text-col" style="display: flex; flex-direction: column; min-width: 0; flex: 1; margin-right: 10px;">
+                                <div style="display: flex; align-items: center; min-width: 0; width: 100%;">
+                                    <strong class="username-truncate" style="color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${post.username}</strong>
                                     ${editedTag}
                                     ${postEditDeleteHTML}
                                 </div>
-                                <span class="time-stamp">${post.timestamp}</span>
+                                <span class="time-stamp truncate-text" style="font-size: 12px; color: gray; margin-top: 2px;">${post.timestamp}</span>
                             </div>
                         </div>
                         <div class="post-content">
-                            <p id="post-content-text-${post.id}">${parseSocialText(post.content)}</p>
+                            <p id="post-content-text-${post.id}">${typeof parseSocialText === "function" ? parseSocialText(post.content) : post.content}</p>
                             ${mediaHTML}
                             ${snippetHTML}
                             ${quoteBoxHTML}
@@ -441,7 +442,9 @@
                 let repliesHTML = "";
                 comments.forEach(c => {
                     repliesHTML += `<div class="post" onclick="window.location.href='post.html?id=${c.postId}'" style="border-left: 4px solid #00e676; cursor:pointer; padding: 15px; background: rgba(255,255,255,0.03); margin-bottom: 10px; border-radius: 8px;">
-                            <p style="font-size: 11px; color: #a09eb5; margin-bottom: 8px;">Replied to @${c.postOwner}'s post • ${c.timestamp}</p>
+                            <div style="display: flex; min-width: 0;">
+                                <p class="truncate-text" style="font-size: 11px; color: #a09eb5; margin-bottom: 8px; width: 100%;">Replied to @${c.postOwner}'s post • ${c.timestamp}</p>
+                            </div>
                             <p style="color: #e0e0e0;">${c.content}</p>
                             <p style="font-size: 11px; color: #00e676; margin-top: 8px; display: flex; align-items: center; gap: 4px;">View original conversation <span class="material-icons" style="font-size: 14px;">arrow_forward</span></p>
                         </div>`;
@@ -681,16 +684,18 @@
 
                 let usersHTML = "";
                 users.forEach(user => {
+                    // THE FIX: Flexbox Min-Width inside Relation Modal
                     usersHTML += `
-                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05);">
-                            <img src="${user.avatar}" onclick="window.location.href='profile.html?user=${user.username}'" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; cursor: pointer;">
-                            <div style="flex: 1; cursor: pointer;" onclick="window.location.href='profile.html?user=${user.username}'">
-                                <strong style="color: white; display: block;">${user.username}</strong>
-                                <span style="font-size: 11px; color: #a09eb5;">${user.bio || "No bio yet."}</span>
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05); min-width: 0;">
+                            <img src="${user.avatar}" onclick="window.location.href='profile.html?user=${user.username}'" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; cursor: pointer; flex-shrink: 0;">
+                            
+                            <div style="flex: 1; cursor: pointer; min-width: 0; display: flex; flex-direction: column;" onclick="window.location.href='profile.html?user=${user.username}'">
+                                <strong class="username-truncate" style="color: white; display: block; max-width: 100%;">${user.username}</strong>
+                                <span class="truncate-text" style="font-size: 11px; color: #a09eb5;">${user.bio || "No bio yet."}</span>
                             </div>
                             
                             ${user.username !== currentUser ? `
-                                <button class="media-control-btn" style="padding: 5px 12px; font-size: 12px; ${user.isFollowing ? 'background: rgba(255,51,102,0.1); color: #ff3366; border-color: rgba(255,51,102,0.3);' : ''}" 
+                                <button class="media-control-btn" style="flex-shrink: 0; padding: 5px 12px; font-size: 12px; ${user.isFollowing ? 'background: rgba(255,51,102,0.1); color: #ff3366; border-color: rgba(255,51,102,0.3);' : ''}" 
                                         onclick="executeListFollow(this, '${user.username}')">
                                     ${user.isFollowing ? 'Unfollow' : 'Follow'}
                                 </button>

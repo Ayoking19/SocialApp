@@ -2,9 +2,8 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
-// THE FIX: The security guard now correctly looks for the "currentUser" badge!
 const currentUser = localStorage.getItem("currentUser");
 
 /* --- THE UI/UX SKELETON ENGINE --- */
@@ -96,8 +95,6 @@ function openEditModal(title, currentContent, onSave) {
             </div>`;
         document.body.appendChild(modal);
     }
-
-    
     document.getElementById('editModalTitle').innerText = title;
     document.getElementById('editModalInput').value = currentContent;
     modal.style.display = 'flex';
@@ -234,21 +231,22 @@ function toggleCommentLike(element, commentId) {
     })
     .then(response => response.text())
     .then(data => {
-        let currentLikes = parseInt(element.textContent.replace(/[^0-9]/g, '')) || 0;
+        const countSpan = element.querySelector('.like-count') || element.querySelector('span:last-child');
+        let currentLikes = parseInt(countSpan.textContent) || 0;
         
         if (data === "LIKED") {
-            element.innerHTML = `<span class="material-icons" style="font-size: 14px;">favorite</span> ${currentLikes + 1}`;
+            countSpan.textContent = currentLikes + 1;
             element.style.color = "#ff3366";
             element.style.background = "rgba(255, 51, 102, 0.1)";
         } else if (data === "UNLIKED") {
-            element.innerHTML = `<span class="material-icons" style="font-size: 14px;">favorite</span> ${currentLikes - 1}`;
+            countSpan.textContent = currentLikes - 1;
             element.style.color = "";
             element.style.background = "";
         }
     });
 }
 
-function editComment(commentId, currentContent, postId) {
+function editComment(commentId, currentContent) {
     openEditModal("Edit Comment", currentContent, (newContent) => {
         if (newContent && newContent.trim() !== "") {
             fetch(`${API_BASE}/api/editComment`, {
@@ -259,14 +257,18 @@ function editComment(commentId, currentContent, postId) {
             .then(data => {
                 if (data === "SUCCESS") {
                     showToast("Comment updated!");
-                    loadComments(postId);
+                    if (typeof loadComments === 'function') {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const postId = urlParams.get('id');
+                        if (postId) loadComments(postId);
+                    }
                 }
             });
         }
     });
 }
 
-function deleteComment(commentId, postId) {
+function deleteComment(commentId) {
     openConfirmModal("Are you sure you want to delete this comment?", () => {
         fetch(`${API_BASE}/api/deleteComment`, {
             method: 'POST',
@@ -276,16 +278,13 @@ function deleteComment(commentId, postId) {
         .then(data => {
             if (data === "SUCCESS") {
                 showToast("Comment deleted.");
-                loadComments(postId);
-                
-                // [THE FIX]: Instantly update the comment count on the main post
-                const commentBtn = document.getElementById(`comment-btn-${postId}`);
-                if (commentBtn) {
-                    const countSpan = commentBtn.querySelector('.comment-count');
-                    if (countSpan) {
-                        let currentCount = parseInt(countSpan.textContent) || 0;
-                        countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
-                    }
+                if (typeof loadComments === 'function') {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const postId = urlParams.get('id');
+                    if (postId) loadComments(postId);
+                } else {
+                    const commentElem = document.getElementById(`comment-container-${commentId}`);
+                    if (commentElem) commentElem.remove();
                 }
             }
         });
@@ -293,123 +292,8 @@ function deleteComment(commentId, postId) {
 }
 
 function toggleComments(postId) {
-    const commentSection = document.getElementById(`comments-${postId}`);
-    if (!commentSection) return;
-
-    if (commentSection.style.display === "none" || commentSection.style.display === "") {
-        commentSection.style.display = "block";
-        loadComments(postId); 
-    } else {
-        commentSection.style.display = "none";
-    }
-}
-
-function loadComments(postId) {
-    const commentList = document.getElementById(`comment-list-${postId}`);
-    if (!commentList) return;
-
-    commentList.innerHTML = "<p style='color: gray; font-size: 14px; text-align: center;'>Loading...</p>";
-
-    fetch(`${API_BASE}/api/getComments`, {
-        method: 'POST',
-        body: JSON.stringify({ postId: postId.toString(), currentUser: currentUser })
-    })
-    .then(response => response.json())
-    .then(comments => {
-        commentList.innerHTML = comments.length === 0 ? "<p style='text-align:center; color:gray;'>No comments yet.</p>" : "";
-        comments.forEach(comment => {
-            let commentFollowBtn = "";
-            if (comment.username !== currentUser) {
-                const btnStyle = comment.isFollowing ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);' : '';
-                const btnText = comment.isFollowing ? 'Unfollow' : 'Follow';
-                commentFollowBtn = `<button class="media-control-btn" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; ${btnStyle}" onclick="feedFollowUser(this, '${comment.username}')">${btnText}</button>`;
-            }
-
-            const editedTag = comment.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic;"> (edited)</span>` : "";
-            const commentLikeStyle = comment.isLiked ? 'color: #ff3366; background: rgba(255, 51, 102, 0.1);' : '';
-
-            let editDeleteHTML = "";
-            if (comment.username === currentUser) {
-                editDeleteHTML = `
-                    <span onclick="editComment(${comment.id}, '${comment.content.replace(/'/g, "\\'")}', ${postId})" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Comment">
-                        <span class="material-icons" style="font-size: 14px;">edit</span>
-                    </span>
-                    <span onclick="deleteComment(${comment.id}, ${postId})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Comment">
-                        <span class="material-icons" style="font-size: 14px;">delete</span>
-                    </span>
-                `;
-            }
-
-            // [THE FIX]: Added dynamic ID hook to the comment repost button
-            commentList.innerHTML += `
-                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00e676;">
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <a href="profile.html?user=${comment.username}" style="text-decoration: none;"><strong style="color: #00e676; font-size: 14px;">${comment.username}</strong></a>
-                        ${editedTag}
-                        ${editDeleteHTML}
-                        ${commentFollowBtn}
-                        <span style="font-size: 11px; color: gray; margin-left: auto;">${comment.timestamp}</span>
-                    </div>
-                    <p style="margin: 5px 0; font-size: 14px; color: #e0e0e0;">${comment.content}</p>
-                    
-                    <div style="display: flex; gap: 15px; margin-top: 8px; align-items: center; color: #a09eb5;">
-                        <span onclick="toggleCommentLike(this, ${comment.id})" class="like-btn" style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px; ${commentLikeStyle}">
-                            <span class="material-icons" style="font-size: 14px;">favorite</span> ${comment.likes}
-                        </span>
-                        
-                        <span id="comment-repost-btn-${comment.id}" class="repost-btn" onclick="openRepostMenu(${postId}, false, ${comment.id})" style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px;">
-                            <span class="material-icons" style="font-size: 14px;">repeat</span>
-                        </span>
-                        
-                        <span class="quote-btn" onclick="openCommentQuotesModal(${comment.id})" style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px;">
-                            <span class="material-icons" style="font-size: 14px;">format_quote</span>
-                        </span>
-
-                        <span style="cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 12px;" onclick="replyToComment(${postId}, '${comment.username}')">
-                            <span class="material-icons" style="font-size: 14px;">reply</span> Reply
-                        </span>
-                    </div>
-                </div>`;
-        });
-    })
-    .catch(error => console.error("Error loading comments:", error));
-}
-
-function submitComment(postId) {
-    const inputField = document.getElementById(`comment-input-${postId}`);
-    if (!inputField) return;
-    const content = inputField.value;
-
-    if (content.trim() !== "") {
-        fetch(`${API_BASE}/api/addComment`, {
-            method: 'POST',
-            body: JSON.stringify({ username: currentUser, postId: postId.toString(), content: content })
-        })
-        .then(response => response.text())
-        .then(data => {
-            if (data === "SUCCESS") {
-                inputField.value = ""; 
-                loadComments(postId); 
-                
-                // [THE FIX]: Instantly increment the comment count on the main post
-                const commentBtn = document.getElementById(`comment-btn-${postId}`);
-                if (commentBtn) {
-                    const countSpan = commentBtn.querySelector('.comment-count');
-                    if (countSpan) {
-                        countSpan.textContent = (parseInt(countSpan.textContent) || 0) + 1;
-                    }
-                }
-            }
-        });
-    }
-}
-
-function replyToComment(postId, targetUsername) {
-    const inputField = document.getElementById(`comment-input-${postId}`);
-    if (inputField) {
-        inputField.value = `@${targetUsername} `;
-        inputField.focus();
-    }
+    const targetUrl = `post.html?id=${postId}`;
+    window.location.href = targetUrl;
 }
 
 function feedFollowUser(buttonElement, targetUsername) {
@@ -534,7 +418,6 @@ function openRepostMenu(postId, isReposted = false, commentId = null) {
     overlay.appendChild(menuCard);
     document.body.appendChild(overlay);
 
-    // [THE FIX]: Mapped the isReposted flag deeply into the execute function
     document.getElementById('repostConfirm').onclick = () => { executeRepost(postId, isReposted, commentId); overlay.remove(); };
     document.getElementById('quoteConfirm').onclick = () => { openQuoteEditor(postId, commentId); overlay.remove(); };
 }
@@ -612,83 +495,32 @@ function openQuoteEditor(postId, commentId = null) {
             showToast("Please add text or media to your quote.");
             return;
         }
-        executeQuote(postId, textArea.value, quoteMediaBase64, commentId);
+        
+        if (typeof executeQuote === 'function') {
+            executeQuote(postId, textArea.value, quoteMediaBase64, commentId);
+        } else {
+            fetch(`${API_BASE}/api/createPost`, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    username: currentUser, 
+                    content: textArea.value, 
+                    media: quoteMediaBase64, 
+                    parentPostId: postId,
+                    parentCommentId: commentId 
+                })
+            })
+            .then(res => res.text())
+            .then(data => {
+                if(data === "SUCCESS") {
+                    showToast("Quote Posted!");
+                    if(typeof loadFeed === 'function') loadFeed();
+                }
+            });
+        }
         overlay.remove();
     };
 }
 
-function openCommentQuotesModal(commentId) {
-    let existingModal = document.getElementById('commentQuotesModalOverlay');
-    if (existingModal) existingModal.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'commentQuotesModalOverlay';
-    overlay.className = 'modal-overlay';
-    overlay.style.zIndex = '5000';
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-    const menuCard = document.createElement('div');
-    menuCard.className = 'modal-card';
-    menuCard.style.maxWidth = '450px';
-    menuCard.style.width = '90%';
-    menuCard.style.maxHeight = '80vh';
-    menuCard.style.display = 'flex';
-    menuCard.style.flexDirection = 'column';
-
-    menuCard.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="margin: 0; color: white;">Quoted By</h3>
-            <button id="closeCommentQuotesBtn" style="background: transparent; border: none; color: #ff3366; cursor: pointer; display: flex; align-items: center;"><span class="material-icons">close</span></button>
-        </div>
-        <div id="commentQuotesListContainer" style="overflow-y: auto; flex: 1; padding-right: 10px;">
-            <p style="text-align: center; color: #00e676;">Loading quotes...</p>
-        </div>
-    `;
-
-    overlay.appendChild(menuCard);
-    document.body.appendChild(overlay);
-
-    document.getElementById('closeCommentQuotesBtn').onclick = () => overlay.remove();
-
-    const container = document.getElementById('commentQuotesListContainer');
-
-    fetch(`${API_BASE}/api/getCommentQuotes`, {
-        method: 'POST',
-        body: JSON.stringify({ commentId: commentId.toString(), currentUser: currentUser })
-    })
-    .then(res => res.json())
-    .then(posts => {
-        if (posts.length === 0) {
-            container.innerHTML = "<p style='text-align: center; color: gray;'>No quotes yet.</p>";
-            return;
-        }
-        
-        let quotesHTML = "";
-        posts.forEach(post => {
-            let mediaHTML = "";
-            if (post.media && post.media !== "") {
-                mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
-            }
-            quotesHTML += `
-                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <img src="${post.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
-                        <strong style="color: white;">${post.username}</strong>
-                        <span style="color: gray; font-size: 12px; margin-left: auto;">${post.timestamp}</span>
-                    </div>
-                    <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
-                    ${mediaHTML}
-                </div>
-            `;
-        });
-        container.innerHTML = quotesHTML;
-    })
-    .catch(err => {
-        container.innerHTML = "<p style='text-align: center; color: #ff3366;'>Error loading quotes.</p>";
-    });
-}
-
-// [THE FIX]: Reposting & Undoing Reposts now surgically updates colors and counts without reloading
 function executeRepost(postId, isCurrentlyReposted, commentId = null) {
     fetch(`${API_BASE}/api/createPost`, {
         method: 'POST',
@@ -726,35 +558,7 @@ function executeRepost(postId, isCurrentlyReposted, commentId = null) {
     });
 }
 
-// [THE FIX]: Quoting instantly increments the counter without reloading
-function executeQuote(postId, textContent, mediaBase64 = "", commentId = null) {
-    fetch(`${API_BASE}/api/createPost`, {
-        method: 'POST',
-        body: JSON.stringify({ 
-            username: currentUser, 
-            content: textContent, 
-            media: mediaBase64, 
-            parentPostId: postId,
-            parentCommentId: commentId 
-        })
-    })
-    .then(response => response.text())
-    .then(data => {
-        if (data === "SUCCESS") {
-            showToast("Quote Posted!");
-            
-            const btn = document.getElementById(commentId ? `comment-repost-btn-${commentId}` : `repost-btn-${postId}`);
-            if (btn) {
-                const countSpan = btn.querySelector('.repost-count');
-                if (countSpan) {
-                    let currentCount = parseInt(countSpan.textContent) || 0;
-                    countSpan.textContent = currentCount + 1;
-                }
-            }
-        }
-    });
-}
-
+// [THE FIX]: Pushed the timestamp to the bottom right using flex-end layout
 function buildQuoteBox(parentPost) {
     if (!parentPost) return ""; 
     
@@ -767,19 +571,24 @@ function buildQuoteBox(parentPost) {
         }
     }
 
-    const pEditedTag = parentPost.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic;"> (edited)</span>` : "";
+    const pEditedTag = parentPost.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px; flex-shrink: 0;"> (edited)</span>` : "";
     const linkTarget = parentPost.isComment ? `post.html?id=${parentPost.postId}` : `post.html?id=${parentPost.id}`;
+
+    const shortTime = parentPost.timestamp && parentPost.timestamp.length > 16 ? parentPost.timestamp.substring(0, 16) : parentPost.timestamp;
 
     return `
     <div class="embedded-quote" onclick="event.stopPropagation(); window.location.href='${linkTarget}'" style="border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-top: 10px; background: rgba(255,255,255,0.02); cursor: pointer; transition: background 0.2s;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <img src="${parentPost.avatar}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;">
-            <strong style="font-size: 13px; color: white;">${parentPost.username}</strong>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0;">
+            <img src="${parentPost.avatar}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+            <strong class="username-truncate" style="font-size: 13px; color: white;">${parentPost.username}</strong>
             ${pEditedTag}
-            <span style="font-size: 11px; color: gray; margin-left: auto;">${parentPost.timestamp}</span>
         </div>
         <div style="font-size: 14px; color: #e0e0e0; line-height: 1.4;">${parentPost.content}</div>
         ${pMediaHTML}
+        
+        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+            <span style="font-size: 11px; color: gray;">${shortTime}</span>
+        </div>
     </div>
     `;
 }
@@ -811,11 +620,26 @@ function openLightbox(imageSrc) {
     overlay.style.display = 'flex';
 }
 
+function closeLightbox() {
+    const overlay = document.getElementById('customLightboxOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
 /* ========================================== */
 /* --- GLOBAL SCROLL MEMORY ENGINE            */
 /* ========================================== */
 function saveScrollPosition(pageIdentifier = 'general') {
     sessionStorage.setItem(pageIdentifier + 'Scroll', window.scrollY || document.documentElement.scrollTop);
+}
+
+function restoreScrollPosition(pageIdentifier = 'general') {
+    setTimeout(() => {
+        const savedScroll = sessionStorage.getItem(pageIdentifier + 'Scroll');
+        if (savedScroll) {
+            window.scrollTo(0, parseInt(savedScroll));
+            sessionStorage.removeItem(pageIdentifier + 'Scroll');
+        }
+    }, 100); 
 }
 
 /* ========================================= */
@@ -888,16 +712,6 @@ function saveCustomUsername() {
             document.getElementById('usernameError').style.display = 'block';
         }
     });
-}
-
-function restoreScrollPosition(pageIdentifier = 'general') {
-    setTimeout(() => {
-        const savedScroll = sessionStorage.getItem(pageIdentifier + 'Scroll');
-        if (savedScroll) {
-            window.scrollTo(0, parseInt(savedScroll));
-            sessionStorage.removeItem(pageIdentifier + 'Scroll');
-        }
-    }, 100); 
 }
 
 /* ========================================= */

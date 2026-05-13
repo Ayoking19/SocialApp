@@ -13,3 +13,6 @@ out/
 secrets.properties
 *.db
 social_network.db
+
+# Ignore all user-uploaded media
+src/main/resources/static/uploads/

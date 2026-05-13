@@ -24,6 +24,14 @@ public class Main {
         DatabaseManager.initializeDatabase();
         MessageSystem.ensureSchema();
 
+        // [THE FIX]: Instant non-destructive database patch to support media in comments!
+        try (java.sql.Connection conn = DatabaseManager.connect()) {
+            conn.createStatement().execute("ALTER TABLE comments ADD COLUMN image_url TEXT");
+            System.out.println("[SYSTEM]: Comment Media schema patched successfully.");
+        } catch (Exception e) { 
+            // If the column already exists, it silently ignores the error.
+        }
+
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
@@ -252,6 +260,7 @@ public class Main {
                         String username = extractJsonValue(body, "username");
                         int postId = Integer.parseInt(extractJsonValue(body, "postId"));
                         String content = extractJsonValue(body, "content");
+                        String media = saveMediaFile(extractJsonValue(body, "media")); // [THE FIX]: Saves comment media
                         
                         Integer parentCommentId = null;
                         if (body.contains("\"parentCommentId\":")) {
@@ -267,7 +276,8 @@ public class Main {
                             }
                         }
                         
-                        boolean success = PostSystem.addComment(username, postId, content, parentCommentId);
+                        // [THE FIX]: Pass the media variable into the PostSystem
+                        boolean success = PostSystem.addComment(username, postId, content, media, parentCommentId);
                         String response = success ? "SUCCESS" : "FAILURE";
                         
                         exchange.sendResponseHeaders(200, response.length());
