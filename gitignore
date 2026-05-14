@@ -16,3 +16,5 @@ social_network.db
 
 # Ignore all user-uploaded media
 src/main/resources/static/uploads/
+
+firebase-key.json

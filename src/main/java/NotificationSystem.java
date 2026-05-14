@@ -1,19 +1,14 @@
 package main.java;
 
 import java.sql.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.io.OutputStreamWriter;
 
 public class NotificationSystem {
-
-    // [THE CLOUD BRIDGE]: This is where your Firebase Server Key goes!
-    private static final String FIREBASE_SERVER_KEY = "YOUR_FIREBASE_API_KEY_HERE"; 
 
     /* ========================================= */
     /* --- METHOD 1: ASYNCHRONOUS NOTIFICATION --- */
     /* ========================================= */
     public static void createNotification(String recipient, String actor, String type, int postId) {
+        // Prevent sending a notification to yourself
         if (recipient.equals(actor)) return; 
 
         new Thread(() -> {
@@ -41,15 +36,16 @@ public class NotificationSystem {
                         if (deviceToken != null && !deviceToken.trim().isEmpty()) {
                             
                             // Format the notification text based on the action
-                            String pushTitle = "New Alert";
+                            String pushTitle = "SocialApp";
                             String pushBody = actor + " interacted with you.";
                             
                             if (type.equals("LIKE")) { pushTitle = "New Like"; pushBody = actor + " liked your post."; }
                             else if (type.equals("COMMENT")) { pushTitle = "New Comment"; pushBody = actor + " commented on your post."; }
                             else if (type.equals("FOLLOW")) { pushTitle = "New Follower"; pushBody = actor + " started following you."; }
-                            else if (type.contains("MESSAGE")) { pushTitle = actor; pushBody = "Sent you a new message."; }
+                            else if (type.contains("MESSAGE")) { pushTitle = "New Message"; pushBody = actor + " sent you a private message."; }
                             
-                            sendFirebasePushNotification(deviceToken, pushTitle, pushBody);
+                            // [THE NEW TRIGGER]: Tap the Node.js Postman on the shoulder!
+                            triggerPushNotification(deviceToken, pushTitle, pushBody);
                         }
                     }
                 }
@@ -61,44 +57,25 @@ public class NotificationSystem {
     }
 
     /* ========================================= */
-    /* --- THE FIREBASE RAW HTTP CLIENT ---      */
+    /* --- NODE.JS POSTMAN TRIGGER ---           */
     /* ========================================= */
-    private static void sendFirebasePushNotification(String deviceToken, String title, String body) {
-        if (FIREBASE_SERVER_KEY.equals("YOUR_FIREBASE_API_KEY_HERE")) {
-            System.out.println("[FCM Mock] Push to " + deviceToken + " | " + title + ": " + body);
-            return; // Skip actual network request if key isn't set yet
-        }
-
+    public static void triggerPushNotification(String deviceToken, String title, String messageText) {
         try {
-            URL url = new URL("https://fcm.googleapis.com/fcm/send");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setUseCaches(false);
-            conn.setDoInput(true);
-            conn.setDoOutput(true);
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "key=" + FIREBASE_SERVER_KEY);
-            conn.setRequestProperty("Content-Type", "application/json");
-
-            // Construct the raw JSON payload for Google's Firebase Servers
-            String jsonPayload = "{" +
-                "\"to\": \"" + deviceToken + "\"," +
-                "\"notification\": {" +
-                    "\"title\": \"" + title + "\"," +
-                    "\"body\": \"" + body + "\"," +
-                    "\"sound\": \"default\"," +
-                    "\"priority\": \"high\"" +
-                "}" +
-            "}";
-
-            OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
-            wr.write(jsonPayload);
-            wr.flush();
+            // 1. Build the command exactly as you would type it in the Ubuntu terminal
+            String[] command = {
+                "node",
+                "postman.js",
+                deviceToken,
+                title,
+                messageText 
+            };
             
-            int responseCode = conn.getResponseCode();
-            System.out.println("[FCM] Push sent to " + deviceToken + " | Firebase Status: " + responseCode);
+            // 2. Command the Ubuntu operating system to launch the Subprocess
+            Runtime.getRuntime().exec(command);
+            System.out.println("Postman dispatched to Google for token: " + deviceToken);
             
         } catch (Exception e) {
-            System.out.println("[FCM] Error sending push: " + e.getMessage());
+            System.out.println("Postman failed to launch: " + e.getMessage());
         }
     }
 
