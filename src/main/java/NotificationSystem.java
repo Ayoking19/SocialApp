@@ -100,7 +100,7 @@ public class NotificationSystem {
     /* ========================================= */
     public static String getNotifications(String username) {
         StringBuilder json = new StringBuilder("[");
-        String sql = "SELECT id, actor_user, type, post_id, is_read, created_at AS timestamp FROM notifications WHERE recipient_user = ? ORDER BY created_at DESC LIMIT 50";
+        String sql = "SELECT id, actor_user, type, post_id, is_read, timestamp FROM notifications WHERE recipient_user = ? ORDER BY timestamp DESC LIMIT 50";
         
         try (Connection conn = DatabaseManager.connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {

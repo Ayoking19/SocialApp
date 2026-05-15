@@ -160,7 +160,7 @@
                 reader.onloadend = function() {
                     attachedMediaBase64 = reader.result; 
                     if (type === 'image') {
-                        previewContainer.innerHTML = `<div class="preview-item"><img src="${attachedMediaBase64}"><button class="remove-media-btn" onclick="removeMedia()">X</button></div>`;
+                        previewContainer.innerHTML = `<div class="preview-item" style="position: relative; max-width: 100%; text-align: center;"><img src="${attachedMediaBase64}" style="max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 10px;"><button class="remove-media-btn" onclick="removeMedia()" style="position: absolute; top: -10px; right: -10px; z-index: 10;">X</button></div>`;
                     } else if (type === 'video') {
                         previewContainer.innerHTML = `<div class="preview-item"><video src="${attachedMediaBase64}" controls style="max-height: 300px; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);"></video><button class="remove-media-btn" onclick="removeMedia()">X</button></div>`;
                     }

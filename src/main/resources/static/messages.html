@@ -850,7 +850,7 @@
                         }
                     }
 
-                    const editedTag = msg.isEdited ? `<span style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">edit</span> Edited</div>` : "";
+                    const editedTag = msg.isEdited ? `<div style="font-size: 11px; opacity: 0.7; font-style: italic; margin-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; width: max-content;">Edited</div>` : "";
                     const forwardedTag = msg.isForwarded ? `<div style="font-size: 12px; opacity: 0.8; font-style: italic; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><span class="material-icons" style="font-size: 14px;">forward</span> Forwarded</div>` : "";
 
                     let replyHtml = "";
