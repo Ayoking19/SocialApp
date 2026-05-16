@@ -74,7 +74,18 @@ public class Main {
             server.createContext("/api/registerDevice", new HttpHandler() {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
+                    // 1. The CORS Preflight Handshake Headers
                     exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, OPTIONS");
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+                    
+                    // 2. The OPTIONS Scout Interceptor
+                    if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                        exchange.sendResponseHeaders(204, -1);
+                        return; // Exit immediately, the scout is satisfied
+                    }
+
+                    // 3. The Actual Data Payload Handler
                     if ("POST".equals(exchange.getRequestMethod())) {
                         InputStream is = exchange.getRequestBody();
                         String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
