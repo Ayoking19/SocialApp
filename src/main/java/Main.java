@@ -24,6 +24,22 @@ public class Main {
         DatabaseManager.initializeDatabase();
         MessageSystem.ensureSchema();
 
+        /* ========================================= */
+        /* --- FIREBASE IGNITION & TEST FIRE ---     */
+        /* ========================================= */
+        System.out.println("=== Igniting Firebase ===");
+        FirebaseService.initialize();
+
+        // [Target Lock]: This is the exact device token pulled from your Chrome screenshot
+        String myPhoneToken = "fcU4rDoLT5mvQctQ-A0HkH:APA91bEERklnEycHkay-pkQISgbN9BWeky4qpPqRErcUN3QuNKCZDxtmOQN3RLgOIDH_ADTXwJzCTGN0iNs14vozEk5xpeDp3dOnPOungsnLuYvEmYMKK14";
+        
+        System.out.println("=== Firing Test Notification ===");
+        FirebaseService.sendPushNotification(
+            myPhoneToken, 
+            "System Online", 
+            "The Java backend cannon is successfully connected!"
+        );
+
         // [HOT PATCH]: Adds Media Support to Comments
         try (java.sql.Connection conn = DatabaseManager.connect()) {
             conn.createStatement().execute("ALTER TABLE comments ADD COLUMN image_url TEXT");
