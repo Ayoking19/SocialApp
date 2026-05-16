@@ -741,4 +741,4 @@ checkNotifications();
 checkUnreadMessages(); 
 highlightActiveNav();
 setInterval(checkNotifications, 30000);
-setInterval(checkUnreadMessages, 1000);
+setInterval(checkUnreadMessages, 30000);
