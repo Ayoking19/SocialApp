@@ -11,6 +11,8 @@ public class NotificationSystem {
         // Prevent sending a notification to yourself
         if (recipient.equals(actor)) return; 
 
+        // [Asynchronous Thread]: Runs this database save and push alert in the background 
+        // so the user who liked the post doesn't experience any app lag.
         new Thread(() -> {
             try { Thread.sleep(100); } catch (InterruptedException ignored) {}
 
@@ -35,7 +37,7 @@ public class NotificationSystem {
                         String deviceToken = rs.getString("fcm_token");
                         if (deviceToken != null && !deviceToken.trim().isEmpty()) {
                             
-                            // Format the notification text based on the action
+                            // Format the notification text based on the exact action
                             String pushTitle = "SocialApp";
                             String pushBody = actor + " interacted with you.";
                             
@@ -43,9 +45,11 @@ public class NotificationSystem {
                             else if (type.equals("COMMENT")) { pushTitle = "New Comment"; pushBody = actor + " commented on your post."; }
                             else if (type.equals("FOLLOW")) { pushTitle = "New Follower"; pushBody = actor + " started following you."; }
                             else if (type.contains("MESSAGE")) { pushTitle = "New Message"; pushBody = actor + " sent you a private message."; }
+                            else if (type.equals("QUOTE")) { pushTitle = "New Quote"; pushBody = actor + " quoted your post."; }
+                            else if (type.contains("REPOST")) { pushTitle = "New Repost"; pushBody = actor + " reposted your content."; }
                             
-                            // [THE NEW TRIGGER]: Tap the Node.js Postman on the shoulder!
-                            triggerPushNotification(deviceToken, pushTitle, pushBody);
+                            // [THE NEW TRIGGER]: Fire the native Java Firebase Cannon!
+                            FirebaseService.sendPushNotification(deviceToken, pushTitle, pushBody);
                         }
                     }
                 }
@@ -54,29 +58,6 @@ public class NotificationSystem {
                 System.out.println("Notification Error: " + e.getMessage());
             }
         }).start(); 
-    }
-
-    /* ========================================= */
-    /* --- NODE.JS POSTMAN TRIGGER ---           */
-    /* ========================================= */
-    public static void triggerPushNotification(String deviceToken, String title, String messageText) {
-        try {
-            // 1. Build the command exactly as you would type it in the Ubuntu terminal
-            String[] command = {
-                "node",
-                "postman.js",
-                deviceToken,
-                title,
-                messageText 
-            };
-            
-            // 2. Command the Ubuntu operating system to launch the Subprocess
-            Runtime.getRuntime().exec(command);
-            System.out.println("Postman dispatched to Google for token: " + deviceToken);
-            
-        } catch (Exception e) {
-            System.out.println("Postman failed to launch: " + e.getMessage());
-        }
     }
 
     /* ========================================= */
