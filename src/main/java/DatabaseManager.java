@@ -115,7 +115,6 @@ public class DatabaseManager {
                 + "FOREIGN KEY (reply_to_id) REFERENCES messages(id)"
                 + ");";
 
-        // --- NEW: THE BLOCKING ENGINE JUNCTION TABLE ---
         String createBlockedUsersTable = "CREATE TABLE IF NOT EXISTS blocked_users ("
                 + "blocker_id INTEGER NOT NULL,"
                 + "blocked_id INTEGER NOT NULL,"
@@ -123,6 +122,28 @@ public class DatabaseManager {
                 + "FOREIGN KEY (blocker_id) REFERENCES users(id),"
                 + "FOREIGN KEY (blocked_id) REFERENCES users(id),"
                 + "PRIMARY KEY (blocker_id, blocked_id)"
+                + ");";
+
+        // --- NEW: THE SAVED POSTS ENGINE ---
+        String createSavedPostsTable = "CREATE TABLE IF NOT EXISTS saved_posts ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "user_id INTEGER NOT NULL,"
+                + "post_id INTEGER NOT NULL,"
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,"
+                + "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,"
+                + "UNIQUE(user_id, post_id)"
+                + ");";
+
+        // --- NEW: THE SAVED COMMENTS ENGINE ---
+        String createSavedCommentsTable = "CREATE TABLE IF NOT EXISTS saved_comments ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "user_id INTEGER NOT NULL,"
+                + "comment_id INTEGER NOT NULL,"
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,"
+                + "FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE,"
+                + "UNIQUE(user_id, comment_id)"
                 + ");";
 
         try (Connection conn = connect();
@@ -136,9 +157,11 @@ public class DatabaseManager {
             stmt.execute(createFollowersTable);
             stmt.execute(createNotificationsTable); 
             stmt.execute(createMessagesTable);
-            
-            // Execute the new table creation
             stmt.execute(createBlockedUsersTable);
+            
+            // Execute the new saved posts and comments table creation
+            stmt.execute(createSavedPostsTable);
+            stmt.execute(createSavedCommentsTable);
             
             /* ========================================= */
             /* --- THE SCHEMA MIGRATION ENGINE ---       */

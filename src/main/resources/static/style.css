@@ -2,7 +2,7 @@
 /* --- GLOBAL OVERFLOW & TRUNCATION PROTECTIONS --- */
 /* ========================================= */
 html, body {
-    overflow-x: hidden !important; /* Ultimate safety net: entirely disables horizontal scrolling */
+    overflow-x: clip !important; /* THE FIX: 'clip' hides horizontal overflow but FORBIDS the browser from destroying position: sticky! */
     max-width: 100vw !important;
 }
 
@@ -28,23 +28,15 @@ span[style*="white-space: nowrap"] {
 }
 
 /* Aggressively truncate ALL usernames across ALL pages to ~10 characters max */
+/* The Smart Flexbox Truncation Engine */
 .user-info strong,
 .user-info a,
 .username-truncate {
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: 90px !important; 
-    display: inline-block !important;
-    vertical-align: bottom !important;
-}
-
-@media (min-width: 768px) {
-    .user-info strong,
-    .user-info a,
-    .username-truncate {
-        max-width: 250px !important;
-    }
+    max-width: 100% !important; /* Takes up all available space, but no more */
+    display: block !important; 
 }
 
 
@@ -388,20 +380,37 @@ body.in-chat .bottom-nav {
 }
 
 .comment-input-wrapper {
+    position: sticky;      /* Nails it to the screen */
+    bottom: 0;             /* Nails it to the bottom */
+    background: #0b0f1a;   /* Solid background so posts slide under it */
+    padding: 15px 10px;
+    z-index: 100;
     display: flex;
+    align-items: center;
     gap: 10px;
-    margin-bottom: 15px;
+    width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .comment-input {
-    flex: 1;
+    flex: 1;               /* Tells the text box to stretch */
+    min-width: 0;          /* Crucial: Prevents the text box from pushing buttons away */
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 10px 15px;
-    border-radius: 10px;
+    border-radius: 20px;
     color: white;
     outline: none; 
-    min-width: 0; 
+}
+
+.post-comment-btn {
+    background: #00e676;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;        /* THE SHIELD: Prevents the button from shrinking or being pushed off screen! */
 }
 
 .comment-input:focus {
@@ -1192,6 +1201,69 @@ textarea {
 .search-highlight {
     border: 2px solid #00e676 !important;
     background-color: rgba(0, 230, 118, 0.2) !important;
+}
+
+/* ========================================= */
+/* --- CUSTOM BUTTON REPLACEMENTS ---        */
+/* ========================================= */
+
+/* Fixes the Oval Send Button */
+.chat-send-btn {
+    width: 45px;
+    height: 45px;
+    border-radius: 50% !important; /* Forces a perfect circle */
+    background: #00e676;
+    color: #0b0f1a;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0 !important;     /* Forbids Flexbox from turning it into an oval */
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.chat-send-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 230, 118, 0.5);
+}
+
+/* Fixes the Greedy Follow Button in Modals */
+.modal-follow-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    color: #00e676;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s ease;
+    flex-shrink: 0 !important;     /* Prevents squishing */
+    width: max-content !important; /* Only be exactly as wide as the text */
+}
+
+.modal-follow-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+}
+
+/* Fixes the Missing Search Button */
+.chat-search-btn {
+    background: transparent;
+    color: #00e676;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    transition: 0.2s ease;
+}
+
+.chat-search-btn:hover {
+    transform: scale(1.2);
 }
 
 /* ========================================= */

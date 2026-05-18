@@ -1409,6 +1409,110 @@ public class Main {
                     }
                 }
             });
+
+            /* ========================================= */
+            /* --- 43. THE SAVE POST ENDPOINT ---        */
+            /* ========================================= */
+            server.createContext("/api/savePost", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "currentUser");
+                        int postId = Integer.parseInt(extractJsonValue(body, "postId"));
+                        
+                        // Tells the PostSystem to toggle the save and return the new status
+                        String response = PostSystem.toggleSave(username, postId);
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 44. THE GET SAVED POSTS ENDPOINT ---  */
+            /* ========================================= */
+            server.createContext("/api/getSavedPosts", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String pageStr = extractJsonValue(body, "page");
+                        int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
+                        
+                        // Fetches the JSON array of posts this user has saved
+                        String jsonResponse = PostSystem.getSavedPosts(currentUser, page);
+                        
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 45. THE SAVE COMMENT ENDPOINT ---     */
+            /* ========================================= */
+            server.createContext("/api/saveComment", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "currentUser");
+                        int commentId = Integer.parseInt(extractJsonValue(body, "commentId"));
+                        
+                        String response = PostSystem.toggleSaveComment(username, commentId);
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 46. THE GET SAVED COMMENTS ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/getSavedComments", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        String pageStr = extractJsonValue(body, "page");
+                        int page = (pageStr == null || pageStr.isEmpty()) ? 1 : Integer.parseInt(pageStr);
+                        
+                        String jsonResponse = PostSystem.getSavedComments(currentUser, page);
+                        
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
                      
             server.setExecutor(null);
             server.start();

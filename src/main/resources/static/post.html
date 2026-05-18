@@ -23,7 +23,8 @@
             <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
-            <li><a href="following.html">Following</a></li>    
+            <li><a href="following.html">Following</a></li>   
+            <li><a href="saved.html">Saved Posts</a></li>    
             <li><a href="messages.html">Messages</a></li>    
             <li><a href="notifications.html">Notifications</a></li>
             <li><a href="settings.html">Settings</a></li>
@@ -132,9 +133,11 @@
 
                 let followBadgeHTML = "";
                 if (post.username !== currentUser) {
-                    const btnStyle = post.isFollowing ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366; border-color: rgba(255, 51, 102, 0.3);' : '';
+                    const btnStyle = post.isFollowing ? 'background: rgba(255, 51, 102, 0.1) !important; color: #ff3366 !important; border-color: rgba(255, 51, 102, 0.3) !important;' : '';
                     const btnText = post.isFollowing ? 'Unfollow' : 'Follow';
-                    followBadgeHTML = `<button class="media-control-btn" style="margin-left: auto; padding: 4px 10px; font-size: 12px; ${btnStyle}" onclick="feedFollowUser(this, '${post.username}')">${btnText}</button>`;
+                    
+                    /* THE FIX: Swapped to modal-follow-btn for strict width limits */
+                    followBadgeHTML = `<button class="modal-follow-btn" style="margin-left: auto; padding: 6px 12px; font-size: 13px; ${btnStyle}" onclick="feedFollowUser(this, '${post.username}')">${btnText}</button>`;
                 }
 
                 let mediaHTML = "";
@@ -152,33 +155,30 @@
 
                 const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
                 
-                let postEditDeleteHTML = "";
-                if (post.username === currentUser) {
-                    postEditDeleteHTML = `
-                        <span id="edit-btn-${post.id}" onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
-                            <span class="material-icons" style="font-size: 14px;">edit</span>
-                        </span>
-                        <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Post">
-                            <span class="material-icons" style="font-size: 14px;">delete</span>
-                        </span>
-                    `;
-                }
+                // --- THE FIX: Ripped out old buttons and injected Universal Kebab ---
+                const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(post, 'post') : "";
 
                 const shortTime = post.timestamp && post.timestamp.length > 16 ? post.timestamp.substring(0, 16) : post.timestamp;
 
                 const postHTML = `
-                    <div id="post-card-${post.id}" class="post" style="border: none; background: transparent; padding: 0;">
+                    <div id="post-card-${post.id}" style="border: none; background: transparent; padding: 0; transform: none !important; transition: none !important;">
+                        
                         <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                            <img src="${post.avatar}" onclick="window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; cursor: pointer;">
-                            <div style="display: flex; flex-direction: column;">
-                                <div style="display: flex; align-items: center;">
-                                    <a href="profile.html?user=${post.username}" class="username-truncate" style="color: white; text-decoration: none; font-weight: bold;">@${post.username}</a>
-                                    ${editedTag}
-                                    ${postEditDeleteHTML}
-                                </div>
-                                <span class="time-stamp" style="font-size: 12px; color: gray;">${shortTime}</span>
+                            <div style="display: flex; align-items: center; flex-shrink: 0; margin-right: 10px;">
+                                <img src="${post.avatar}" onclick="window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; cursor: pointer;">
                             </div>
-                            ${followBadgeHTML}
+                            
+                            <div class="user-info-text-col" style="flex: 1; min-width: 0; padding-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
+                                    <a href="profile.html?user=${post.username}" class="username-truncate" style="color: white; text-decoration: none; font-weight: bold; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: inline-block;">${post.username}</a>
+                                    ${editedTag}
+                                </div>
+                                <span class="time-stamp" style="font-size: 12px; color: gray; margin-top: 2px;">${shortTime}</span>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: auto;">
+                                ${kebabMenuHTML}
+                            </div>
                         </div>
                         
                         <div class="post-content" style="font-size: 18px; line-height: 1.5; margin-top: 15px;">
@@ -206,24 +206,28 @@
                         
                         <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                             
-                            <div id="comment-list-${post.id}" style="margin-bottom: 15px; max-height: none;">
+                            <div id="comment-list-${post.id}" style="margin-bottom: 100px; max-height: none;">
                                 <p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>
                             </div>
                             
-                            <div id="reply-banner" style="display: none; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #a09eb5;">
-                                <span id="reply-banner-text"></span>
-                                <span class="material-icons" style="cursor: pointer; font-size: 16px; color: #ff3366;" onclick="cancelReply()">close</span>
-                            </div>
+                            <div style="position: fixed; bottom: 70px; left: 0; width: 100%; background: #0b0f1a; border-top: 1px solid #334155; padding: 12px 20px; z-index: 1000; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
+                                
+                                <div id="reply-banner" style="display: none; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #a09eb5;">
+                                    <span id="reply-banner-text"></span>
+                                    <span class="material-icons" style="cursor: pointer; font-size: 16px; color: #ff3366;" onclick="cancelReply()">close</span>
+                                </div>
 
-                            <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
-                            
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
-                                    <span class="material-icons">add_photo_alternate</span>
-                                </label>
-                                <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
-                                <input type="text" id="comment-input-${post.id}" placeholder="Write your reply..." style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); color: white;">
-                                <button onclick="submitThreadedComment(${post.id})" class="media-control-btn">Post</button>
+                                <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                                
+                                <div style="display: flex; gap: 10px; align-items: center; width: 100%; max-width: 1200px; margin: 0 auto;">
+                                    <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s; flex-shrink: 0;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
+                                        <span class="material-icons">add_photo_alternate</span>
+                                    </label>
+                                    <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
+                                    
+                                    <input type="text" id="comment-input-${post.id}" class="comment-input" placeholder="Write your reply..." style="flex: 1; min-width: 0;">
+                                    <button onclick="submitThreadedComment(${post.id})" class="post-comment-btn">Post</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -302,7 +306,49 @@
             .then(res => res.json())
             .then(comments => {
                 globalCommentsData = comments;
+                
+                // [THE DEEP LINK RECEIVER ENGINE]
+                const targetCommentId = urlParams.get('commentId');
+                
+                if (targetCommentId) {
+                    const traceId = parseInt(targetCommentId);
+                    let targetNode = globalCommentsData.find(c => c.id === traceId);
+                    
+                    if (targetNode) {
+                        // 1. Path Reconstruction: Trace the ancestors to open the exact correct thread
+                        const path = [];
+                        let pId = targetNode.parentCommentId;
+                        
+                        while (pId !== null && pId !== undefined) {
+                            path.unshift(pId); // Add to the front so the oldest parent is first
+                            let pNode = globalCommentsData.find(c => c.id === pId);
+                            pId = pNode ? pNode.parentCommentId : null;
+                        }
+                        
+                        // Force the view stack to open exactly where the target comment lives
+                        viewStack = path; 
+                    }
+                }
+
+                // Render the specific thread we just reconstructed
                 renderThreadView(postId);
+
+                // 2. The Auto-Scroller & Glow Trigger
+                if (targetCommentId) {
+                    setTimeout(() => {
+                        const targetEl = document.getElementById(`comment-container-${targetCommentId}`);
+                        if (targetEl) {
+                            // Scroll it perfectly into the center of the user's screen
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Trigger the CSS animation
+                            targetEl.classList.add('deep-link-glow');
+                            
+                            // Clean up the URL so refreshing doesn't replay the animation
+                            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?id=${postId}`;
+                            window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+                        }
+                    }, 400); // 400ms delay ensures the DOM is fully painted before scrolling
+                }
             })
             .catch(err => console.error("Error loading comments:", err));
         };
@@ -353,20 +399,15 @@
         };
 
         // THE FIX: HTML Generator separating mobile layout & truncation
+        // THE FIX: Single Comment Generator featuring the Vertical Stack & Kebab Engine
         function generateSingleCommentHTML(c, currentPostId, isFocused) {
             const likeStyle = c.isLiked ? 'color: #ff3366; background: rgba(255, 51, 102, 0.1);' : '';
             const repostStyle = c.isReposted ? 'color: #00a8ff; background: rgba(0, 168, 255, 0.1);' : '';
             const editedText = c.isEdited ? '<span style="font-size: 10px; color: gray; font-style: italic; margin-left: 5px; flex-shrink: 0;">(edited)</span>' : '';
             
-            let editDeleteHTML = "";
-            if (c.username === currentUser) {
-                editDeleteHTML = `
-                    <span onclick="editComment(${c.id}, '${c.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; flex-shrink: 0;" title="Edit"><span class="material-icons" style="font-size: 14px;">edit</span></span>
-                    <span onclick="deleteComment(${c.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; flex-shrink: 0;" title="Delete"><span class="material-icons" style="font-size: 14px;">delete</span></span>
-                `;
-            }
+            // --- THE FIX: Ripped out editDeleteHTML and replaced with Kebab Engine ---
+            const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(c, 'comment') : "";
 
-            // Moved Timestamp to bottom right layout block below
             const shortCommentTime = c.timestamp && c.timestamp.length > 16 ? c.timestamp.substring(0, 16) : c.timestamp;
 
             const viewRepliesBtn = (!isFocused && c.replyCount > 0) 
@@ -388,14 +429,24 @@
                 <div class="comment-thread" id="comment-container-${c.id}" style="${containerStyle} border-radius: 8px;">
                     
                     <div style="display: flex; align-items: center; width: 100%;">
-                        <strong class="username-truncate" style="color: white; cursor: pointer; font-size: ${isFocused ? '16px' : '15px'};" onclick="window.location.href='profile.html?user=${c.username}'">@${c.username}</strong>
-                        ${editedText}
+                        <div style="display: flex; align-items: center; flex-shrink: 0; margin-right: 10px;">
+                            <img src="${c.avatar}" onclick="window.location.href='profile.html?user=${c.username}'" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; cursor: pointer;">
+                        </div>
+                        
+                        <div class="user-info-text-col" style="flex: 1; min-width: 0; padding-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
+                                <strong class="username-truncate" style="color: white; cursor: pointer; font-size: ${isFocused ? '16px' : '15px'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;" onclick="window.location.href='profile.html?user=${c.username}'">${c.username}</strong>
+                                ${editedText}
+                            </div>
+                            <span class="time-stamp" style="font-size: 12px; color: gray; margin-top: 2px;">${shortCommentTime}</span>
+                        </div>
+                        
                         <div style="margin-left: auto; display: flex; align-items: center;">
-                            ${editDeleteHTML}
+                            ${kebabMenuHTML}
                         </div>
                     </div>
                     
-                    <p style="font-size: ${isFocused ? '17px' : '15px'}; color: #e0e0e0; margin-top: 6px; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(c.content) : c.content}</p>
+                    <p style="font-size: ${isFocused ? '17px' : '15px'}; color: #e0e0e0; margin-top: 10px; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(c.content) : c.content}</p>
                     ${commentMediaHTML}
                     
                     <div class="comment-actions-wrapper">
@@ -416,7 +467,6 @@
                         <div class="comment-actions-right">
                             <span class="reply-action-btn" onclick="initiateReply(${c.id}, '${c.username.replace(/'/g, "\\'")}')"><span class="material-icons" style="font-size: 14px;">reply</span> Reply</span>
                             ${viewRepliesBtn}
-                            <span class="timestamp-mobile-right" style="font-size: 11px; color: gray; margin-left: ${isFocused ? '0' : 'auto'};">${shortCommentTime}</span>
                         </div>
                     </div>
                 </div>

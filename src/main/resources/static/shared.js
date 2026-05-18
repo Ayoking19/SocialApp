@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -20,6 +20,26 @@ document.head.insertAdjacentHTML("beforeend", `
         .skel-avatar { width: 40px; height: 40px; border-radius: 50%; }
         .skel-line { height: 14px; margin-bottom: 10px; width: 100%; }
         .skel-media { height: 250px; border-radius: 15px; margin-top: 15px; }
+
+        /* THE KEBAB MENU CSS */
+        .kebab-menu-container { position: relative; display: inline-block; }
+        .kebab-btn { background: transparent; border: none; color: #a09eb5; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: 0.2s; outline: none; }
+        .kebab-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 1000; min-width: 150px; overflow: hidden; flex-direction: column; }
+        .dropdown-item { padding: 12px 15px; color: white; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; border: none; background: transparent; width: 100%; text-align: left; transition: 0.2s; font-family: inherit; }
+        .dropdown-item:hover { background: rgba(255,255,255,0.05); }
+        .dropdown-item.danger { color: #ff3366; }
+        .dropdown-item.danger:hover { background: rgba(255, 51, 102, 0.1); }
+
+        @keyframes deepLinkFlash {
+            0% { background-color: rgba(0, 230, 118, 0.3); box-shadow: 0 0 15px rgba(0,230,118,0.4); transform: scale(1.02); }
+            10% { background-color: rgba(0, 230, 118, 0.4); transform: scale(1.02); }
+            100% { background-color: rgba(255, 255, 255, 0.03); box-shadow: none; transform: scale(1); }
+        }
+        .deep-link-glow {
+            animation: deepLinkFlash 2.5s ease-out forwards !important;
+            border-left: 4px solid #00e676 !important;
+        }
     </style>
 `);
 
@@ -572,7 +592,8 @@ function buildQuoteBox(parentPost) {
     }
 
     const pEditedTag = parentPost.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px; flex-shrink: 0;"> (edited)</span>` : "";
-    const linkTarget = parentPost.isComment ? `post.html?id=${parentPost.postId}` : `post.html?id=${parentPost.id}`;
+    // [THE FIX]: Quote boxes now fire deep-link coordinates if they are quoting a comment
+    const linkTarget = parentPost.isComment ? `post.html?id=${parentPost.postId}&commentId=${parentPost.id}` : `post.html?id=${parentPost.id}`;
 
     const shortTime = parentPost.timestamp && parentPost.timestamp.length > 16 ? parentPost.timestamp.substring(0, 16) : parentPost.timestamp;
 
@@ -640,6 +661,121 @@ function restoreScrollPosition(pageIdentifier = 'general') {
             sessionStorage.removeItem(pageIdentifier + 'Scroll');
         }
     }, 100); 
+}
+
+/* ========================================= */
+/* --- KEBAB MENU & SAVE POST ENGINE ---     */
+/* ========================================= */
+
+// Toggles the specific dropdown and closes all others
+window.toggleDropdown = function(dropdownId) {
+    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+        if (menu.id !== dropdownId) menu.style.display = 'none';
+    });
+    
+    const menu = document.getElementById(dropdownId);
+    if (menu) {
+        menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+    }
+};
+
+// Global click listener to close dropdowns if user clicks anywhere else on the screen
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.kebab-menu-container')) {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+// The Save Post logic
+// The Live Save Post Logic
+/* ========================================= */
+/* --- UNIVERSAL KEBAB & OPTIMISTIC UI ---   */
+/* ========================================= */
+
+// The Live Optimistic Save Engine
+window.savePost = function(id, btnElement, type = 'post') {
+    const isUnsaving = btnElement.innerText.includes('Unsave');
+    const endpoint = type === 'comment' ? '/api/saveComment' : '/api/savePost';
+    
+    // 1. OPTIMISTIC UI INSTANT SWAP
+    // 1. OPTIMISTIC UI INSTANT SWAP
+    // 1. OPTIMISTIC UI INSTANT SWAP
+    if (isUnsaving) {
+        btnElement.innerHTML = `<span class="material-icons" style="font-size: 18px;">bookmark_border</span> Save`;
+        if (typeof showToast === "function") showToast(`${type === 'comment' ? 'Comment' : 'Post'} Removed!`);
+        
+        // [THE FIX]: Now vanishes BOTH posts and comments!
+        if (window.location.pathname.includes('saved.html')) {
+            const cardId = type === 'comment' ? `comment-card-${id}` : `post-card-${id}`;
+            const card = document.getElementById(cardId);
+            if (card) card.style.display = 'none';
+        }
+    } else {
+        btnElement.innerHTML = `<span class="material-icons" style="font-size: 18px;">bookmark</span> Unsave`;
+        if (typeof showToast === "function") showToast(`${type === 'comment' ? 'Comment' : 'Post'} Saved!`);
+    }
+
+    // Close dropdown instantly
+    document.querySelectorAll('.dropdown-menu').forEach(menu => menu.style.display = 'none');
+
+    // 3. SILENT BACKEND SYNC
+    fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        body: JSON.stringify({ currentUser: currentUser, postId: id.toString(), commentId: id.toString() })
+    }).catch(err => console.error("Save Error:", err));
+};
+
+// The Universal Kebab Generator (DRY Architecture)
+window.generateKebabMenu = function(item, type = 'post') {
+    const id = type === 'comment' ? item.id : item.id;
+    const isSaved = item.isSaved || false;
+    const isFollowing = item.isFollowing || false;
+    const contentEscaped = item.content ? item.content.replace(/'/g, "\\'") : "";
+   const itemOwner = item.username;
+    
+    let kebabHTML = "";
+    if (itemOwner === currentUser) {
+        kebabHTML = `
+            <div class="kebab-menu-container">
+                <button class="kebab-btn" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}')">
+                    <span class="material-icons">more_vert</span>
+                </button>
+                <div id="dropdown-${type}-${id}" class="dropdown-menu">
+                    <button class="dropdown-item" onclick="event.stopPropagation(); ${type === 'comment' ? `editComment(${id}, '${contentEscaped}')` : `window.location.href='edit-post.html?id=${id}'`}">
+                        <span class="material-icons" style="font-size: 18px;">edit</span> Edit
+                    </button>
+                    <button class="dropdown-item danger" onclick="event.stopPropagation(); ${type === 'comment' ? `deleteComment(${id})` : `deletePost(${id})`}">
+                        <span class="material-icons" style="font-size: 18px;">delete</span> Delete
+                    </button>
+                    <button class="dropdown-item" onclick="event.stopPropagation(); savePost(${id}, this, '${type}')">
+                        <span class="material-icons" style="font-size: 18px;">${isSaved ? 'bookmark' : 'bookmark_border'}</span> ${isSaved ? 'Unsave' : 'Save'}
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        const followText = isFollowing ? 'Unfollow' : 'Follow';
+        const followColor = isFollowing ? 'color: #ff3366; background: rgba(255, 51, 102, 0.05);' : 'color: white;';
+        
+        kebabHTML = `
+            <div class="kebab-menu-container">
+                <button class="kebab-btn" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}')">
+                    <span class="material-icons">more_vert</span>
+                </button>
+                <div id="dropdown-${type}-${id}" class="dropdown-menu">
+                    <button class="dropdown-item" onclick="event.stopPropagation(); savePost(${id}, this, '${type}')">
+                        <span class="material-icons" style="font-size: 18px;">${isSaved ? 'bookmark' : 'bookmark_border'}</span> ${isSaved ? 'Unsave' : 'Save'}
+                    </button>
+                    <button class="dropdown-item" style="${followColor}" onclick="event.stopPropagation(); ${type === 'comment' ? 'feedFollowUser' : 'feedFollowUser'}(this, '${itemOwner}'); toggleDropdown('dropdown-${type}-${id}');">
+                        ${followText}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    return kebabHTML;
 }
 
 /* ========================================= */

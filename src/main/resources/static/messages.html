@@ -18,7 +18,8 @@
             <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
-            <li><a href="following.html">Following</a></li>        
+            <li><a href="following.html">Following</a></li>   
+            <li><a href="saved.html">Saved Posts</a></li>        
             <li><a href="messages.html" style="color: #00e676;">Messages</a></li>        
             <li><a href="notifications.html">Notifications</a></li>
             <li><a href="settings.html">Settings</a></li>
@@ -79,8 +80,9 @@
                     </div>
 
                     <div id="chatSearchBar" class="chat-search-bar" style="display: none;">
-                        <input type="text" id="chatSearchInput" placeholder="Search in chat..." onkeyup="handleChatSearchInput(event)">
-                        <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="toggleChatSearch()">close</span>
+                        <input type="text" id="inChatSearchInput" placeholder="Search in chat..." onkeyup="handleChatSearchInput(event)">
+                        <button onclick="executeChatSearch()" class="chat-search-btn" title="Search"><span class="material-icons">search</span></button>
+                        <span class="material-icons" style="cursor: pointer; color: #ff3366; margin-left: 5px;" onclick="toggleChatSearch()">close</span>
                     </div>
 
                     <div id="searchNavControls" style="display: none; position: absolute; right: 15px; bottom: 85px; flex-direction: column; gap: 5px; z-index: 100;">
@@ -94,7 +96,7 @@
                             <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="exitSelectionMode()">close</span>
                             <strong id="selectionCountText" style="color: white; font-size: 16px;">1 Selected</strong>
                         </div>
-                        <button class="media-control-btn" style="background: white; color: black;" onclick="showMultiSelectOptions()">Select</button>
+                        <button class="modal-follow-btn" style="background: white !important; color: black !important; border: none !important; padding: 6px 16px !important; flex-shrink: 0;" onclick="showMultiSelectOptions()">Select</button>
                     </div>
                     
                     <div class="chat-history" id="chatHistoryContainer"></div>
@@ -127,7 +129,7 @@
                                 <input type="file" id="msgDocUpload" accept=".pdf,.doc,.docx,.txt" hidden onchange="previewMsgMedia(this, 'document')">
                                 
                                 <input type="text" id="messageInput" placeholder="Start a new message..." onkeypress="handleEnter(event)">
-                                <button onclick="executeSendMessage()" class="media-control-btn" style="flex-shrink: 0; border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center;"><span class="material-icons">send</span></button>
+                                <button onclick="executeSendMessage()" class="chat-send-btn"><span class="material-icons">send</span></button>
                             </div>
                         </div>
                     </div>
@@ -156,7 +158,7 @@
                     <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="exitMediaSelectionMode()">close</span>
                     <strong id="mediaSelectionCountText" style="color: white;">1 Selected</strong>
                 </div>
-                <button class="media-control-btn" style="background: white; color: black;" onclick="triggerMediaActionSheet()">Select</button>
+                <button class="modal-follow-btn" style="background: white !important; color: black !important; border: none !important; padding: 6px 16px !important; flex-shrink: 0;" onclick="triggerMediaActionSheet()">Select</button>
             </div>
             
             <div id="mediaGalleryContent" style="flex: 1; overflow-y: auto; padding-top: 15px;"></div>
@@ -369,11 +371,11 @@
             const nav = document.getElementById("searchNavControls");
             if (bar.style.display === "none" || bar.style.display === "") {
                 bar.style.display = "flex";
-                document.getElementById("chatSearchInput").focus();
+                document.getElementById("inChatSearchInput").focus(); // FIXED ID
             } else {
                 bar.style.display = "none";
                 nav.style.display = "none";
-                document.getElementById("chatSearchInput").value = "";
+                document.getElementById("inChatSearchInput").value = ""; // FIXED ID
                 clearSearchHighlights();
             }
         }
@@ -395,7 +397,7 @@
         }
 
         function executeChatSearch() {
-            const query = document.getElementById("chatSearchInput").value.toLowerCase();
+            const query = document.getElementById("inChatSearchInput").value.toLowerCase(); // FIXED ID
             const navControls = document.getElementById("searchNavControls");
             
             clearSearchHighlights();
@@ -416,7 +418,7 @@
 
             if (currentSearchMatches.length > 0) {
                 navControls.style.display = "flex";
-                currentSearchIndex = currentSearchMatches.length - 1; 
+                currentSearchIndex = currentSearchMatches.length - 1; // This guarantees it defaults to the LATEST message!
                 jumpToSearchResult();
             } else {
                 navControls.style.display = "none";
@@ -903,7 +905,7 @@
                 }
 
                 if (document.getElementById("chatSearchBar").style.display === "flex") {
-                    const query = document.getElementById("chatSearchInput").value.toLowerCase();
+                    const query = document.getElementById("inChatSearchInput").value.toLowerCase(); // FIXED ID
                     if (query.trim() !== "" && currentSearchMatches.length > 0 && currentSearchIndex >= 0) {
                         const msgId = currentSearchMatches[currentSearchIndex];
                         const targetBubble = document.getElementById(`msg-bubble-${msgId}`);

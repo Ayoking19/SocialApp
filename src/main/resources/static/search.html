@@ -16,8 +16,9 @@
             <li><a href="index.html">Home</a></li>
             <li><a href="top.html">Top Posts</a></li>
             <li><a href="profile.html">Profile</a></li>
-            <li><a href="search.html" style="color: #00e676;">Search</a></li>
-            <li><a href="following.html">Following</a></li> 
+            <li><a href="search.html">Search</a></li>
+            <li><a href="following.html">Following</a></li>
+            <li><a href="saved.html">Saved Posts</a></li>   
             <li><a href="messages.html">Messages</a></li>       
             <li><a href="notifications.html">Notifications</a></li>
             <li><a href="settings.html">Settings</a></li>
@@ -43,8 +44,8 @@
 
     <div class="container">
         <main class="feed">
-            <div class="search-container">
-                <div class="search-box">
+            <div class="search-container" style="position: sticky; top: 65px; background: #1a0b2e; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.05); margin-top: 0; padding: 15px 20px;">
+                    <div class="search-box">
                     <span class="material-icons search-icon">search</span>
                     <input type="text" id="searchInput" class="search-input" placeholder="Search..." onkeypress="handleEnter(event)">
                     <button class="search-btn" onclick="executeSearch()">Search</button>
@@ -59,7 +60,7 @@
                 </div>
             </div>
 
-            <div id="searchResults" class="search-results-area">
+            <div id="searchResults" class="search-results-area" style="padding-left: 0 !important; padding-right: 0 !important;">
                 <p class="search-placeholder-text">Type something above to explore the network.</p>
             </div>
         </main>
@@ -159,18 +160,18 @@
                     if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
                         mediaHTML = `<video src="${post.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 400px; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(0, 230, 118, 0.3); background: #000;"></video>`;
                     } else {
-                        mediaHTML = `<div style="position: relative; margin-top: 15px;">
-                            <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);">
-                            <div style="margin-top: 8px; display: flex; gap: 10px;">
-                                <a href="${post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="display: flex; align-items: center; gap: 5px;">
-                                    <span class="material-icons" style="font-size: 16px;">download</span> Download
-                                </a>
-                                <button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="display: flex; align-items: center; gap: 5px;">
-                                    <span class="material-icons" style="font-size: 16px;">fullscreen</span> Full Screen
-                                </button>
-                            </div>
-                        </div>`;
-                    }
+                            mediaHTML = `<div style="position: relative; margin-top: 15px;">
+                                <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);">
+                                <div style="margin-top: 8px; display: flex; gap: 10px;">
+                                    <a href="${post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Download">
+                                        <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">download</span>
+                                    </a>
+                                    <button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Full Screen">
+                                        <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">fullscreen</span>
+                                    </button>
+                                </div>
+                            </div>`;
+                        }
                 }
 
                 let snippetHTML = (post.matchedSnippet && post.matchedSnippet !== "") ? `<div style="background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; padding: 8px 12px; margin-top: 10px; border-radius: 4px; font-size: 13px; color: #a09eb5; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="font-size: 16px; color: #00e676;">chat</span> <span style="color: white; font-style: italic;">"${post.matchedSnippet}"</span></div>` : "";
@@ -180,41 +181,30 @@
                 const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
                 const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px; flex-shrink: 0;"> (edited)</span>` : "";
 
-                let postEditDeleteHTML = "";
-                if (post.username === currentUser) {
-                    postEditDeleteHTML = `
-                        <span id="edit-btn-${post.id}" onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s; flex-shrink: 0;" title="Edit Post">
-                            <span class="material-icons" style="font-size: 14px;">edit</span>
-                        </span>
-                        <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s; flex-shrink: 0;" title="Delete Post">
-                            <span class="material-icons" style="font-size: 14px;">delete</span>
-                        </span>
-                    `;
-                }
+                // [THE FIX]: Ripped out old buttons and injected Kebab Menu
+                // --- THE FIX: Universal Kebab Engine Integration ---
+                    const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(post, 'post') : "";
 
                 const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                 const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
 
                 html += `
-                    <div id="post-card-${post.id}" class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
-                        <div class="user-info" style="display: flex; align-items: flex-start; flex-wrap: nowrap; width: 100%;">
-                            <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
-                            
-                            <div class="user-info-text-col" style="display: flex; flex-direction: column; min-width: 0; flex: 1; margin-right: 10px;">
-                                <div style="display: flex; align-items: center; min-width: 0; width: 100%;">
-                                    <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" class="truncate-text" style="color: white; text-decoration: none; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${post.username}</a>
-                                    ${editedTag}
-                                    ${postEditDeleteHTML}
+                    <div id="post-card-${post.id}" class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer; margin-bottom: 20px;">
+                        <div class="user-info" style="display: flex; align-items: center; width: 100%;">
+                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
+                                
+                                <div class="user-info-text-col" style="flex: 1; min-width: 0; padding-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
+                                    <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" style="color: white; text-decoration: none; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: inline-block;">${post.username}</a>
+                                    ${editedTag ? `<div style="display: flex; align-items: center; flex-shrink: 0;">${editedTag}</div>` : ''}
                                 </div>
-                                <span class="time-stamp truncate-text" style="font-size: 12px; color: gray; margin-top: 2px;">${post.timestamp}</span>
+                                <span class="time-stamp" style="font-size: 12px; color: gray; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${post.timestamp.substring(0, 16)}</span>
                             </div>
-                            
-                            ${post.username !== currentUser ? 
-                                (post.isFollowing ? 
-                                    `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
-                                    `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
-                                ) : ''}
-                        </div>
+                                
+                                <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: auto;">
+                                    ${kebabMenuHTML}
+                                </div>
+                            </div>
                         
                         <div class="post-content">
                             <p id="post-content-text-${post.id}">${parseSocialText(post.content)}</p>
@@ -263,14 +253,14 @@
                     const btnText = user.isFollowing ? 'Unfollow' : 'Follow';
                     
                     usersHTML += `
-                        <div style="display: flex; align-items: center; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; cursor: pointer;" onclick="window.location.href='profile.html?user=${user.username}'">
-                            <img src="${user.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px;">
-                            <div style="display: flex; flex-direction: column; flex: 1;">
-                                <strong style="color: white; font-size: 16px;">${user.username}</strong>
-                                <span style="color: #a09eb5; font-size: 13px;">${user.bio}</span>
+                        <div style="display: flex; align-items: center; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; cursor: pointer; min-width: 0;" onclick="window.location.href='profile.html?user=${user.username}'">
+                            <img src="${user.avatar}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; flex-shrink: 0;">
+                            <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; margin-right: 10px;">
+                                <strong class="username-truncate" style="color: white; font-size: 16px; max-width: 100%;">${user.username}</strong>
+                                <span class="truncate-text" style="color: #a09eb5; font-size: 13px; max-width: 100%;">${user.bio || "No bio yet."}</span>
                             </div>
                             ${user.username !== currentUser ? 
-                                `<button class="media-control-btn" style="${btnStyle}" onclick="event.stopPropagation(); searchFollowUser(this, '${user.username}')">${btnText}</button>` 
+                                `<button class="modal-follow-btn" style="${btnStyle}" onclick="event.stopPropagation(); searchFollowUser(this, '${user.username}')">${btnText}</button>` 
                             : ''}
                         </div>
                     `;

@@ -24,6 +24,7 @@
             <li><a href="profile.html">Profile</a></li>
             <li><a href="search.html">Search</a></li>
             <li><a href="following.html">Following</a></li> 
+            <li><a href="saved.html">Saved Posts</a></li>   
             <li><a href="messages.html">Messages</a></li>       
             <li><a href="notifications.html">Notifications</a></li>
             <li><a href="settings.html">Settings</a></li>
@@ -215,11 +216,11 @@
                             mediaHTML = `<div style="position: relative; margin-top: 15px;">
                                 <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);">
                                 <div style="margin-top: 8px; display: flex; gap: 10px;">
-                                    <a href="${post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="display: flex; align-items: center; gap: 5px;">
-                                        <span class="material-icons" style="font-size: 16px;">download</span> Download
+                                    <a href="${post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Download">
+                                        <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">download</span>
                                     </a>
-                                    <button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="display: flex; align-items: center; gap: 5px;">
-                                        <span class="material-icons" style="font-size: 16px;">fullscreen</span> Full Screen
+                                    <button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Full Screen">
+                                        <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">fullscreen</span>
                                     </button>
                                 </div>
                             </div>`;
@@ -231,42 +232,45 @@
                     const repostColorStyle = post.isReposted ? 'background: rgba(0, 168, 255, 0.1); color: #00a8ff;' : '';
                     const editedTag = post.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
                     
-                    let postEditDeleteHTML = "";
-                    if (post.username === currentUser) {
-                        postEditDeleteHTML = `
-                            <span onclick="event.stopPropagation(); editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}')" style="cursor: pointer; color: #a09eb5; margin-left: 10px; transition: 0.2s;" title="Edit Post">
-                                <span class="material-icons" style="font-size: 14px;">edit</span>
-                            </span>
-                            <span onclick="event.stopPropagation(); deletePost(${post.id})" style="cursor: pointer; color: #ff3366; margin-left: 5px; transition: 0.2s;" title="Delete Post">
-                                <span class="material-icons" style="font-size: 14px;">delete</span>
-                            </span>
-                        `;
-                    }
+                    // [THE FIX]: The dynamic Kebab Menu generator
+                    // --- THE FIX: Universal Kebab Engine Integration ---
+                    const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(post, 'post') : "";
 
                     const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
-                    const targetUrl = isPureRepost ? `post.html?id=${post.parentPost.id}` : `post.html?id=${post.id}`;
+                    
+                    // The Deep Link Router
+                    let targetUrl = `post.html?id=${post.id}`;
+                    if (isPureRepost) {
+                        // If reposted item is a comment, attach the &commentId= coordinate to the URL!
+                        targetUrl = post.parentPost.isComment 
+                            ? `post.html?id=${post.parentPost.postId}&commentId=${post.parentPost.id}` 
+                            : `post.html?id=${post.parentPost.id}`;
+                    }
 
+                    // [THE FIX]: The Bulletproof Master Feed HTML Block
                     feedHTML += `
-                        <div class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
+                        <div id="post-card-${post.id}" class="post" onclick="saveScrollPosition('${window.location.pathname}'); window.location.href='${targetUrl}'" style="cursor: pointer;">
+                            
                             <div class="user-info" style="display: flex; align-items: center; width: 100%;">
-                                <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; flex-shrink: 0;">
-                                <div class="user-info-text-col">
-                                    <div style="display: flex; align-items: center; min-width: 0;">
-                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" class="truncate-text" style="color: white; text-decoration: none; font-weight: bold;">${post.username}</a>
-                                        ${editedTag}
-                                        ${postEditDeleteHTML}
-                                    </div>
-                                    <span class="time-stamp truncate-text" style="font-size: 12px; color: gray;">${post.timestamp.substring(0, 16)}</span>
+                                <div style="display: flex; align-items: center; flex-shrink: 0; margin-right: 10px;">
+                                    <img src="${post.avatar}" onclick="event.stopPropagation(); window.location.href='profile.html?user=${post.username}'" class="mini-profile-pic" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
                                 </div>
-                                ${post.username !== currentUser ? 
-                                    (post.isFollowing ? 
-                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto; background: rgba(255, 51, 102, 0.1); color: #ff3366;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Unfollow</button>` : 
-                                        `<button class="media-control-btn" style="flex-shrink: 0; margin-left: auto;" onclick="event.stopPropagation(); feedFollowUser(this, '${post.username}')">Follow</button>`
-                                    ) : ''}
+                                
+                                <div class="user-info-text-col" style="flex: 1; min-width: 0; padding-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                                    <div style="display: flex; align-items: center; gap: 5px; width: 100%;">
+                                        <a href="profile.html?user=${post.username}" onclick="event.stopPropagation();" style="color: white; text-decoration: none; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: inline-block;">${post.username}</a>
+                                        ${editedTag ? `<div style="display: flex; align-items: center; flex-shrink: 0;">${editedTag}</div>` : ''}
+                                    </div>
+                                    <span class="time-stamp" style="font-size: 12px; color: gray; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${post.timestamp.substring(0, 16)}</span>
+                                </div>
+                                
+                                <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: auto;">
+                                    ${kebabMenuHTML}
+                                </div>
                             </div>
                             
                             <div class="post-content">
-                                <p>${parseSocialText(post.content)}</p>
+                                <p id="post-content-text-${post.id}">${parseSocialText(post.content)}</p>
                                 ${mediaHTML}
                                 ${quoteBoxHTML}
                             </div>
@@ -277,12 +281,12 @@
                                     <span class="like-count">${post.likes}</span>
                                 </span>
                                 
-                                <span class="repost-btn" onclick="event.stopPropagation(); openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: color 0.2s; ${repostColorStyle}">
+                                <span id="repost-btn-${post.id}" class="repost-btn" onclick="event.stopPropagation(); openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: color 0.2s; ${repostColorStyle}">
                                     <span class="material-icons" style="font-size: 20px;">repeat</span>
                                     <span class="repost-count">${post.repostCount}</span> 
                                 </span>
 
-                                <span class="comment-btn" onclick="event.stopPropagation(); toggleComments(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: 0.2s;">
+                                <span id="comment-btn-${post.id}" class="comment-btn" onclick="event.stopPropagation(); toggleComments(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; transition: 0.2s;">
                                     <span class="material-icons" style="font-size: 20px;">chat_bubble_outline</span> 
                                     <span class="comment-count">${post.commentCount}</span>
                                 </span>
