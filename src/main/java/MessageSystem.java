@@ -111,6 +111,10 @@ public class MessageSystem {
                     insertStmt.setBoolean(5, isForwarded);
                     if (replyToId != null) insertStmt.setInt(6, replyToId); else insertStmt.setNull(6, java.sql.Types.INTEGER);
                     insertStmt.executeUpdate();
+
+                    // --- THE FIX: Trigger Firebase Push for Direct Messages ---
+                    NotificationSystem.createNotification(receiver, sender, "MESSAGE", 0);
+
                     return "SUCCESS";
                 }
             }
@@ -378,6 +382,19 @@ public class MessageSystem {
             insertStmt.setString(5, mediaBase64);
             if (replyToId != null) insertStmt.setInt(6, replyToId); else insertStmt.setNull(6, java.sql.Types.INTEGER);
             insertStmt.executeUpdate();
+
+            // --- THE FIX: Trigger Firebase Push for Group Messages ---
+            try (PreparedStatement fetchMembers = conn.prepareStatement("SELECT users.username FROM group_members JOIN users ON group_members.user_id = users.id WHERE group_members.group_id = ?")) {
+                fetchMembers.setInt(1, groupId);
+                ResultSet rs = fetchMembers.executeQuery();
+                while (rs.next()) {
+                    String member = rs.getString("username");
+                    if (!member.equals(sender)) {
+                        NotificationSystem.createNotification(member, sender, "GROUP_MESSAGE", groupId);
+                    }
+                }
+            }
+
             return "SUCCESS";
         } catch (SQLException e) { System.out.println("Group Message Error: " + e.getMessage()); }
         return "ERROR";
