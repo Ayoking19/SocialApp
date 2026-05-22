@@ -49,11 +49,38 @@
 
             <div class="profile-info-section">
                 <div class="profile-pic-wrapper">
-                    <img id="profileImage" src="https://ui-avatars.com/api/?name=User" class="large-profile-pic" alt="Profile Picture">
-                    <div class="edit-pic-btn" id="editPicBtn" onclick="document.getElementById('avatarUpload').click()">
+                    <img id="profileImage" src="https://ui-avatars.com/api/?name=User" class="large-profile-pic" alt="Profile Picture" onclick="openLightbox(this.src)" style="cursor: pointer;">
+                    <div class="edit-pic-btn" id="editPicBtn" onclick="openAvatarMenu()">
                         <span class="material-icons" style="font-size: 18px;">photo_camera</span>
                     </div>
-                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+                    <input type="file" id="avatarGalleryUpload" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+                    <input type="file" id="avatarCameraUpload" accept="image/*" capture="user" style="display: none;" onchange="handleAvatarUpload(this)">
+                </div>
+
+                <div class="modal-overlay" id="avatarMenuModal" style="display: none; z-index: 6000;">
+                    <div class="modal-card" style="max-width: 320px;">
+                        <h3 style="margin-bottom: 20px;">Update Profile Picture</h3>
+                        <button class="main-post-btn" style="width: 100%; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 10px;" onclick="closeAvatarMenu(); document.getElementById('avatarCameraUpload').click()">
+                            <span class="material-icons">photo_camera</span> Take Photo
+                        </button>
+                        <button class="media-control-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;" onclick="closeAvatarMenu(); document.getElementById('avatarGalleryUpload').click()">
+                            <span class="material-icons">image</span> Choose from Gallery
+                        </button>
+                        <button class="modal-cancel-btn" style="width: 100%; margin-top: 15px;" onclick="closeAvatarMenu()">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="modal-overlay" id="avatarMenuModal" style="display: none; z-index: 6000;">
+                    <div class="modal-card" style="max-width: 320px;">
+                        <h3 style="margin-bottom: 20px;">Update Profile Picture</h3>
+                        <button class="main-post-btn" style="width: 100%; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 10px;" onclick="closeAvatarMenu(); openNativeCamera('profile')">
+                            <span class="material-icons">photo_camera</span> Take Photo
+                        </button>
+                        <button class="media-control-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;" onclick="closeAvatarMenu(); document.getElementById('avatarUpload').click()">
+                            <span class="material-icons">image</span> Choose from Gallery
+                        </button>
+                        <button class="modal-cancel-btn" style="width: 100%; margin-top: 15px;" onclick="closeAvatarMenu()">Cancel</button>
+                    </div>
                 </div>
 
                 <div class="profile-details" style="display: flex; flex-direction: column; min-width: 0;">
@@ -599,6 +626,9 @@
                 if (data === "FOLLOWED" || data === "UNFOLLOWED") loadRelations(); 
             });
         }
+
+        function openAvatarMenu() { document.getElementById('avatarMenuModal').style.display = 'flex'; }
+        function closeAvatarMenu() { document.getElementById('avatarMenuModal').style.display = 'none'; }
 
         function handleAvatarUpload(input) {
             const file = input.files[0];
