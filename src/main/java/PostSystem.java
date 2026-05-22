@@ -132,19 +132,19 @@ public class PostSystem {
                         if (generatedKeys.next()) {
                             int newPostId = generatedKeys.getInt(1);
                             
-                            if (isNewPostQuote && finalParentId != null) {
-                                String qUserSql = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
-                                try (PreparedStatement qStmt = conn.prepareStatement(qUserSql)) {
-                                    qStmt.setInt(1, finalParentId);
-                                    ResultSet qRs = qStmt.executeQuery();
-                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE", newPostId);
-                                }
-                            } else if (isNewPostQuote && parentCommentId != null) {
+                            if (isNewPostQuote && parentCommentId != null) {
                                 String qUserSql = "SELECT users.username FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?";
                                 try (PreparedStatement qStmt = conn.prepareStatement(qUserSql)) {
                                     qStmt.setInt(1, parentCommentId);
                                     ResultSet qRs = qStmt.executeQuery();
-                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE", newPostId);
+                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE_COMMENT", newPostId);
+                                }
+                            } else if (isNewPostQuote && finalParentId != null) {
+                                String qUserSql = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
+                                try (PreparedStatement qStmt = conn.prepareStatement(qUserSql)) {
+                                    qStmt.setInt(1, finalParentId);
+                                    ResultSet qRs = qStmt.executeQuery();
+                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE_POST", newPostId);
                                 }
                             }
 
