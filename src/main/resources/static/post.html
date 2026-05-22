@@ -35,7 +35,6 @@
     <header class="top-bar">
         <div class="menu-trigger" onclick="toggleOverlayMenu()">
             <span class="material-icons">menu</span>
-            <span>Menu</span>
         </div>
         <div class="logo">Social<span>App</span></div>
         <div style="width: 50px;"></div> 
@@ -195,7 +194,7 @@
                             
                             <span id="repost-btn-${post.id}" class="repost-btn" onclick="openRepostMenu(${post.id}, ${post.isReposted})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; border-radius: 20px; ${repostColorStyle}">
                                 <span class="material-icons" style="font-size: 18px;">repeat</span>
-                                <span class="repost-count">${post.pureRepostCount}</span> Reposts
+                                <span class="repost-count">${post.repostCount}</span> Reposts
                             </span>
 
                             <span id="quote-btn-${post.id}" class="quote-btn" onclick="openQuotesModal(${post.id})" style="cursor: pointer; display: flex; align-items: center; gap: 5px; transition: color 0.2s; padding: 4px 8px; background: rgba(0, 230, 118, 0.05); color: #00e676; border-radius: 20px;">
@@ -308,7 +307,17 @@
                 globalCommentsData = comments;
                 
                 // [THE DEEP LINK RECEIVER ENGINE]
-                const targetCommentId = urlParams.get('commentId');
+                let targetCommentId = urlParams.get('commentId');
+                const highlightUser = urlParams.get('highlightUser');
+
+                // THE FIX: If the backend didn't supply the exact comment ID, dynamically find the newest comment by the actor!
+                if (!targetCommentId && highlightUser) {
+                    const userComments = globalCommentsData.filter(c => c.username === highlightUser);
+                    if (userComments.length > 0) {
+                        userComments.sort((a, b) => b.id - a.id); // Sort to ensure we grab the absolute newest
+                        targetCommentId = userComments[0].id.toString();
+                    }
+                }
                 
                 if (targetCommentId) {
                     const traceId = parseInt(targetCommentId);
@@ -320,7 +329,7 @@
                         let pId = targetNode.parentCommentId;
                         
                         while (pId !== null && pId !== undefined) {
-                            path.unshift(pId); // Add to the front so the oldest parent is first
+                            path.unshift(pId);
                             let pNode = globalCommentsData.find(c => c.id === pId);
                             pId = pNode ? pNode.parentCommentId : null;
                         }
@@ -347,7 +356,7 @@
                             const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?id=${postId}`;
                             window.history.replaceState({path: cleanUrl}, '', cleanUrl);
                         }
-                    }, 400); // 400ms delay ensures the DOM is fully painted before scrolling
+                    }, 600); // Bumped delay to 600ms to guarantee Capacitor webviews finish painting before scroll
                 }
             })
             .catch(err => console.error("Error loading comments:", err));

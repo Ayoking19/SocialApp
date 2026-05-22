@@ -30,7 +30,6 @@
     <header class="top-bar">
         <div class="menu-trigger" onclick="toggleOverlayMenu()">
             <span class="material-icons">menu</span>
-            <span>Menu</span>
         </div>
         <div class="logo">Social<span>App</span></div>
         <div style="width: 50px;"></div> 
@@ -454,7 +453,8 @@
                 
                 let repliesHTML = "";
                 comments.forEach(c => {
-                    repliesHTML += `<div class="post" onclick="window.location.href='post.html?id=${c.postId}'" style="border-left: 4px solid #00e676; cursor:pointer; padding: 15px; background: rgba(255,255,255,0.03); margin-bottom: 10px; border-radius: 8px;">
+                    // THE FIX: Added &commentId=${c.id} to trigger the Scroll-and-Glow engine!
+                    repliesHTML += `<div class="post" onclick="window.location.href='post.html?id=${c.postId}&commentId=${c.id}'" style="border-left: 4px solid #00e676; cursor:pointer; padding: 15px; background: rgba(255,255,255,0.03); margin-bottom: 10px; border-radius: 8px;">
                             <div style="display: flex; min-width: 0;">
                                 <p class="truncate-text" style="font-size: 11px; color: #a09eb5; margin-bottom: 8px; width: 100%;">Replied to @${c.postOwner}'s post • ${c.timestamp}</p>
                             </div>

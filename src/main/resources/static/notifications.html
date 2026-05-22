@@ -30,7 +30,6 @@
     <header class="top-bar">
         <div class="menu-trigger" onclick="toggleOverlayMenu()">
             <span class="material-icons">menu</span>
-            <span>Menu</span>
         </div>
         <div class="logo">Social<span>App</span></div>
         <div style="width: 50px;"></div> 
@@ -114,25 +113,25 @@
                         message = `started following you.`;
                     } else if (n.type === 'COMMENT') {
                         message = `commented on your post.`;
-                        link = `post.html?id=${n.postId}`;
+                        link = `post.html?id=${n.postId}&highlightUser=${n.actor}`; // THE FIX: Target user's newest comment
                     } else if (n.type === 'COMMENT_REPLY') {
                         message = `replied to your comment.`;
-                        link = `post.html?id=${n.postId}`;
-                    } else if (n.type === 'COMMENT_LIKE') { // [THE FIX]: Added Comment Like Translation
+                        link = `post.html?id=${n.postId}&highlightUser=${n.actor}`; // THE FIX: Target user's newest reply
+                    } else if (n.type === 'COMMENT_LIKE') { 
                         message = `liked your comment.`;
-                        link = `post.html?id=${n.postId}`;
-                    } else if (n.type === 'COMMENT_MENTION') { // [THE FIX]: Added Comment Mention Translation
+                        link = `post.html?id=${n.postId}&highlightUser=${currentUser}`; // THE FIX: Safely targets YOUR liked comment
+                    } else if (n.type === 'COMMENT_MENTION') { 
                         message = `mentioned you in a comment.`;
-                        link = `post.html?id=${n.postId}`;
+                        link = `post.html?id=${n.postId}&highlightUser=${n.actor}`; 
                     } else if (n.type === 'COMMENT_THREAD') {
                         message = `also commented on a post you replied to.`;
-                        link = `post.html?id=${n.postId}`;
+                        link = `post.html?id=${n.postId}&highlightUser=${n.actor}`; 
                     } else if (n.type === 'QUOTE') {
-                        message = `quoted your post.`;
-                        link = `post.html?id=${n.postId}`;
+                        message = `quoted your post/comment.`;
+                        link = `post.html?id=${n.postId}`; // THE FIX: PostSystem.java now feeds this the exact Quote ID!
                     } else if (n.type === 'REPOST') {
-                        message = `reposted your post.`;
-                        link = `post.html?id=${n.postId}`;
+                        message = `reposted your post/comment.`;
+                        link = `post.html?id=${n.postId}&highlightUser=${currentUser}`; // THE FIX: Gracefully handles both post and comment reposts
                     } else if (n.type === 'REPOST_REPOST') {
                         message = `reposted your repost.`;
                         link = `post.html?id=${n.postId}`;

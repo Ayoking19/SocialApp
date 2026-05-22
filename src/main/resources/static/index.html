@@ -34,7 +34,6 @@
     <header class="top-bar">
         <div class="menu-trigger" onclick="toggleOverlayMenu()">
             <span class="material-icons">menu</span>
-            <span>Menu</span>
         </div>
         <div class="logo">Social<span>App</span></div>
     </header>
@@ -241,11 +240,15 @@
 
                     const isPureRepost = (!post.content || post.content.trim() === "") && (!post.media || post.media === "") && post.parentPost;
                     
-                    // The Bulletproof Smart Router
+                    // THE FIX: The Bulletproof Deep-Link Router
                     let targetUrl = `post.html?id=${post.id}`;
                     if (isPureRepost) {
-                        // If the reposted item is a comment, we MUST route to its parent Post ID, not its Comment ID!
-                        targetUrl = post.parentPost.isComment ? `post.html?id=${post.parentPost.postId}` : `post.html?id=${post.parentPost.id}`;
+                        if (post.parentPost.isComment) {
+                            // Automatically grab BOTH coordinates and trigger the Glow Engine!
+                            targetUrl = `post.html?id=${post.parentPost.postId}&commentId=${post.parentPost.id}`;
+                        } else {
+                            targetUrl = `post.html?id=${post.parentPost.id}`;
+                        }
                     }
 
                     // [THE FIX]: Added ID hooks to all the stat buttons below

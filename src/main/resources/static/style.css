@@ -160,6 +160,7 @@ body.in-chat .bottom-nav {
     white-space: nowrap; 
     margin-bottom: 0; 
     z-index: 10; 
+    padding: 5px 15px;
 }
 
 .menu-trigger {
@@ -171,6 +172,13 @@ body.in-chat .bottom-nav {
     font-weight: bold;
     z-index: 2100; 
 }
+
+.menu-trigger .material-icons {
+    padding: 8px;
+    margin-right: 5px;
+    border-radius: 8px;
+}
+
 
 /* --- THE OVERLAY MENU --- */
 .overlay-menu {
@@ -1203,6 +1211,20 @@ textarea {
     background-color: rgba(0, 230, 118, 0.2) !important;
 }
 
+/* ========================================= */
+/* --- THE DEEP-LINK SCROLL & GLOW ENGINE ---*/
+/* ========================================= */
+@keyframes deepLinkGlow {
+    0% { background-color: rgba(255, 255, 255, 0.03); box-shadow: 0 0 0px transparent; }
+    15% { background-color: rgba(0, 230, 118, 0.3); box-shadow: 0 0 25px rgba(0, 230, 118, 0.8); transform: scale(1.02); }
+    100% { background-color: rgba(255, 255, 255, 0.03); box-shadow: 0 0 0px transparent; transform: scale(1); }
+}
+
+.deep-link-glow {
+    animation: deepLinkGlow 2.5s ease-out forwards;
+    border-left: 4px solid #00e676 !important;
+    z-index: 999;
+}
 /* ========================================= */
 /* --- CUSTOM BUTTON REPLACEMENTS ---        */
 /* ========================================= */

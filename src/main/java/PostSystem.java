@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.regex.Pattern;
 
 public class PostSystem {
 
@@ -71,8 +70,8 @@ public class PostSystem {
                         if (rsComm.next()) {
                             String targetUsername = rsComm.getString("username");
                             int originalPostId = rsComm.getInt("post_id");
-                            if (!targetUsername.equals(identifier)) {
-                                NotificationSystem.createNotification(targetUsername, identifier, isNewPostQuote ? "QUOTE" : "REPOST", originalPostId);
+                            if (!targetUsername.equals(identifier) && !isNewPostQuote) {
+                                NotificationSystem.createNotification(targetUsername, identifier, "REPOST", originalPostId);
                             }
                         }
                     }
@@ -90,17 +89,17 @@ public class PostSystem {
 
                             if ((targetContent == null || targetContent.trim().isEmpty()) && hasTargetParent) {
                                 finalParentId = targetParentId;
-                                if (!targetUsername.equals(identifier)) NotificationSystem.createNotification(targetUsername, identifier, isNewPostQuote ? "QUOTE_REPOST" : "REPOST_REPOST", parentPostId);
+                                if (!targetUsername.equals(identifier) && !isNewPostQuote) NotificationSystem.createNotification(targetUsername, identifier, "REPOST_REPOST", parentPostId);
                                 String originalQuery = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
                                 try (PreparedStatement origStmt = conn.prepareStatement(originalQuery)) {
                                     origStmt.setInt(1, targetParentId);
                                     ResultSet rsOrig = origStmt.executeQuery();
-                                    if (rsOrig.next() && !rsOrig.getString("username").equals(identifier)) {
-                                        NotificationSystem.createNotification(rsOrig.getString("username"), identifier, isNewPostQuote ? "QUOTE" : "REPOST", targetParentId);
+                                    if (rsOrig.next() && !rsOrig.getString("username").equals(identifier) && !isNewPostQuote) {
+                                        NotificationSystem.createNotification(rsOrig.getString("username"), identifier, "REPOST", targetParentId);
                                     }
                                 }
                             } else {
-                                if (!targetUsername.equals(identifier)) NotificationSystem.createNotification(targetUsername, identifier, isNewPostQuote ? "QUOTE" : "REPOST", parentPostId);
+                                if (!targetUsername.equals(identifier) && !isNewPostQuote) NotificationSystem.createNotification(targetUsername, identifier, "REPOST", parentPostId);
                             }
                         }
                     }
@@ -130,13 +129,32 @@ public class PostSystem {
                     insertPostStmt.executeUpdate();
 
                     try (ResultSet generatedKeys = insertPostStmt.getGeneratedKeys()) {
-                        if (generatedKeys.next() && content != null) {
+                        if (generatedKeys.next()) {
                             int newPostId = generatedKeys.getInt(1);
-                            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@(\\w+)").matcher(content);
-                            while (matcher.find()) {
-                                String mentionedUser = matcher.group(1);
-                                if (!mentionedUser.equals(identifier)) {
-                                    NotificationSystem.createNotification(mentionedUser, identifier, "MENTION", newPostId);
+                            
+                            if (isNewPostQuote && finalParentId != null) {
+                                String qUserSql = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
+                                try (PreparedStatement qStmt = conn.prepareStatement(qUserSql)) {
+                                    qStmt.setInt(1, finalParentId);
+                                    ResultSet qRs = qStmt.executeQuery();
+                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE", newPostId);
+                                }
+                            } else if (isNewPostQuote && parentCommentId != null) {
+                                String qUserSql = "SELECT users.username FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?";
+                                try (PreparedStatement qStmt = conn.prepareStatement(qUserSql)) {
+                                    qStmt.setInt(1, parentCommentId);
+                                    ResultSet qRs = qStmt.executeQuery();
+                                    if (qRs.next() && !qRs.getString("username").equals(identifier)) NotificationSystem.createNotification(qRs.getString("username"), identifier, "QUOTE", newPostId);
+                                }
+                            }
+
+                            if (content != null) {
+                                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@(\\w+)").matcher(content);
+                                while (matcher.find()) {
+                                    String mentionedUser = matcher.group(1);
+                                    if (!mentionedUser.equals(identifier)) {
+                                        NotificationSystem.createNotification(mentionedUser, identifier, "MENTION", newPostId);
+                                    }
                                 }
                             }
                         }
@@ -175,178 +193,81 @@ public class PostSystem {
     /* --- FEED & SEARCH UPGRADES (OPTIMIZED)--- */
     /* ========================================= */
 
+    private static String buildStatColumns(String currentUser, boolean forceIsFollowing) {
+        String safeUser = currentUser.replace("'", "''");
+        String IS_PURE_REPOST = "((posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = ''))";
+        String followingStr = forceIsFollowing ? "1 AS is_following, " : "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND following_id = posts.user_id) AS is_following, ";
+
+        // THE FIX: Explicitly checking parent_comment_id first to redirect engagement math to the comments table!
+        return "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = posts.parent_comment_id) ELSE (SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") END) AS like_count, " +
+               "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = posts.parent_comment_id) ELSE (SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") END) AS comment_count, " +
+               "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = posts.parent_comment_id AND " + IS_PURE_REPOST + ") ELSE (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND " + IS_PURE_REPOST + ") END) AS repost_count, " +
+               "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = posts.parent_comment_id AND NOT " + IS_PURE_REPOST + ") ELSE (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND NOT " + IS_PURE_REPOST + ") END) AS quote_count, " +
+               followingStr +
+               "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND comment_id = posts.parent_comment_id) ELSE EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND post_id = " + TARGET_ID + ") END) AS is_liked, " +
+               "(CASE WHEN " + IS_PURE_REPOST + " AND posts.parent_comment_id IS NOT NULL THEN EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = posts.parent_comment_id AND pr.user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND " + IS_PURE_REPOST + ") ELSE EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND " + IS_PURE_REPOST + ") END) AS is_reposted, " +
+               "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
+               "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id ";
+    }
+
     public static String getFeed(String currentUser, int pageNumber) {
-        int limit = 15; 
-        int offset = (pageNumber - 1) * limit; 
-        
+        int limit = 15; int offset = (pageNumber - 1) * limit; 
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = "WHERE user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM (SELECT * FROM posts " + blockFilter + "ORDER BY created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts " +
-                          "JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "ORDER BY posts.created_at DESC";
-
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
+                          "FROM (SELECT * FROM posts " + blockFilter + "ORDER BY created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id ORDER BY posts.created_at DESC";
         return executeStandardPostQuery(querySQL, currentUser, null, false);
     }
 
     public static String getFollowingFeed(String currentUser, int pageNumber) {
-        int limit = 15; 
-        int offset = (pageNumber - 1) * limit; 
-
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "1 AS is_following, " + 
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM (SELECT posts.* FROM posts JOIN followers ON posts.user_id = followers.following_id WHERE followers.follower_id = (SELECT id FROM users WHERE username = ?) ORDER BY posts.created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts " +
-                          "JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "ORDER BY posts.created_at DESC";
-
-        return executeStandardPostQuery(querySQL, currentUser, null, true);
+        int limit = 15; int offset = (pageNumber - 1) * limit; 
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, true) +
+                          "FROM (SELECT posts.* FROM posts JOIN followers ON posts.user_id = followers.following_id WHERE followers.follower_id = (SELECT id FROM users WHERE username = ?) ORDER BY posts.created_at DESC LIMIT " + limit + " OFFSET " + offset + ") AS posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id ORDER BY posts.created_at DESC";
+        return executeStandardPostQuery(querySQL, currentUser, currentUser, false);
     }
 
     public static String getTopPosts(String currentUser, String timeFilter, String customDate) {
         String safeUser = currentUser.replace("'", "''");
         String blockFilter = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
+        String timeCondition = "1=1"; String queryParam = null;
+        if ("today".equals(timeFilter)) timeCondition = "date(posts.created_at) = date('now')";
+        else if ("week".equals(timeFilter)) timeCondition = "posts.created_at >= datetime('now', '-7 days')";
+        else if ("month".equals(timeFilter)) timeCondition = "strftime('%Y-%m', posts.created_at) = strftime('%Y-%m', 'now')";
+        else if ("custom_day".equals(timeFilter)) { timeCondition = "date(posts.created_at) = ?"; queryParam = customDate; }
+        else if ("custom_month".equals(timeFilter)) { timeCondition = "strftime('%Y-%m', posts.created_at) = ?"; queryParam = customDate; }
+        else if ("custom_year".equals(timeFilter)) { timeCondition = "strftime('%Y', posts.created_at) = ?"; queryParam = customDate; }
 
-        String timeCondition = "1=1"; 
-        String queryParam = null;
-
-        if ("today".equals(timeFilter)) {
-            timeCondition = "date(posts.created_at) = date('now')";
-        } else if ("week".equals(timeFilter)) {
-            timeCondition = "posts.created_at >= datetime('now', '-7 days')";
-        } else if ("month".equals(timeFilter)) {
-            timeCondition = "strftime('%Y-%m', posts.created_at) = strftime('%Y-%m', 'now')";
-        } else if ("custom_day".equals(timeFilter)) {
-            timeCondition = "date(posts.created_at) = ?";
-            queryParam = customDate; 
-        } else if ("custom_month".equals(timeFilter)) {
-            timeCondition = "strftime('%Y-%m', posts.created_at) = ?";
-            queryParam = customDate; 
-        } else if ("custom_year".equals(timeFilter)) {
-            timeCondition = "strftime('%Y', posts.created_at) = ?";
-            queryParam = customDate; 
-        }
-
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE " + timeCondition + blockFilter +
-                          "AND NOT (posts.parent_post_id IS NOT NULL AND (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '')) " +
-                          "ORDER BY (like_count + comment_count + repost_count) DESC, posts.created_at DESC LIMIT 50";
-
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
+                          "FROM posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                          "WHERE " + timeCondition + blockFilter + " AND NOT (posts.parent_post_id IS NOT NULL AND (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '')) ORDER BY (like_count + comment_count + repost_count) DESC, posts.created_at DESC LIMIT 50";
         return executeStandardPostQuery(querySQL, currentUser, queryParam, false);
     }
 
     public static String getUserPosts(String targetUsername, String currentUser) {
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE users.username = ? ORDER BY posts.created_at DESC";
-
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
+                          "FROM posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id WHERE users.username = ? ORDER BY posts.created_at DESC";
         return executeStandardPostQuery(querySQL, currentUser, targetUsername, false);
     }
 
     public static String getUserQuotes(String targetUsername, String currentUser) {
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE users.username = ? AND (posts.parent_post_id IS NOT NULL OR posts.parent_comment_id IS NOT NULL) AND ((posts.content IS NOT NULL AND trim(posts.content) != '') OR (posts.image_url IS NOT NULL AND trim(posts.image_url) != '')) " + 
-                          "ORDER BY posts.created_at DESC";
-
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
+                          "FROM posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                          "WHERE users.username = ? AND (posts.parent_post_id IS NOT NULL OR posts.parent_comment_id IS NOT NULL) AND ((posts.content IS NOT NULL AND trim(posts.content) != '') OR (posts.image_url IS NOT NULL AND trim(posts.image_url) != '')) ORDER BY posts.created_at DESC";
         return executeStandardPostQuery(querySQL, currentUser, targetUsername, false);
     }
 
     public static String getUserReposts(String targetUsername, String currentUser) {
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE users.username = ? AND (posts.parent_post_id IS NOT NULL OR posts.parent_comment_id IS NOT NULL) AND (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '') " + 
-                          "ORDER BY posts.created_at DESC";
-
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
+                          "FROM posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                          "WHERE users.username = ? AND (posts.parent_post_id IS NOT NULL OR posts.parent_comment_id IS NOT NULL) AND (posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = '') ORDER BY posts.created_at DESC";
         return executeStandardPostQuery(querySQL, currentUser, targetUsername, false);
     }
 
-    private static String executeStandardPostQuery(String querySQL, String currentUser, String param3, boolean bypassFollowCheck) {
+    private static String executeStandardPostQuery(String querySQL, String currentUser, String param1, boolean forceIsSaved) {
         StringBuilder jsonBuilder = new StringBuilder("[");
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
-            
-            if (bypassFollowCheck) {
-                pstmt.setString(1, currentUser);
-                pstmt.setString(2, currentUser);
-                pstmt.setString(3, currentUser); 
-            } else {
-                pstmt.setString(1, currentUser);
-                pstmt.setString(2, currentUser);
-                pstmt.setString(3, currentUser);
-                if (param3 != null) pstmt.setString(4, param3);
-            }
+            if (param1 != null) pstmt.setString(1, param1);
             
             ResultSet rs = pstmt.executeQuery();
             boolean isFirst = true;
@@ -355,34 +276,33 @@ public class PostSystem {
                 isFirst = false;
 
                 String user = rs.getString("username");
-                String avatar = rs.getString("profile_pic_url");
-                if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+                String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
                 String content = rs.getString("content"); if (content == null) content = "";
                 String media = rs.getString("image_url"); if (media == null) media = "";
 
-                // [THE FIX]: A safe Micro-Query to check if THIS specific post is saved
-                boolean isSaved = false;
-                try (PreparedStatement saveStmt = conn.prepareStatement("SELECT 1 FROM saved_posts WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = ?")) {
-                    saveStmt.setString(1, currentUser);
-                    saveStmt.setInt(2, rs.getInt("id"));
-                    isSaved = saveStmt.executeQuery().next();
+                boolean isSaved = forceIsSaved;
+                if (!forceIsSaved) {
+                    try (PreparedStatement saveStmt = conn.prepareStatement("SELECT 1 FROM saved_posts WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = ?")) {
+                        saveStmt.setString(1, currentUser); saveStmt.setInt(2, rs.getInt("id"));
+                        isSaved = saveStmt.executeQuery().next();
+                    }
                 }
 
-                jsonBuilder.append("{")
-                           .append("\"id\":").append(rs.getInt("id")).append(",")
-                           .append("\"username\":\"").append(user).append("\",")
-                           .append("\"avatar\":\"").append(avatar).append("\",")
-                           .append("\"content\":\"").append(content.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
-                           .append("\"media\":\"").append(media).append("\",")
-                           .append("\"likes\":").append(rs.getInt("like_count")).append(",")
-                           .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
-                           .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
-                           .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",") 
-                           .append("\"isFollowing\":").append(bypassFollowCheck ? true : rs.getBoolean("is_following")).append(",")
-                           .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
-                           .append("\"isSaved\":").append(isSaved).append(",")
-                           .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
-                           .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
+                jsonBuilder.append("{").append("\"id\":").append(rs.getInt("id"))
+                           .append(",\"username\":\"").append(user).append("\"")
+                           .append(",\"avatar\":\"").append(avatar).append("\"")
+                           .append(",\"content\":\"").append(content.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\"")
+                           .append(",\"media\":\"").append(media).append("\"")
+                           .append(",\"likes\":").append(rs.getInt("like_count"))
+                           .append(",\"commentCount\":").append(rs.getInt("comment_count"))
+                           .append(",\"repostCount\":").append(rs.getInt("repost_count"))
+                           .append(",\"quoteCount\":").append(rs.getInt("quote_count"))
+                           .append(",\"isReposted\":").append(rs.getBoolean("is_reposted"))
+                           .append(",\"isFollowing\":").append(rs.getBoolean("is_following"))
+                           .append(",\"isLiked\":").append(rs.getBoolean("is_liked"))
+                           .append(",\"isSaved\":").append(isSaved)
+                           .append(",\"isEdited\":").append(rs.getBoolean("is_edited"))
+                           .append(",\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
 
                 int parentPostId = rs.getInt("parent_post_id");
                 int parentCommentId = rs.getInt("parent_comment_id");
@@ -391,34 +311,16 @@ public class PostSystem {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
-                    String pMedia = "";
-                    try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch (Exception e) {}
+                    String pMedia = ""; try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch (Exception e) {}
 
-                    jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentCommentId).append(",")
-                               .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
-                               .append("\"isComment\":true,")
-                               .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
-                               .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
-                               .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
-                               .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
-                               .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
-                               .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
+                    jsonBuilder.append("\"parentPost\":{\"id\":").append(parentCommentId).append(",\"postId\":").append(rs.getInt("pc_post_id")).append(",\"isComment\":true,\"username\":\"").append(escapeJSON(pUser)).append("\",\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",\"content\":\"").append(escapeJSON(pContent)).append("\",\"media\":\"").append(escapeJSON(pMedia)).append("\",\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
                 } else if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
-                    jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentPostId).append(",")
-                               .append("\"isComment\":false,")
-                               .append("\"username\":\"").append(pUser).append("\",")
-                               .append("\"avatar\":\"").append(pAvatar).append("\",")
-                               .append("\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
-                               .append("\"media\":\"").append(pMedia).append("\",")
-                               .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
-                               .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
+                    jsonBuilder.append("\"parentPost\":{\"id\":").append(parentPostId).append(",\"isComment\":false,\"username\":\"").append(pUser).append("\",\"avatar\":\"").append(pAvatar).append("\",\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",\"media\":\"").append(pMedia).append("\",\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
                 } else {
                     jsonBuilder.append("\"parentPost\":null");
                 }
@@ -429,32 +331,25 @@ public class PostSystem {
     }
 
     public static String getSinglePost(String postId, String currentUser) {
+        String safeUser = currentUser.replace("'", "''");
+        String IS_PURE = "((posts.content IS NULL OR trim(posts.content) = '') AND (posts.image_url IS NULL OR trim(posts.image_url) = ''))";
+
         String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS pure_repost_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND ((p2.content IS NOT NULL AND trim(p2.content) != '') OR (p2.image_url IS NOT NULL AND trim(p2.image_url) != ''))) AS quote_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "EXISTS (SELECT 1 FROM saved_posts WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = posts.id) AS is_saved, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = posts.parent_comment_id) ELSE (SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") END) AS like_count, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = posts.parent_comment_id) ELSE (SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") END) AS comment_count, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = posts.parent_comment_id AND " + IS_PURE + ") ELSE (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND " + IS_PURE + ") END) AS pure_repost_count, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = posts.parent_comment_id AND NOT " + IS_PURE + ") ELSE (SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND NOT " + IS_PURE + ") END) AS quote_count, " +
+                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND following_id = posts.user_id) AS is_following, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND comment_id = posts.parent_comment_id) ELSE EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND post_id = " + TARGET_ID + ") END) AS is_liked, " +
+                          "(CASE WHEN " + IS_PURE + " AND posts.parent_comment_id IS NOT NULL THEN EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = posts.parent_comment_id AND pr.user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND " + IS_PURE + ") ELSE EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND " + IS_PURE + ") END) AS is_reposted, " +
+                          "EXISTS (SELECT 1 FROM saved_posts WHERE user_id = (SELECT id FROM users WHERE username = '" + safeUser + "') AND post_id = posts.id) AS is_saved, " +
                           "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
                           "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                          "FROM posts JOIN users ON posts.user_id = users.id " +
-                          "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                          "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                          "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                          "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                          "WHERE posts.id = ?";
+                          "FROM posts JOIN users ON posts.user_id = users.id LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id WHERE posts.id = ?";
 
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(querySQL)) {
-            pstmt.setString(1, currentUser);
-            pstmt.setString(2, currentUser);
-            pstmt.setString(3, currentUser);
-            pstmt.setString(4, currentUser);
-            pstmt.setInt(5, Integer.parseInt(postId));
+            pstmt.setInt(1, Integer.parseInt(postId));
             ResultSet rs = pstmt.executeQuery();
-
             if (rs.next()) {
                 String user = rs.getString("username");
                 String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
@@ -469,20 +364,16 @@ public class PostSystem {
                     String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
-                    String pMedia = "";
-                    try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch (Exception e) {}
-                    
+                    String pMedia = ""; try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch (Exception e) {}
                     parentPostJson = "{\"id\":" + parentCommentId + ",\"postId\":" + rs.getInt("pc_post_id") + ",\"isComment\":true,\"username\":\"" + escapeJSON(pUser) + "\",\"avatar\":\"" + escapeJSON(pAvatar) + "\",\"content\":\"" + escapeJSON(pContent) + "\",\"media\":\"" + escapeJSON(pMedia) + "\",\"isEdited\":" + rs.getBoolean("pc_is_edited") + ",\"timestamp\":\"" + rs.getString("pc_timestamp") + "\"}";
                 } else if (parentPostId > 0) {
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
-                    
                     parentPostJson = "{\"id\":" + parentPostId + ",\"isComment\":false,\"username\":\"" + escapeJSON(pUser) + "\",\"avatar\":\"" + escapeJSON(pAvatar) + "\",\"content\":\"" + escapeJSON(pContent) + "\",\"media\":\"" + escapeJSON(pMedia) + "\",\"isEdited\":" + rs.getBoolean("parent_is_edited") + ",\"timestamp\":\"" + rs.getString("parent_timestamp") + "\"}";
                 }
-
-                return "{\"id\":" + rs.getInt("id") + ",\"username\":\"" + escapeJSON(user) + "\",\"avatar\":\"" + escapeJSON(avatar) + "\",\"content\":\"" + escapeJSON(content) + "\",\"media\":\"" + escapeJSON(media) + "\",\"likes\":" + rs.getInt("like_count") + ",\"commentCount\":" + rs.getInt("comment_count") + ",\"pureRepostCount\":" + rs.getInt("pure_repost_count") + ",\"quoteCount\":" + rs.getInt("quote_count") + ",\"isReposted\":" + rs.getBoolean("is_reposted") + ",\"isFollowing\":" + rs.getBoolean("is_following") + ",\"isLiked\":" + rs.getBoolean("is_liked") + ",\"isEdited\":" + rs.getBoolean("is_edited") + ",\"isSaved\":" + rs.getBoolean("is_saved") + ",\"parentPost\":" + parentPostJson + ",\"timestamp\":\"" + rs.getString("created_at") + "\"}";
+                return "{\"id\":" + rs.getInt("id") + ",\"username\":\"" + escapeJSON(user) + "\",\"avatar\":\"" + escapeJSON(avatar) + "\",\"content\":\"" + escapeJSON(content) + "\",\"media\":\"" + escapeJSON(media) + "\",\"likes\":" + rs.getInt("like_count") + ",\"commentCount\":" + rs.getInt("comment_count") + ",\"repostCount\":" + rs.getInt("pure_repost_count") + ",\"quoteCount\":" + rs.getInt("quote_count") + ",\"isReposted\":" + rs.getBoolean("is_reposted") + ",\"isFollowing\":" + rs.getBoolean("is_following") + ",\"isLiked\":" + rs.getBoolean("is_liked") + ",\"isEdited\":" + rs.getBoolean("is_edited") + ",\"isSaved\":" + rs.getBoolean("is_saved") + ",\"parentPost\":" + parentPostJson + ",\"timestamp\":\"" + rs.getString("created_at") + "\"}";
             }
         } catch (Exception e) { System.out.println("Error: " + e.getMessage()); }
         return "ERROR";
@@ -538,109 +429,182 @@ public class PostSystem {
 
     public static String searchPosts(String searchQuery, String currentUser) {
         StringBuilder jsonBuilder = new StringBuilder("[");
-        Pattern strictWordPattern = Pattern.compile("\\b" + Pattern.quote(searchQuery) + "\\b", Pattern.CASE_INSENSITIVE);
+        java.util.regex.Pattern strictWordPattern = java.util.regex.Pattern.compile("(?i)\\b" + java.util.regex.Pattern.quote(searchQuery) + "\\b");
         
         String safeUser = currentUser.replace("'", "''");
-        String blockFilter = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
+        String blockFilterPosts = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
+        String blockFilterComments = " AND comments.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND comments.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
         
-        String searchSQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                           "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                           "(SELECT GROUP_CONCAT(content, ' ') FROM comments WHERE comments.post_id = posts.id) AS all_comments, " +
-                           "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                           "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                           "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                           "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                           "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                           "FROM posts " +
-                           "JOIN users ON posts.user_id = users.id " +
-                           "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                           "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                           "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                           "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                           "WHERE (posts.content LIKE ? OR posts.id IN (SELECT post_id FROM comments WHERE content LIKE ?))" + blockFilter + 
-                           "ORDER BY posts.created_at DESC";
+        boolean first = true;
+        String searchPattern = "%" + searchQuery + "%";
 
-        try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
+        try (Connection conn = DatabaseManager.connect()) {
+            String postSQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
+                       "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
+                       "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
+                       "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
+                       "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
+                       "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
+                       "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
+                       "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
+                       "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
+                       "FROM posts " +
+                       "JOIN users ON posts.user_id = users.id " +
+                       "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
+                       "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
+                       "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
+                       "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                       "WHERE posts.content LIKE ? " + blockFilterPosts + 
+                       "ORDER BY posts.created_at DESC";
 
-            String searchPattern = "%" + searchQuery + "%";
-            pstmt.setString(1, currentUser);
-            pstmt.setString(2, currentUser);
-            pstmt.setString(3, currentUser);
-            pstmt.setString(4, searchPattern);
-            pstmt.setString(5, searchPattern);
+            try (PreparedStatement pstmt = conn.prepareStatement(postSQL)) {
+                pstmt.setString(1, currentUser);
+                pstmt.setString(2, currentUser);
+                pstmt.setString(3, currentUser);
+                pstmt.setString(4, searchPattern);
+                ResultSet rs = pstmt.executeQuery();
 
-            ResultSet rs = pstmt.executeQuery();
-            boolean first = true;
-            java.util.regex.Matcher commentMatcher; 
+                while (rs.next()) {
+                    String text = rs.getString("content"); if (text == null) text = "";
+                    java.util.regex.Matcher m = strictWordPattern.matcher(text);
+                    String matchedSnippet = "";
+                    if (m.find()) {
+                        int start = Math.max(0, m.start() - 25);
+                        int end = Math.min(text.length(), m.end() + 25);
+                        matchedSnippet = "..." + escapeJSON(text.substring(start, end).replace("\n", " ")) + "...";
+                    }
 
-            while (rs.next()) {
-                String text = rs.getString("content");
-                String allComments = rs.getString("all_comments");
-                if (text == null) text = ""; 
-                if (allComments == null) allComments = ""; 
+                    if (!first) jsonBuilder.append(",");
+                    first = false;
 
-                boolean matchFoundInPost = strictWordPattern.matcher(text).find();
-                commentMatcher = strictWordPattern.matcher(allComments);
-                boolean matchFoundInComments = commentMatcher.find();
+                    String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+                    String media = rs.getString("image_url"); if (media == null) media = "";
 
-                if (!matchFoundInPost && !matchFoundInComments) { continue; }
+                    jsonBuilder.append("{")
+                               .append("\"id\":").append(rs.getInt("id")).append(",")
+                               .append("\"username\":\"").append(escapeJSON(rs.getString("username"))).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
+                               .append("\"content\":\"").append(escapeJSON(text)).append("\",")
+                               .append("\"media\":\"").append(escapeJSON(media)).append("\",")
+                               .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
+                               .append("\"likes\":").append(rs.getInt("like_count")).append(",")
+                               .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
+                               .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
+                               .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
+                               .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
+                               .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
+                               .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                               .append("\"isComment\":false,")
+                               .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
 
-                String matchedSnippet = "";
-                if (!matchFoundInPost && matchFoundInComments) {
-                    int start = Math.max(0, commentMatcher.start() - 25);
-                    int end = Math.min(allComments.length(), commentMatcher.end() + 25);
-                    matchedSnippet = "..." + escapeJSON(allComments.substring(start, end).replace("\n", " ")) + "...";
+                    int parentPostId = rs.getInt("parent_post_id");
+                    int parentCommentId = rs.getInt("parent_comment_id");
+
+                    if (parentPostId > 0) {
+                        String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
+                        String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
+                        String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
+                        String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
+                        
+                        jsonBuilder.append("\"parentPost\":{")
+                                   .append("\"id\":").append(parentPostId).append(",")
+                                   .append("\"isComment\":false,")
+                                   .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
+                                   .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
+                                   .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
+                                   .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
+                                   .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
+                                   .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
+                    } else if (parentCommentId > 0) {
+                        String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
+                        String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
+                        String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
+                        String pMedia = "";
+                        try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch(Exception e){}
+
+                        jsonBuilder.append("\"parentPost\":{")
+                                   .append("\"id\":").append(parentCommentId).append(",")
+                                   .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
+                                   .append("\"isComment\":true,")
+                                   .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
+                                   .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
+                                   .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
+                                   .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
+                                   .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
+                                   .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
+                    } else {
+                        jsonBuilder.append("\"parentPost\":null");
+                    }
+                    jsonBuilder.append("}");
                 }
+            }
 
-                if (!first) { jsonBuilder.append(","); }
-                first = false;
+            String commentSQL = "SELECT comments.id, comments.post_id, comments.parent_comment_id, users.username, users.profile_pic_url, comments.content, comments.image_url, comments.created_at, comments.is_edited, " +
+                       "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count, " +
+                       "(SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = comments.id) AS comment_count, " +
+                       "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
+                       "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = comments.user_id) AS is_following, " +
+                       "EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND comment_id = comments.id) AS is_liked, " +
+                       "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = comments.id AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
+                       "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited " +
+                       "FROM comments " +
+                       "JOIN users ON comments.user_id = users.id " +
+                       "JOIN posts parent_post ON comments.post_id = parent_post.id " +
+                       "JOIN users parent_user ON parent_post.user_id = parent_user.id " +
+                       "WHERE comments.content LIKE ? " + blockFilterComments + 
+                       "ORDER BY comments.created_at DESC";
 
-                int id = rs.getInt("id");
-                String user = rs.getString("username");
-                String avatar = rs.getString("profile_pic_url");
-                String media = rs.getString("image_url");
-                String time = rs.getString("created_at");
-                int likes = rs.getInt("like_count");
-                int comments = rs.getInt("comment_count");
-                int reposts = rs.getInt("repost_count");
-                boolean isFollowing = rs.getBoolean("is_following");
-                boolean isLiked = rs.getBoolean("is_liked");
-                boolean isEdited = rs.getBoolean("is_edited");
-                boolean isReposted = rs.getBoolean("is_reposted");
+            try (PreparedStatement pstmt = conn.prepareStatement(commentSQL)) {
+                pstmt.setString(1, currentUser);
+                pstmt.setString(2, currentUser);
+                pstmt.setString(3, currentUser);
+                pstmt.setString(4, searchPattern);
+                ResultSet rs = pstmt.executeQuery();
 
-                if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
-                if (media == null) media = "";
+                while (rs.next()) {
+                    String text = rs.getString("content"); if (text == null) text = "";
+                    
+                    java.util.regex.Matcher m = strictWordPattern.matcher(text);
+                    String matchedSnippet = "";
+                    if (m.find()) {
+                        int start = Math.max(0, m.start() - 25);
+                        int end = Math.min(text.length(), m.end() + 25);
+                        matchedSnippet = "..." + escapeJSON(text.substring(start, end).replace("\n", " ")) + "...";
+                    } else {
+                        matchedSnippet = escapeJSON(text); 
+                    }
 
-                jsonBuilder.append("{")
-                           .append("\"id\":").append(id).append(",")
-                           .append("\"username\":\"").append(escapeJSON(user)).append("\",")
-                           .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
-                           .append("\"content\":\"").append(escapeJSON(text)).append("\",")
-                           .append("\"media\":\"").append(escapeJSON(media)).append("\",")
-                           .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",") 
-                           .append("\"likes\":").append(likes).append(",")
-                           .append("\"commentCount\":").append(comments).append(",")
-                           .append("\"repostCount\":").append(reposts).append(",")
-                           .append("\"isReposted\":").append(isReposted).append(",")
-                           .append("\"isFollowing\":").append(isFollowing).append(",")
-                           .append("\"isLiked\":").append(isLiked).append(",")
-                           .append("\"isEdited\":").append(isEdited).append(",")
-                           .append("\"timestamp\":\"").append(time).append("\",");
+                    if (!first) jsonBuilder.append(",");
+                    first = false;
 
-                int parentPostId = rs.getInt("parent_post_id");
-                int parentCommentId = rs.getInt("parent_comment_id");
+                    String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+                    String media = rs.getString("image_url"); if (media == null) media = "";
 
-                if (parentPostId > 0) {
+                    jsonBuilder.append("{")
+                               .append("\"id\":").append(rs.getInt("id")).append(",") 
+                               .append("\"postId\":").append(rs.getInt("post_id")).append(",")
+                               .append("\"username\":\"").append(escapeJSON(rs.getString("username"))).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
+                               .append("\"content\":\"").append(escapeJSON(text)).append("\",")
+                               .append("\"media\":\"").append(escapeJSON(media)).append("\",")
+                               .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
+                               .append("\"likes\":").append(rs.getInt("like_count")).append(",")
+                               .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
+                               .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
+                               .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
+                               .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
+                               .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
+                               .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                               .append("\"isComment\":true,") 
+                               .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
+
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
                     jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentPostId).append(",")
+                               .append("\"id\":").append(rs.getInt("post_id")).append(",")
                                .append("\"isComment\":false,")
                                .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
                                .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
@@ -648,28 +612,11 @@ public class PostSystem {
                                .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
                                .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
                                .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
-                } else if (parentCommentId > 0) {
-                    String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
-                    String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
-                    String pMedia = "";
-                    try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch(Exception e){}
-
-                    jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentCommentId).append(",")
-                               .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
-                               .append("\"isComment\":true,")
-                               .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
-                               .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
-                               .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
-                               .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
-                               .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
-                               .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
-                } else {
-                    jsonBuilder.append("\"parentPost\":null");
+                    
+                    jsonBuilder.append("}");
                 }
-                jsonBuilder.append("}");
             }
+
         } catch (Exception e) { System.out.println("Error searching posts: " + e.getMessage()); }
         
         jsonBuilder.append("]");
@@ -678,125 +625,198 @@ public class PostSystem {
 
     public static String searchProfilePosts(String searchQuery, String targetUsername, String currentUser) {
         StringBuilder jsonBuilder = new StringBuilder("[");
-        java.util.regex.Pattern strictWordPattern = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(searchQuery) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Pattern strictWordPattern = java.util.regex.Pattern.compile("(?i)\\b" + java.util.regex.Pattern.quote(searchQuery) + "\\b");
 
-        String searchSQL = "SELECT DISTINCT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                           "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                           "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                           "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                           "(SELECT GROUP_CONCAT(content, ' ') FROM comments WHERE comments.post_id = posts.id) AS all_comments, " +
-                           "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                           "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                           "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                           "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                           "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
-                           "FROM posts " +
-                           "JOIN users ON posts.user_id = users.id " +
-                           "LEFT JOIN comments c_search ON c_search.post_id = posts.id " +
-                           "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
-                           "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
-                           "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
-                           "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
-                           "WHERE (users.username = ? OR c_search.user_id = (SELECT id FROM users WHERE username = ?)) " +
-                           "AND (posts.content LIKE ? OR posts.id IN (SELECT post_id FROM comments WHERE content LIKE ?)) " +
-                           "ORDER BY posts.created_at DESC";
+        String safeUser = currentUser.replace("'", "''");
+        String blockFilterPosts = " AND posts.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND posts.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
+        String blockFilterComments = " AND comments.user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) AND comments.user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = (SELECT id FROM users WHERE username = '" + safeUser + "')) ";
 
-        try (Connection conn = DatabaseManager.connect();
-             PreparedStatement pstmt = conn.prepareStatement(searchSQL)) {
+        boolean first = true;
+        String searchPattern = "%" + searchQuery + "%";
 
-            String searchPattern = "%" + searchQuery + "%";
-            pstmt.setString(1, currentUser);
-            pstmt.setString(2, currentUser);
-            pstmt.setString(3, currentUser);
-            pstmt.setString(4, targetUsername);
-            pstmt.setString(5, targetUsername);
-            pstmt.setString(6, searchPattern);
-            pstmt.setString(7, searchPattern);
+        try (Connection conn = DatabaseManager.connect()) {
+            String postSQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
+                       "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
+                       "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
+                       "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
+                       "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
+                       "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
+                       "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
+                       "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
+                       "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
+                       "FROM posts " +
+                       "JOIN users ON posts.user_id = users.id " +
+                       "LEFT JOIN posts parent_post ON posts.parent_post_id = parent_post.id " +
+                       "LEFT JOIN users parent_user ON parent_post.user_id = parent_user.id " +
+                       "LEFT JOIN comments parent_comment ON posts.parent_comment_id = parent_comment.id " +
+                       "LEFT JOIN users parent_comment_user ON parent_comment.user_id = parent_comment_user.id " +
+                       "WHERE users.username = ? AND posts.content LIKE ? " + blockFilterPosts + 
+                       "ORDER BY posts.created_at DESC";
 
-            ResultSet rs = pstmt.executeQuery();
-            boolean first = true;
-            while (rs.next()) {
-                String text = rs.getString("content");
-                String allComments = rs.getString("all_comments");
-                if (text == null) text = "";
-                if (allComments == null) allComments = "";
+            try (PreparedStatement pstmt = conn.prepareStatement(postSQL)) {
+                pstmt.setString(1, currentUser);
+                pstmt.setString(2, currentUser);
+                pstmt.setString(3, currentUser);
+                pstmt.setString(4, targetUsername);
+                pstmt.setString(5, searchPattern);
+                ResultSet rs = pstmt.executeQuery();
 
-                boolean matchFoundInPost = strictWordPattern.matcher(text).find();
-                java.util.regex.Matcher commentMatcher = strictWordPattern.matcher(allComments);
-                boolean matchFoundInComments = commentMatcher.find();
+                while (rs.next()) {
+                    String text = rs.getString("content"); if (text == null) text = "";
+                    java.util.regex.Matcher m = strictWordPattern.matcher(text);
+                    String matchedSnippet = "";
+                    if (m.find()) {
+                        int start = Math.max(0, m.start() - 25);
+                        int end = Math.min(text.length(), m.end() + 25);
+                        matchedSnippet = "..." + escapeJSON(text.substring(start, end).replace("\n", " ")) + "...";
+                    }
 
-                if (!matchFoundInPost && !matchFoundInComments) continue;
+                    if (!first) jsonBuilder.append(",");
+                    first = false;
 
-                String matchedSnippet = "";
-                if (!matchFoundInPost && matchFoundInComments) {
-                    int start = Math.max(0, commentMatcher.start() - 25);
-                    int end = Math.min(allComments.length(), commentMatcher.end() + 25);
-                    matchedSnippet = "..." + allComments.substring(start, end).replace("\"", "\\\"").replace("\n", " ") + "...";
+                    String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+                    String media = rs.getString("image_url"); if (media == null) media = "";
+
+                    jsonBuilder.append("{")
+                               .append("\"id\":").append(rs.getInt("id")).append(",")
+                               .append("\"username\":\"").append(escapeJSON(rs.getString("username"))).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
+                               .append("\"content\":\"").append(escapeJSON(text)).append("\",")
+                               .append("\"media\":\"").append(escapeJSON(media)).append("\",")
+                               .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
+                               .append("\"likes\":").append(rs.getInt("like_count")).append(",")
+                               .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
+                               .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
+                               .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
+                               .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
+                               .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
+                               .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                               .append("\"isComment\":false,")
+                               .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
+
+                    int parentPostId = rs.getInt("parent_post_id");
+                    int parentCommentId = rs.getInt("parent_comment_id");
+
+                    if (parentPostId > 0) {
+                        String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
+                        String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
+                        String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
+                        String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
+                        
+                        jsonBuilder.append("\"parentPost\":{")
+                                   .append("\"id\":").append(parentPostId).append(",")
+                                   .append("\"isComment\":false,")
+                                   .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
+                                   .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
+                                   .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
+                                   .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
+                                   .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
+                                   .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
+                    } else if (parentCommentId > 0) {
+                        String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
+                        String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
+                        String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
+                        String pMedia = "";
+                        try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch(Exception e){}
+
+                        jsonBuilder.append("\"parentPost\":{")
+                                   .append("\"id\":").append(parentCommentId).append(",")
+                                   .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
+                                   .append("\"isComment\":true,")
+                                   .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
+                                   .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
+                                   .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
+                                   .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
+                                   .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
+                                   .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
+                    } else {
+                        jsonBuilder.append("\"parentPost\":null");
+                    }
+                    jsonBuilder.append("}");
                 }
+            }
 
-                if (!first) jsonBuilder.append(",");
-                first = false;
+            String commentSQL = "SELECT comments.id, comments.post_id, comments.parent_comment_id, users.username, users.profile_pic_url, comments.content, comments.image_url, comments.created_at, comments.is_edited, " +
+                       "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count, " +
+                       "(SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = comments.id) AS comment_count, " +
+                       "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
+                       "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = comments.user_id) AS is_following, " +
+                       "EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND comment_id = comments.id) AS is_liked, " +
+                       "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = comments.id AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
+                       "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited " +
+                       "FROM comments " +
+                       "JOIN users ON comments.user_id = users.id " +
+                       "JOIN posts parent_post ON comments.post_id = parent_post.id " +
+                       "JOIN users parent_user ON parent_post.user_id = parent_user.id " +
+                       "WHERE users.username = ? AND comments.content LIKE ? " + blockFilterComments + 
+                       "ORDER BY comments.created_at DESC";
 
-                String avatar = rs.getString("profile_pic_url");
-                if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+            try (PreparedStatement pstmt = conn.prepareStatement(commentSQL)) {
+                pstmt.setString(1, currentUser);
+                pstmt.setString(2, currentUser);
+                pstmt.setString(3, currentUser);
+                pstmt.setString(4, targetUsername);
+                pstmt.setString(5, searchPattern);
+                ResultSet rs = pstmt.executeQuery();
 
-                jsonBuilder.append("{")
-                           .append("\"id\":").append(rs.getInt("id")).append(",")
-                           .append("\"username\":\"").append(rs.getString("username")).append("\",")
-                           .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
-                           .append("\"content\":\"").append(text.replace("\"", "\\\"").replace("\n", "\\n")).append("\",")
-                           .append("\"media\":\"").append(rs.getString("image_url")).append("\",")
-                           .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
-                           .append("\"likes\":").append(rs.getInt("like_count")).append(",")
-                           .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
-                           .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
-                           .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
-                           .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
-                           .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
-                           .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
-                           .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
+                while (rs.next()) {
+                    String text = rs.getString("content"); if (text == null) text = "";
+                    
+                    java.util.regex.Matcher m = strictWordPattern.matcher(text);
+                    String matchedSnippet = "";
+                    if (m.find()) {
+                        int start = Math.max(0, m.start() - 25);
+                        int end = Math.min(text.length(), m.end() + 25);
+                        matchedSnippet = "..." + escapeJSON(text.substring(start, end).replace("\n", " ")) + "...";
+                    } else {
+                        matchedSnippet = escapeJSON(text);
+                    }
 
-                int parentPostId = rs.getInt("parent_post_id");
-                int parentCommentId = rs.getInt("parent_comment_id");
+                    if (!first) jsonBuilder.append(",");
+                    first = false;
 
-                if (parentPostId > 0) {
+                    String avatar = rs.getString("profile_pic_url"); if (avatar == null || avatar.trim().isEmpty()) avatar = MessageSystem.DEFAULT_AVATAR;
+                    String media = rs.getString("image_url"); if (media == null) media = "";
+
+                    jsonBuilder.append("{")
+                               .append("\"id\":").append(rs.getInt("id")).append(",")
+                               .append("\"postId\":").append(rs.getInt("post_id")).append(",")
+                               .append("\"username\":\"").append(escapeJSON(rs.getString("username"))).append("\",")
+                               .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
+                               .append("\"content\":\"").append(escapeJSON(text)).append("\",")
+                               .append("\"media\":\"").append(escapeJSON(media)).append("\",")
+                               .append("\"matchedSnippet\":\"").append(matchedSnippet).append("\",")
+                               .append("\"likes\":").append(rs.getInt("like_count")).append(",")
+                               .append("\"commentCount\":").append(rs.getInt("comment_count")).append(",")
+                               .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
+                               .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
+                               .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
+                               .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
+                               .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                               .append("\"isComment\":true,")
+                               .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",");
+
                     String pUser = rs.getString("parent_username"); if (pUser == null) pUser = "Unknown";
                     String pAvatar = rs.getString("parent_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
                     String pContent = rs.getString("parent_content"); if (pContent == null) pContent = "";
                     String pMedia = rs.getString("parent_media"); if (pMedia == null) pMedia = "";
                     
                     jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentPostId).append(",")
+                               .append("\"id\":").append(rs.getInt("post_id")).append(",")
                                .append("\"isComment\":false,")
-                               .append("\"username\":\"").append(pUser).append("\",")
-                               .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
-                               .append("\"content\":\"").append(pContent.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")).append("\",")
-                               .append("\"media\":\"").append(pMedia).append("\",")
-                               .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
-                               .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
-                } else if (parentCommentId > 0) {
-                    String pUser = rs.getString("pc_username"); if (pUser == null) pUser = "Unknown";
-                    String pAvatar = rs.getString("pc_avatar"); if (pAvatar == null || pAvatar.isEmpty()) pAvatar = MessageSystem.DEFAULT_AVATAR;
-                    String pContent = rs.getString("pc_content"); if (pContent == null) pContent = "";
-                    String pMedia = "";
-                    try { pMedia = rs.getString("pc_media"); if (pMedia == null) pMedia = ""; } catch(Exception e){}
-
-                    jsonBuilder.append("\"parentPost\":{")
-                               .append("\"id\":").append(parentCommentId).append(",")
-                               .append("\"postId\":").append(rs.getInt("pc_post_id")).append(",")
-                               .append("\"isComment\":true,")
-                               .append("\"username\":\"").append(pUser).append("\",")
+                               .append("\"username\":\"").append(escapeJSON(pUser)).append("\",")
                                .append("\"avatar\":\"").append(escapeJSON(pAvatar)).append("\",")
                                .append("\"content\":\"").append(escapeJSON(pContent)).append("\",")
                                .append("\"media\":\"").append(escapeJSON(pMedia)).append("\",")
-                               .append("\"isEdited\":").append(rs.getBoolean("pc_is_edited")).append(",")
-                               .append("\"timestamp\":\"").append(rs.getString("pc_timestamp")).append("\"}");
-                } else {
-                    jsonBuilder.append("\"parentPost\":null");
+                               .append("\"isEdited\":").append(rs.getBoolean("parent_is_edited")).append(",")
+                               .append("\"timestamp\":\"").append(rs.getString("parent_timestamp")).append("\"}");
+                    
+                    jsonBuilder.append("}");
                 }
-                jsonBuilder.append("}");
             }
-        } catch (Exception e) { System.out.println("Error: " + e.getMessage()); }
+
+        } catch (Exception e) { System.out.println("Error searching posts: " + e.getMessage()); }
+        
         jsonBuilder.append("]");
         return jsonBuilder.toString();
     }
@@ -808,11 +828,13 @@ public class PostSystem {
     public static String toggleLike(String identifier, int postId) {
         int finalPostId = postId;
         
-        String checkRepostSQL = "SELECT parent_post_id FROM posts WHERE id = ? AND parent_post_id IS NOT NULL AND (content IS NULL OR trim(content) = '') AND (image_url IS NULL OR trim(image_url) = '')";
+        String checkRepostSQL = "SELECT parent_post_id, parent_comment_id FROM posts WHERE id = ? AND (content IS NULL OR trim(content) = '') AND (image_url IS NULL OR trim(image_url) = '') AND (parent_post_id IS NOT NULL OR parent_comment_id IS NOT NULL)";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement prStmt = conn.prepareStatement(checkRepostSQL)) {
             prStmt.setInt(1, finalPostId);
             ResultSet rsPr = prStmt.executeQuery();
             if (rsPr.next()) {
+                int pCId = rsPr.getInt("parent_comment_id");
+                if (pCId > 0) return toggleCommentLike(identifier, pCId);
                 finalPostId = rsPr.getInt("parent_post_id");
             }
         } catch (SQLException e) { System.out.println("Error checking repost link: " + e.getMessage()); }
@@ -870,7 +892,6 @@ public class PostSystem {
         return "ERROR";
     }
 
-    // --- THE FIX: Overloaded Methods for Media in Comments ---
     public static boolean addComment(String identifier, int postId, String content) {
         return addComment(identifier, postId, content, "", null);
     }
@@ -879,7 +900,6 @@ public class PostSystem {
         return addComment(identifier, postId, content, "", parentCommentId);
     }
 
-    // --- Core Threaded Comment Engine (Now Supports Media) ---
     public static boolean addComment(String identifier, int postId, String content, String mediaUrl, Integer parentCommentId) {
         String sql = "INSERT INTO comments(post_id, user_id, content, image_url, parent_comment_id) VALUES(?, (SELECT id FROM users WHERE username = ? OR email = ?), ?, ?, ?)";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement pstmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
@@ -887,7 +907,7 @@ public class PostSystem {
             pstmt.setString(2, identifier);
             pstmt.setString(3, identifier);
             pstmt.setString(4, content);
-            pstmt.setString(5, mediaUrl); // [THE FIX]: Saves the media URL to the database!
+            pstmt.setString(5, mediaUrl);
             
             if (parentCommentId != null) {
                 pstmt.setInt(6, parentCommentId);
@@ -1014,7 +1034,7 @@ public class PostSystem {
                           "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count, " +
                           "(SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = comments.id) AS reply_count, " +
                           "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND ((p2.content IS NOT NULL AND trim(p2.content) != '') OR (p2.image_url IS NOT NULL AND trim(p2.image_url) != ''))) AS quote_count, " +
+                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND NOT ((p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = ''))) AS quote_count, " +
                           "EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND comment_id = comments.id) AS is_liked, " +
                           "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = comments.id AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
                           "(SELECT COUNT(*) FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = comments.user_id) AS is_following, " +
@@ -1068,7 +1088,6 @@ public class PostSystem {
 
     public static String getUserActivity(String targetUsername) {
         StringBuilder jsonBuilder = new StringBuilder("[");
-        // [THE FIX]: Select image_url here too!
         String sql = "SELECT comments.id AS comment_id, comments.content, comments.image_url, comments.created_at, comments.is_edited, posts.id AS post_id, users.username AS post_owner, " +
                      "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count " +
                      "FROM comments JOIN posts ON comments.post_id = posts.id JOIN users ON posts.user_id = users.id " +
@@ -1086,7 +1105,7 @@ public class PostSystem {
                 
                 jsonBuilder.append("{\"id\":").append(rs.getInt("comment_id")).append(",")
                            .append("\"content\":\"").append(escapeJSON(text)).append("\",")
-                           .append("\"media\":\"").append(escapeJSON(media)).append("\",") // Parse it
+                           .append("\"media\":\"").append(escapeJSON(media)).append("\",") 
                            .append("\"likes\":").append(rs.getInt("like_count")).append(",")
                            .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
                            .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\",")
@@ -1121,7 +1140,6 @@ public class PostSystem {
                     checkStmt.setInt(2, postId);
                     
                     if (checkStmt.executeQuery().next()) {
-                        // If it's already saved, delete the record
                         try (PreparedStatement removeStmt = conn.prepareStatement(removeSaveSQL)) {
                             removeStmt.setInt(1, userId);
                             removeStmt.setInt(2, postId);
@@ -1129,7 +1147,6 @@ public class PostSystem {
                             return "UNSAVED";
                         }
                     } else {
-                        // If it's not saved, insert a new record
                         try (PreparedStatement addStmt = conn.prepareStatement(addSaveSQL)) {
                             addStmt.setInt(1, userId);
                             addStmt.setInt(2, postId);
@@ -1149,16 +1166,7 @@ public class PostSystem {
         int limit = 15; 
         int offset = (pageNumber - 1) * limit; 
 
-        // We use your existing TARGET_ID logic and inject it into the feed generator
-        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " +
-                          "(SELECT COUNT(*) FROM likes WHERE likes.post_id = " + TARGET_ID + ") AS like_count, " +
-                          "(SELECT COUNT(*) FROM comments WHERE comments.post_id = " + TARGET_ID + ") AS comment_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_post_id = " + TARGET_ID + " AND p2.parent_comment_id IS NULL) AS repost_count, " +
-                          "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = posts.user_id) AS is_following, " +
-                          "EXISTS (SELECT 1 FROM likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND post_id = " + TARGET_ID + ") AS is_liked, " +
-                          "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_post_id = " + TARGET_ID + " AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
-                          "parent_user.username AS parent_username, parent_user.profile_pic_url AS parent_avatar, parent_post.content AS parent_content, parent_post.image_url AS parent_media, parent_post.created_at AS parent_timestamp, parent_post.is_edited AS parent_is_edited, " +
-                          "parent_comment_user.username AS pc_username, parent_comment_user.profile_pic_url AS pc_avatar, parent_comment.content AS pc_content, parent_comment.image_url AS pc_media, parent_comment.created_at AS pc_timestamp, parent_comment.is_edited AS pc_is_edited, parent_comment.post_id AS pc_post_id " +
+        String querySQL = "SELECT posts.id, users.username, users.profile_pic_url, posts.content, posts.image_url, posts.created_at, posts.parent_post_id, posts.parent_comment_id, posts.is_edited, " + buildStatColumns(currentUser, false) +
                           "FROM saved_posts " +
                           "JOIN posts ON saved_posts.post_id = posts.id " +
                           "JOIN users ON posts.user_id = users.id " +
@@ -1169,7 +1177,6 @@ public class PostSystem {
                           "WHERE saved_posts.user_id = (SELECT id FROM users WHERE username = ?) " +
                           "ORDER BY saved_posts.created_at DESC LIMIT " + limit + " OFFSET " + offset;
 
-        // By passing currentUser as the 4th parameter, we safely filter for the user's saved records
         return executeStandardPostQuery(querySQL, currentUser, currentUser, false);
     }
 
@@ -1222,7 +1229,6 @@ public class PostSystem {
                           "(SELECT COUNT(*) FROM comment_likes WHERE comment_likes.comment_id = comments.id) AS like_count, " +
                           "(SELECT COUNT(*) FROM comments c2 WHERE c2.parent_comment_id = comments.id) AS reply_count, " +
                           "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND (p2.content IS NULL OR trim(p2.content) = '') AND (p2.image_url IS NULL OR trim(p2.image_url) = '')) AS repost_count, " +
-                          "(SELECT COUNT(*) FROM posts p2 WHERE p2.parent_comment_id = comments.id AND ((p2.content IS NOT NULL AND trim(p2.content) != '') OR (p2.image_url IS NOT NULL AND trim(p2.image_url) != ''))) AS quote_count, " +
                           "EXISTS (SELECT 1 FROM comment_likes WHERE user_id = (SELECT id FROM users WHERE username = ?) AND comment_id = comments.id) AS is_liked, " +
                           "EXISTS (SELECT 1 FROM posts pr WHERE pr.parent_comment_id = comments.id AND pr.user_id = (SELECT id FROM users WHERE username = ?) AND (pr.content IS NULL OR trim(pr.content) = '') AND (pr.image_url IS NULL OR trim(pr.image_url) = '')) AS is_reposted, " +
                           "EXISTS (SELECT 1 FROM followers WHERE follower_id = (SELECT id FROM users WHERE username = ?) AND following_id = comments.user_id) AS is_following " +
@@ -1257,7 +1263,6 @@ public class PostSystem {
                            .append("\"parentCommentId\":").append(hasParent ? parentCommentId : "null").append(",")
                            .append("\"replyCount\":").append(rs.getInt("reply_count")).append(",")
                            .append("\"repostCount\":").append(rs.getInt("repost_count")).append(",")
-                           .append("\"quoteCount\":").append(rs.getInt("quote_count")).append(",")
                            .append("\"username\":\"").append(escapeJSON(user)).append("\",")
                            .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
                            .append("\"content\":\"").append(escapeJSON(text)).append("\",")
@@ -1266,7 +1271,7 @@ public class PostSystem {
                            .append("\"isLiked\":").append(rs.getBoolean("is_liked")).append(",")
                            .append("\"isReposted\":").append(rs.getBoolean("is_reposted")).append(",")
                            .append("\"isFollowing\":").append(rs.getBoolean("is_following")).append(",")
-                           .append("\"isSaved\":true,") // Hardcoded true because they are fetched from saved_comments
+                           .append("\"isSaved\":true,")
                            .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
                            .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
                            .append("}");
@@ -1274,5 +1279,4 @@ public class PostSystem {
         } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
         jsonBuilder.append("]"); return jsonBuilder.toString();
     }
-
 }

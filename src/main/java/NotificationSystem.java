@@ -44,7 +44,7 @@ public class NotificationSystem {
                             if (type.equals("LIKE")) { pushTitle = "New Like"; pushBody = actor + " liked your post."; }
                             else if (type.equals("COMMENT")) { pushTitle = "New Comment"; pushBody = actor + " commented on your post."; }
                             else if (type.equals("FOLLOW")) { pushTitle = "New Follower"; pushBody = actor + " started following you."; }
-                            else if (type.contains("MESSAGE")) { pushTitle = "New Message"; pushBody = actor + " sent you a private message."; }
+                            else if (type.contains("MESSAGE")) { pushTitle = "New Message"; pushBody = actor + " sent a message."; }
                             else if (type.equals("QUOTE")) { pushTitle = "New Quote"; pushBody = actor + " quoted your post."; }
                             else if (type.contains("REPOST")) { pushTitle = "New Repost"; pushBody = actor + " reposted your content."; }
                             
