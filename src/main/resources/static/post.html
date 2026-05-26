@@ -218,17 +218,17 @@
 
                                 <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
                                 
-                                <div style="display: flex; gap: 10px; align-items: flex-end; width: 100%; max-width: 1200px; margin: 0 auto;">
-                                    <div style="display: flex; align-items: center; padding-bottom: 8px;">
+                                <div style="display: flex; gap: 8px; align-items: flex-end; width: 100%; max-width: 1200px; margin: 0 auto;">
+                                    <div style="display: flex; align-items: center; padding-bottom: 10px;">
                                         <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s; flex-shrink: 0; padding: 4px;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
                                             <span class="material-icons">add_photo_alternate</span>
                                         </label>
                                     </div>
                                     <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
                                     
-                                    <textarea id="comment-input-${post.id}" class="comment-input" placeholder="Write your reply..." style="flex: 1; min-width: 0; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 15px; line-height: 20px; box-sizing: border-box; padding: 12px 15px; border-radius: 20px;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
+                                    <textarea id="comment-input-${post.id}" class="comment-input" placeholder="Write your reply..." style="flex: 1; min-width: 0; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 14px; line-height: 20px; box-sizing: border-box; padding: 12px 12px; border-radius: 20px;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
                                     
-                                    <button onclick="submitThreadedComment(${post.id})" class="post-comment-btn" style="margin-bottom: 5px;">Post</button>
+                                    <button onclick="submitThreadedComment(${post.id})" class="post-comment-btn" style="margin-bottom: 10px;">Post</button>
                                 </div>
                             </div>
                         </div>
