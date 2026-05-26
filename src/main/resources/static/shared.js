@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -20,6 +20,10 @@ document.head.insertAdjacentHTML("beforeend", `
         .skel-avatar { width: 40px; height: 40px; border-radius: 50%; }
         .skel-line { height: 14px; margin-bottom: 10px; width: 100%; }
         .skel-media { height: 250px; border-radius: 15px; margin-top: 15px; }
+
+        /* THE VOICE NOTE CSS */
+        @keyframes pulseMic { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        .recording-pulse { animation: pulseMic 1.2s infinite; }
 
         /* THE KEBAB MENU CSS */
         .kebab-menu-container { position: relative; display: inline-block; }
@@ -851,12 +855,95 @@ function saveCustomUsername() {
 }
 
 /* ========================================= */
+/* --- THE VOICE NOTE ENGINE (HTML5) ---     */
+/* ========================================= */
+let mediaRecorder;
+let audioChunks = [];
+let isRecordingVoice = false;
+let voiceRecordTimer;
+let voiceRecordSeconds = 0;
+
+window.startVoiceRecord = async function(context) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+                if (context === 'message' && typeof attachMsgVoiceNote === 'function') {
+                    attachMsgVoiceNote(reader.result);
+                }
+            };
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        isRecordingVoice = true;
+        voiceRecordSeconds = 0;
+        
+        if (context === 'message') {
+            const micBtn = document.getElementById('micRecordBtn');
+            const inputArea = document.getElementById('messageInput');
+            if(micBtn) {
+                micBtn.style.color = '#ff3366';
+                micBtn.classList.add('recording-pulse');
+            }
+            if(inputArea) {
+                voiceRecordTimer = setInterval(() => {
+                    voiceRecordSeconds++;
+                    const mins = Math.floor(voiceRecordSeconds / 60);
+                    const secs = voiceRecordSeconds % 60;
+                    inputArea.placeholder = `Recording... ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }, 1000);
+            }
+        }
+    } catch (err) {
+        console.error("Microphone Access Denied:", err);
+        if (typeof showToast === 'function') showToast("Microphone access denied. Please check browser permissions.");
+    }
+};
+
+window.stopVoiceRecord = function(context) {
+    if (mediaRecorder && isRecordingVoice) {
+        mediaRecorder.stop();
+        isRecordingVoice = false;
+        clearInterval(voiceRecordTimer);
+        
+        if (context === 'message') {
+            const micBtn = document.getElementById('micRecordBtn');
+            const inputArea = document.getElementById('messageInput');
+            if(micBtn) {
+                micBtn.style.color = '#a09eb5';
+                micBtn.classList.remove('recording-pulse');
+            }
+            if(inputArea) inputArea.placeholder = "Start a new message...";
+        }
+    }
+};
+
+window.toggleVoiceRecord = function(context) {
+    if (isRecordingVoice) stopVoiceRecord(context);
+    else startVoiceRecord(context);
+};
+
+/* ========================================= */
 /* --- THE SOCIAL TEXT PARSER (REGEX) ---    */
 /* ========================================= */
 function parseSocialText(text) {
     if (!text) return "";
     
-    let html = text.replace(/@([\w_]+)/g, `<a href="profile.html?user=$1" style="color: rgb(0, 168, 255); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">@$1</a>`);
+    // THE FIX: Intercepts both raw newlines and JSON-escaped newlines and converts them to HTML line breaks
+    let html = text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+    
+    html = html.replace(/@([\w_]+)/g, `<a href="profile.html?user=$1" style="color: rgb(0, 168, 255); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">@$1</a>`);
     html = html.replace(/#([\w_]+)/g, `<a href="search.html?q=%23$1" style="color: rgb(0, 230, 118); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">#$1</a>`);
     
     return html;

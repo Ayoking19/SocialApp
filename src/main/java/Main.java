@@ -52,6 +52,14 @@ public class Main {
             System.out.println("[SYSTEM]: Firebase Token schema patched successfully.");
         } catch (Exception e) {}
 
+        // [HOT PATCH]: Adds Voice Note Support to All Tables
+        try (java.sql.Connection conn = DatabaseManager.connect()) {
+            conn.createStatement().execute("ALTER TABLE posts ADD COLUMN voice_note TEXT");
+            conn.createStatement().execute("ALTER TABLE comments ADD COLUMN voice_note TEXT");
+            conn.createStatement().execute("ALTER TABLE messages ADD COLUMN voice_note TEXT");
+            System.out.println("[SYSTEM]: Voice Note schema patched successfully.");
+        } catch (Exception e) {}
+
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
@@ -948,12 +956,13 @@ public class Main {
                         String receiver = extractJsonValue(body, "receiver");
                         String content = extractJsonValue(body, "content");
                         String media = saveMediaFile(extractJsonValue(body, "media")); 
+                        String voiceNote = saveMediaFile(extractJsonValue(body, "voiceNote")); 
                         
                         boolean isForwarded = body.contains("\"isForwarded\":true") || body.contains("\"isForwarded\": true");
                         String replyIdStr = extractJsonValue(body, "replyToId");
                         Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
                         
-                        String response = MessageSystem.sendMessage(sender, receiver, content, media, isForwarded, replyToId);
+                        String response = MessageSystem.sendMessage(sender, receiver, content, media, voiceNote, isForwarded, replyToId);
                         
                         exchange.sendResponseHeaders(200, response.length());
                         OutputStream os = exchange.getResponseBody();
@@ -1042,10 +1051,11 @@ public class Main {
                         int groupId = Integer.parseInt(extractJsonValue(body, "groupId"));
                         String content = extractJsonValue(body, "content");
                         String media = saveMediaFile(extractJsonValue(body, "media")); 
+                        String voiceNote = saveMediaFile(extractJsonValue(body, "voiceNote")); 
                         String replyIdStr = extractJsonValue(body, "replyToId");
                         Integer replyToId = (replyIdStr != null && !replyIdStr.trim().isEmpty()) ? Integer.parseInt(replyIdStr) : null;
                         
-                        String response = MessageSystem.sendGroupMessage(sender, groupId, content, media, replyToId);
+                        String response = MessageSystem.sendGroupMessage(sender, groupId, content, media, voiceNote, replyToId);
                         byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
                         exchange.sendResponseHeaders(200, responseBytes.length);
                         exchange.getResponseBody().write(responseBytes);
@@ -1576,6 +1586,8 @@ public class Main {
             String ext = ".png"; 
             if (header.contains("video/mp4")) ext = ".mp4";
             else if (header.contains("video/webm")) ext = ".webm";
+            else if (header.contains("audio/webm")) ext = ".webm";
+            else if (header.contains("audio/mpeg") || header.contains("audio/mp3")) ext = ".mp3";
             else if (header.contains("image/jpeg")) ext = ".jpg";
             else if (header.contains("image/gif")) ext = ".gif";
             else if (header.contains("application/pdf")) ext = ".pdf";

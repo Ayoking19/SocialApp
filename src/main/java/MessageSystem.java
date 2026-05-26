@@ -55,7 +55,7 @@ public class MessageSystem {
         } catch (Exception e) { System.out.println("System Message Error: " + e.getMessage()); }
     }
 
-    public static String sendMessage(String sender, String receiver, String content, String mediaBase64, boolean isForwarded, Integer replyToId) {
+    public static String sendMessage(String sender, String receiver, String content, String mediaBase64, String voiceNoteBase64, boolean isForwarded, Integer replyToId) {
         ensureSchema();
         if (sender.equals(receiver)) return "CANNOT_MESSAGE_SELF";
 
@@ -102,14 +102,15 @@ public class MessageSystem {
                     }
                 }
 
-                String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, content, image_url, is_forwarded, reply_to_id) VALUES (?, ?, ?, ?, ?, ?)";
+                String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, content, image_url, voice_note, is_forwarded, reply_to_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
                 try (PreparedStatement insertStmt = conn.prepareStatement(insertMsgSQL)) {
                     insertStmt.setInt(1, senderId);
                     insertStmt.setInt(2, receiverId);
                     insertStmt.setString(3, content);
                     insertStmt.setString(4, mediaBase64);
-                    insertStmt.setBoolean(5, isForwarded);
-                    if (replyToId != null) insertStmt.setInt(6, replyToId); else insertStmt.setNull(6, java.sql.Types.INTEGER);
+                    insertStmt.setString(5, voiceNoteBase64);
+                    insertStmt.setBoolean(6, isForwarded);
+                    if (replyToId != null) insertStmt.setInt(7, replyToId); else insertStmt.setNull(7, java.sql.Types.INTEGER);
                     insertStmt.executeUpdate();
 
                     // --- THE FIX: Trigger Firebase Push for Direct Messages ---
@@ -126,7 +127,7 @@ public class MessageSystem {
         ensureSchema();
         String markReadSQL = "UPDATE messages SET is_read = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_receiver, 0) = 0";
         
-        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
+        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
                           "(SELECT m2.content FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_content, " +
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
@@ -155,6 +156,7 @@ public class MessageSystem {
                     first = false;
                     String text = rs.getString("content"); if (text == null) text = "";
                     String img = rs.getString("image_url"); if (img == null) img = "";
+                    String voice = rs.getString("voice_note"); if (voice == null) voice = "";
 
                     int replyGrpId = rs.getInt("reply_group_id");
                     String replyGrpIdStr = rs.wasNull() ? "null" : String.valueOf(replyGrpId);
@@ -164,6 +166,7 @@ public class MessageSystem {
                         .append("\"sender\":\"").append(escapeJSON(rs.getString("sender"))).append("\",")
                         .append("\"content\":\"").append(escapeJSON(text)).append("\",")
                         .append("\"media\":\"").append(escapeJSON(img)).append("\",")
+                        .append("\"voiceNote\":\"").append(escapeJSON(voice)).append("\",")
                         .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
                         .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
                         .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
@@ -368,19 +371,20 @@ public class MessageSystem {
         json.append("]"); return json.toString();
     }
 
-    public static String sendGroupMessage(String sender, int groupId, String content, String mediaBase64, Integer replyToId) {
+    public static String sendGroupMessage(String sender, int groupId, String content, String mediaBase64, String voiceNoteBase64, Integer replyToId) {
         ensureSchema();
         if (content != null && content.startsWith("[SYS]")) {
             content = " " + content;
         }
-        String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, group_id, content, image_url, is_forwarded, reply_to_id) VALUES ((SELECT id FROM users WHERE username = ?), (SELECT id FROM users WHERE username = ?), ?, ?, ?, 0, ?)";
+        String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, group_id, content, image_url, voice_note, is_forwarded, reply_to_id) VALUES ((SELECT id FROM users WHERE username = ?), (SELECT id FROM users WHERE username = ?), ?, ?, ?, ?, 0, ?)";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement insertStmt = conn.prepareStatement(insertMsgSQL)) {
             insertStmt.setString(1, sender);
             insertStmt.setString(2, sender);
             insertStmt.setInt(3, groupId);
             insertStmt.setString(4, content);
             insertStmt.setString(5, mediaBase64);
-            if (replyToId != null) insertStmt.setInt(6, replyToId); else insertStmt.setNull(6, java.sql.Types.INTEGER);
+            insertStmt.setString(6, voiceNoteBase64);
+            if (replyToId != null) insertStmt.setInt(7, replyToId); else insertStmt.setNull(7, java.sql.Types.INTEGER);
             insertStmt.executeUpdate();
 
             // --- THE FIX: Trigger Firebase Push for Group Messages ---
@@ -406,7 +410,7 @@ public class MessageSystem {
         // [THE FIX]: Updating the user's Watermark every time they view the group chat
         String updateReadSQL = "UPDATE group_members SET last_read_message_id = COALESCE((SELECT MAX(id) FROM messages WHERE group_id = ?), 0) WHERE group_id = ? AND user_id = (SELECT id FROM users WHERE username = ?)";
         
-        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
+        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
                           "(SELECT m2.content FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_content, " +
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
@@ -436,6 +440,7 @@ public class MessageSystem {
                     first = false;
                     String text = rs.getString("content"); if (text == null) text = "";
                     String img = rs.getString("image_url"); if (img == null) img = "";
+                    String voice = rs.getString("voice_note"); if (voice == null) voice = "";
 
                     int replyGrpId = rs.getInt("reply_group_id");
                     String replyGrpIdStr = rs.wasNull() ? "null" : String.valueOf(replyGrpId);
@@ -445,6 +450,7 @@ public class MessageSystem {
                         .append("\"sender\":\"").append(escapeJSON(rs.getString("sender"))).append("\",")
                         .append("\"content\":\"").append(escapeJSON(text)).append("\",")
                         .append("\"media\":\"").append(escapeJSON(img)).append("\",")
+                        .append("\"voiceNote\":\"").append(escapeJSON(voice)).append("\",")
                         .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
                         .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
                         .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
