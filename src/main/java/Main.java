@@ -1369,6 +1369,31 @@ public class Main {
                     }
                 }
             });
+
+            /* ========================================= */
+            /* --- [NEW] TOGGLE PIN MESSAGE ENDPOINT --- */
+            /* ========================================= */
+            server.createContext("/api/togglePinMessage", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String currentUser = extractJsonValue(body, "currentUser");
+                        int messageId = Integer.parseInt(extractJsonValue(body, "messageId"));
+                        
+                        // Bridges the frontend request directly to your MessageSystem logic!
+                        String response = MessageSystem.togglePinMessage(currentUser, messageId);
+                        
+                        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
             
             /* ========================================= */
             /* --- 41. THE TOP POSTS TIME-SERIES ENDPOINT*/
@@ -1574,6 +1599,15 @@ public class Main {
     /* ============================================================== */
     private static String saveMediaFile(String base64Data) {
         if (base64Data == null || base64Data.trim().isEmpty()) return "";
+        
+        // THE FIX: Extract the original filename from the hidden payload tag
+        String originalName = "";
+        if (base64Data.contains("|NAME:")) {
+            int nameIdx = base64Data.indexOf("|NAME:");
+            originalName = base64Data.substring(nameIdx + 6).replaceAll("[^a-zA-Z0-9.\\-_]", "_");
+            base64Data = base64Data.substring(0, nameIdx);
+        }
+
         if (!base64Data.startsWith("data:")) return base64Data; 
         
         try {
@@ -1587,15 +1621,18 @@ public class Main {
             if (header.contains("video/mp4")) ext = ".mp4";
             else if (header.contains("video/webm")) ext = ".webm";
             else if (header.contains("audio/webm")) ext = ".webm";
-            else if (header.contains("audio/mpeg") || header.contains("audio/mp3")) ext = ".mp3";
+            else if (header.contains("audio/mpeg") || header.contains("audio/mp3") || header.contains("audio/ogg") || header.contains("audio/wav")) ext = ".mp3";
             else if (header.contains("image/jpeg")) ext = ".jpg";
             else if (header.contains("image/gif")) ext = ".gif";
             else if (header.contains("application/pdf")) ext = ".pdf";
             else if (header.contains("text/plain")) ext = ".txt";
+            else if (header.contains("application/msword") || header.contains("application/vnd.")) ext = ".docx";
+            else if (header.contains("application/") || header.contains("text/")) ext = ".doc";
             
             byte[] decodedBytes = Base64.getDecoder().decode(data);
             
-            String fileName = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+            // THE FIX: Uses the original name if present, otherwise defaults to UUID
+            String fileName = System.currentTimeMillis() + "_" + (originalName.isEmpty() ? UUID.randomUUID().toString().substring(0, 8) + ext : originalName);
             
             File dir = new File("src/main/resources/static/uploads");
             if (!dir.exists()) dir.mkdirs();

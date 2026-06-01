@@ -20,6 +20,12 @@ public class MessageSystem {
             
             // [THE FIX]: The Watermark Column for tracking Group read receipts!
             try { stmt.execute("ALTER TABLE group_members ADD COLUMN last_read_message_id INTEGER DEFAULT 0"); } catch (Exception e) {}
+            // [THE FIX]: The Pinned Message Column
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN is_pinned INTEGER DEFAULT 0"); } catch (Exception e) {}
+            try { stmt.execute("ALTER TABLE group_members ADD COLUMN last_read_message_id INTEGER DEFAULT 0"); } catch (Exception e) {}
+            // [THE FIX]: The Pinned Message Column & Timestamp
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN is_pinned INTEGER DEFAULT 0"); } catch (Exception e) {}
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN pinned_at DATETIME DEFAULT NULL"); } catch (Exception e) {}
         } catch (Exception e) { System.out.println("Schema Initialization Error: " + e.getMessage()); }
     }
 
@@ -127,9 +133,10 @@ public class MessageSystem {
         ensureSchema();
         String markReadSQL = "UPDATE messages SET is_read = 1 WHERE receiver_id = (SELECT id FROM users WHERE username = ?) AND sender_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_receiver, 0) = 0";
         
-        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
+        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, m.is_pinned, m.pinned_at, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
                           "(SELECT m2.content FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_content, " +
+                          "(SELECT m2.image_url FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_media, " +
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
                           "(SELECT g.id FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_id " +
                           "FROM messages m JOIN users u ON m.sender_id = u.id " +
@@ -168,10 +175,13 @@ public class MessageSystem {
                         .append("\"media\":\"").append(escapeJSON(img)).append("\",")
                         .append("\"voiceNote\":\"").append(escapeJSON(voice)).append("\",")
                         .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                        .append("\"isPinned\":").append(rs.getBoolean("is_pinned")).append(",")
+                        .append("\"pinnedAt\":\"").append(escapeJSON(rs.getString("pinned_at"))).append("\",")
                         .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
                         .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
                         .append("\"replySender\":\"").append(escapeJSON(rs.getString("reply_sender"))).append("\",")
                         .append("\"replyContent\":\"").append(escapeJSON(rs.getString("reply_content"))).append("\",")
+                        .append("\"replyMedia\":\"").append(escapeJSON(rs.getString("reply_media"))).append("\",")
                         .append("\"replyGroupName\":\"").append(escapeJSON(rs.getString("reply_group_name"))).append("\",")
                         .append("\"replyGroupId\":").append(replyGrpIdStr).append(",")
                         .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
@@ -185,7 +195,7 @@ public class MessageSystem {
     public static String getInbox(String currentUser) {
         ensureSchema();
         String inboxSQL = "SELECT u.username, u.profile_pic_url, " +
-                          "(SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0) OR (sender_id = me.id AND receiver_id = u.id AND COALESCE(deleted_by_sender, 0) = 0)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_message, " +
+                          "(SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN voice_note IS NOT NULL AND trim(voice_note) != '' THEN '[VOICE]' || voice_note WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[MEDIA]' || image_url ELSE '' END FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0) OR (sender_id = me.id AND receiver_id = u.id AND COALESCE(deleted_by_sender, 0) = 0)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_message, " +
                           "(SELECT created_at FROM messages WHERE ((sender_id = u.id AND receiver_id = me.id AND COALESCE(deleted_by_receiver, 0) = 0) OR (sender_id = me.id AND receiver_id = u.id AND COALESCE(deleted_by_sender, 0) = 0)) AND group_id IS NULL ORDER BY created_at DESC LIMIT 1) as last_time, " +
                           "(SELECT COUNT(*) FROM messages WHERE sender_id = u.id AND receiver_id = me.id AND is_read = 0 AND COALESCE(deleted_by_receiver, 0) = 0 AND group_id IS NULL) as unread_count " +
                           "FROM users u " +
@@ -338,7 +348,8 @@ public class MessageSystem {
         // [THE FIX]: This query now physically calculates the unread count against the watermark!
         String sql = "SELECT g.id, g.name, g.avatar, " +
                      "COALESCE((SELECT created_at FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), g.created_at) as last_time, " +
-                     "COALESCE((SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[Attachment]' ELSE '' END FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), 'Group created') as last_message, " +
+                     "COALESCE((SELECT CASE WHEN content IS NOT NULL AND trim(content) != '' THEN content WHEN voice_note IS NOT NULL AND trim(voice_note) != '' THEN '[VOICE]' || voice_note WHEN image_url IS NOT NULL AND trim(image_url) != '' THEN '[MEDIA]' || image_url ELSE '' END FROM messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), 'Group created') as last_message, " +
+                     "(SELECT u.username FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.group_id = g.id ORDER BY m.created_at DESC LIMIT 1) as last_message_sender, " +
                      "(SELECT COUNT(*) FROM messages m WHERE m.group_id = g.id AND m.id > gm.last_read_message_id AND m.sender_id != gm.user_id) as unread_count " +
                      "FROM groups g " +
                      "JOIN group_members gm ON g.id = gm.group_id " +
@@ -357,11 +368,15 @@ public class MessageSystem {
                 String avatar = rs.getString("avatar");
                 if (avatar == null || avatar.trim().isEmpty()) avatar = DEFAULT_AVATAR;
                 
+                String lastMsgSender = rs.getString("last_message_sender");
+                if (lastMsgSender == null) lastMsgSender = "";
+                
                 json.append("{")
                     .append("\"id\":\"").append(rs.getInt("id")).append("\",")
                     .append("\"username\":\"").append(escapeJSON(name)).append("\",") 
                     .append("\"avatar\":\"").append(escapeJSON(avatar)).append("\",")
                     .append("\"lastMessage\":\"").append(escapeJSON(rs.getString("last_message"))).append("\",")
+                    .append("\"lastMessageSender\":\"").append(escapeJSON(lastMsgSender)).append("\",")
                     .append("\"timestamp\":\"").append(rs.getString("last_time")).append("\",")
                     .append("\"unreadCount\":").append(rs.getInt("unread_count")).append(",")
                     .append("\"isGroup\":true")
@@ -372,11 +387,16 @@ public class MessageSystem {
     }
 
     public static String sendGroupMessage(String sender, int groupId, String content, String mediaBase64, String voiceNoteBase64, Integer replyToId) {
+        return sendGroupMessage(sender, groupId, content, mediaBase64, voiceNoteBase64, false, replyToId);
+    }
+
+    public static String sendGroupMessage(String sender, int groupId, String content, String mediaBase64, String voiceNoteBase64, boolean isForwarded, Integer replyToId) {
         ensureSchema();
         if (content != null && content.startsWith("[SYS]")) {
             content = " " + content;
         }
-        String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, group_id, content, image_url, voice_note, is_forwarded, reply_to_id) VALUES ((SELECT id FROM users WHERE username = ?), (SELECT id FROM users WHERE username = ?), ?, ?, ?, ?, 0, ?)";
+        // THE FIX: is_forwarded is now dynamically passed to the SQL insertion!
+        String insertMsgSQL = "INSERT INTO messages (sender_id, receiver_id, group_id, content, image_url, voice_note, is_forwarded, reply_to_id) VALUES ((SELECT id FROM users WHERE username = ?), (SELECT id FROM users WHERE username = ?), ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseManager.connect(); PreparedStatement insertStmt = conn.prepareStatement(insertMsgSQL)) {
             insertStmt.setString(1, sender);
             insertStmt.setString(2, sender);
@@ -384,10 +404,10 @@ public class MessageSystem {
             insertStmt.setString(4, content);
             insertStmt.setString(5, mediaBase64);
             insertStmt.setString(6, voiceNoteBase64);
-            if (replyToId != null) insertStmt.setInt(7, replyToId); else insertStmt.setNull(7, java.sql.Types.INTEGER);
+            insertStmt.setBoolean(7, isForwarded);
+            if (replyToId != null) insertStmt.setInt(8, replyToId); else insertStmt.setNull(8, java.sql.Types.INTEGER);
             insertStmt.executeUpdate();
 
-            // --- THE FIX: Trigger Firebase Push for Group Messages ---
             try (PreparedStatement fetchMembers = conn.prepareStatement("SELECT users.username FROM group_members JOIN users ON group_members.user_id = users.id WHERE group_members.group_id = ?")) {
                 fetchMembers.setInt(1, groupId);
                 ResultSet rs = fetchMembers.executeQuery();
@@ -398,7 +418,6 @@ public class MessageSystem {
                     }
                 }
             }
-
             return "SUCCESS";
         } catch (SQLException e) { System.out.println("Group Message Error: " + e.getMessage()); }
         return "ERROR";
@@ -410,9 +429,10 @@ public class MessageSystem {
         // [THE FIX]: Updating the user's Watermark every time they view the group chat
         String updateReadSQL = "UPDATE group_members SET last_read_message_id = COALESCE((SELECT MAX(id) FROM messages WHERE group_id = ?), 0) WHERE group_id = ? AND user_id = (SELECT id FROM users WHERE username = ?)";
         
-        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, " +
+        String fetchSQL = "SELECT m.id, u.username AS sender, m.content, m.image_url, m.voice_note, m.created_at, m.is_edited, m.is_forwarded, m.reply_to_id, m.is_pinned, m.pinned_at, " +
                           "(SELECT u2.username FROM messages m2 JOIN users u2 ON m2.sender_id = u2.id WHERE m2.id = m.reply_to_id) AS reply_sender, " +
                           "(SELECT m2.content FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_content, " +
+                          "(SELECT m2.image_url FROM messages m2 WHERE m2.id = m.reply_to_id) AS reply_media, " +
                           "(SELECT g.name FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_name, " +
                           "(SELECT g.id FROM messages m2 JOIN groups g ON m2.group_id = g.id WHERE m2.id = m.reply_to_id) AS reply_group_id " +
                           "FROM messages m JOIN users u ON m.sender_id = u.id " +
@@ -452,10 +472,13 @@ public class MessageSystem {
                         .append("\"media\":\"").append(escapeJSON(img)).append("\",")
                         .append("\"voiceNote\":\"").append(escapeJSON(voice)).append("\",")
                         .append("\"isEdited\":").append(rs.getBoolean("is_edited")).append(",")
+                        .append("\"isPinned\":").append(rs.getBoolean("is_pinned")).append(",")
+                        .append("\"pinnedAt\":\"").append(escapeJSON(rs.getString("pinned_at"))).append("\",")
                         .append("\"isForwarded\":").append(rs.getBoolean("is_forwarded")).append(",")
                         .append("\"replyToId\":").append(rs.getInt("reply_to_id")).append(",")
                         .append("\"replySender\":\"").append(escapeJSON(rs.getString("reply_sender"))).append("\",")
                         .append("\"replyContent\":\"").append(escapeJSON(rs.getString("reply_content"))).append("\",")
+                        .append("\"replyMedia\":\"").append(escapeJSON(rs.getString("reply_media"))).append("\",")
                         .append("\"replyGroupName\":\"").append(escapeJSON(rs.getString("reply_group_name"))).append("\",")
                         .append("\"replyGroupId\":").append(replyGrpIdStr).append(",")
                         .append("\"timestamp\":\"").append(rs.getString("created_at")).append("\"")
@@ -468,9 +491,12 @@ public class MessageSystem {
 
     public static String getChatMedia(String currentUser, String targetUser, Integer groupId) {
         ensureSchema();
+        // THE FIX: Also grabs messages containing links for the new 'Links' tab!
+        // THE FIX: The Direct Message query now checks if the chat history was cleared before returning media!
+        // THE FIX: Explicitly forces BOTH group and direct message queries to filter out deleted rows so the media gallery stays clean!
         String sql = groupId != null 
-            ? "SELECT id, image_url, (SELECT username FROM users WHERE id = sender_id) as sender FROM messages WHERE group_id = ? AND image_url IS NOT NULL AND image_url != '' ORDER BY created_at DESC"
-            : "SELECT id, image_url, (SELECT username FROM users WHERE id = sender_id) as sender FROM messages WHERE ((sender_id = (SELECT id FROM users WHERE username = ?) AND receiver_id = (SELECT id FROM users WHERE username = ?)) OR (sender_id = (SELECT id FROM users WHERE username = ?) AND receiver_id = (SELECT id FROM users WHERE username = ?))) AND group_id IS NULL AND image_url IS NOT NULL AND image_url != '' ORDER BY created_at DESC";
+            ? "SELECT id, image_url, content, (SELECT username FROM users WHERE id = sender_id) as sender FROM messages WHERE group_id = ? AND COALESCE(deleted_by_sender, 0) = 0 AND ((image_url IS NOT NULL AND image_url != '') OR (content LIKE '%http://%' OR content LIKE '%https://%')) ORDER BY created_at DESC"
+            : "SELECT id, image_url, content, (SELECT username FROM users WHERE id = sender_id) as sender FROM messages WHERE ((sender_id = (SELECT id FROM users WHERE username = ?) AND receiver_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_sender, 0) = 0) OR (sender_id = (SELECT id FROM users WHERE username = ?) AND receiver_id = (SELECT id FROM users WHERE username = ?) AND COALESCE(deleted_by_receiver, 0) = 0)) AND group_id IS NULL AND ((image_url IS NOT NULL AND image_url != '') OR (content LIKE '%http://%' OR content LIKE '%https://%')) ORDER BY created_at DESC";
 
         StringBuilder json = new StringBuilder("[");
         try (Connection conn = DatabaseManager.connect(); PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -488,7 +514,7 @@ public class MessageSystem {
                 json.append("{")
                     .append("\"id\":").append(rs.getInt("id")).append(",")
                     .append("\"sender\":\"").append(escapeJSON(rs.getString("sender"))).append("\",")
-                    .append("\"media\":\"").append(escapeJSON(rs.getString("image_url"))).append("\"")
+                    .append("\"media\":\"").append(escapeJSON(rs.getString("image_url"))).append("\",\"content\":\"").append(escapeJSON(rs.getString("content"))).append("\"")
                     .append("}");
             }
         } catch (Exception e) {}
@@ -612,5 +638,27 @@ public class MessageSystem {
             }
             return "SUCCESS";
         } catch(Exception e) { return "ERROR"; }
+    }
+
+    public static String togglePinMessage(String currentUser, int messageId) {
+        ensureSchema();
+        try (Connection conn = DatabaseManager.connect()) {
+            String checkSql = "SELECT is_pinned FROM messages WHERE id = ?";
+            boolean currentlyPinned = false;
+            try (PreparedStatement stmt = conn.prepareStatement(checkSql)) {
+                stmt.setInt(1, messageId);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) currentlyPinned = rs.getInt("is_pinned") == 1;
+            }
+            // THE FIX: Saves the exact timestamp when pinned so the frontend can sort it perfectly!
+            String updateSql = "UPDATE messages SET is_pinned = ?, pinned_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+                stmt.setInt(1, currentlyPinned ? 0 : 1);
+                stmt.setInt(2, currentlyPinned ? 0 : 1);
+                stmt.setInt(3, messageId);
+                stmt.executeUpdate();
+                return currentlyPinned ? "UNPINNED" : "PINNED";
+            }
+        } catch (Exception e) { return "ERROR"; }
     }
 }

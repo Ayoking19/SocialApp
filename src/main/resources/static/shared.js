@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -940,9 +940,10 @@ window.toggleVoiceRecord = function(context) {
 function parseSocialText(text) {
     if (!text) return "";
     
-    // THE FIX: Intercepts both raw newlines and JSON-escaped newlines and converts them to HTML line breaks
     let html = text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
     
+    // THE FIX: Swapped #00a8ff for rgb() so the Hashtag parser below doesn't shatter the HTML!
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" target="_blank" style="color: rgb(0, 168, 255); text-decoration: underline;" onclick="event.stopPropagation();">$1</a>`);
     html = html.replace(/@([\w_]+)/g, `<a href="profile.html?user=$1" style="color: rgb(0, 168, 255); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">@$1</a>`);
     html = html.replace(/#([\w_]+)/g, `<a href="search.html?q=%23$1" style="color: rgb(0, 230, 118); text-decoration: none; font-weight: bold;" onclick="event.stopPropagation();">#$1</a>`);
     

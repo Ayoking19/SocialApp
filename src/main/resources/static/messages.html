@@ -6,6 +6,22 @@
     <title>Messages - Our Social Network</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .vn-slider { -webkit-appearance: none; appearance: none; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+        .vn-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #00e676; cursor: pointer; }
+        .vn-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #00e676; cursor: pointer; border: none; }
+        
+        /* THE FIX: A true ease-out fade that perfectly dissolves back into the background */
+        @keyframes smoothGlow {
+            0% { background-color: rgba(255, 255, 255, 0.03); box-shadow: none; transform: scale(1); border-left-color: transparent; }
+            10% { background-color: rgba(0, 230, 118, 0.25); box-shadow: 0 0 12px rgba(0,230,118,0.3); transform: scale(1.01); border-left-color: #00e676; }
+            100% { background-color: rgba(255, 255, 255, 0.03); box-shadow: none; transform: scale(1); border-left-color: transparent; }
+        }
+        .pin-glow-active {
+            animation: smoothGlow 1.5s ease-out forwards !important;
+            border-left: 3px solid transparent !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -99,7 +115,20 @@
                         <button class="modal-follow-btn" style="background: white !important; color: black !important; border: none !important; padding: 6px 16px !important; flex-shrink: 0;" onclick="showMultiSelectOptions()">Select</button>
                     </div>
                     
+                    <div id="pinnedMessageBanner" style="display: none; align-items: center; background: rgba(0, 230, 118, 0.1); border-bottom: 1px solid #00e676; padding: 10px 15px; cursor: pointer; z-index: 10; gap: 10px; transition: 0.2s;" onmouseover="this.style.background='rgba(0, 230, 118, 0.2)'" onmouseout="this.style.background='rgba(0, 230, 118, 0.1)'">
+                        <span class="material-icons" style="color: #00e676; font-size: 20px;">push_pin</span>
+                        <div style="flex: 1; overflow: hidden;">
+                            <strong style="color: #00e676; font-size: 13px;" id="pinnedMessageTitle">Pinned Message</strong>
+                            <p style="color: white; font-size: 13px; margin: 2px 0 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="pinnedMessageContent"></p>
+                        </div>
+                    </div>
+
                     <div class="chat-history" id="chatHistoryContainer"></div>
+                    
+                    <div id="scrollToBottomBtn" style="display: none; position: absolute; bottom: 85px; right: 20px; background: #1e293b; border: 1px solid #00e676; color: #00e676; width: 45px; height: 45px; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;">
+                        <span class="material-icons" style="font-size: 28px;">keyboard_arrow_down</span>
+                        <span id="unreadScrollBadge" style="display: none; position: absolute; top: -5px; right: -5px; background: #ff3366; color: white; font-size: 11px; font-weight: bold; width: 20px; height: 20px; border-radius: 50%; justify-content: center; align-items: center; border: 2px solid #1e293b;">0</span>
+                    </div>
                     
                     <div class="chat-input-area">
                         <div id="blockBanner" style="display: none; text-align: center; padding: 15px; color: #ff3366; font-weight: bold; background: rgba(255, 51, 102, 0.1); border-radius: 8px;"></div>
@@ -115,7 +144,7 @@
                             <div id="msgMediaPreview" style="display: flex; gap: 10px; overflow-x: auto;"></div>
                             <div style="display: flex; gap: 10px; width: 100%; align-items: flex-end;">
                                 <div style="position: relative; display: flex; align-items: center; padding-bottom: 8px; gap: 5px;">
-                                    <button onclick="toggleAttachmentMenu()" class="icon-btn" style="background: transparent; border: none; color: #a09eb5; cursor: pointer; display: flex; align-items: center; padding: 0;"><span class="material-icons" style="font-size: 30px;">add_circle</span></button>
+                                    <button id="attachPlusBtn" onclick="toggleAttachmentMenu()" class="icon-btn" style="background: transparent; border: none; color: #a09eb5; cursor: pointer; display: flex; align-items: center; padding: 0;"><span class="material-icons" style="font-size: 30px;">add_circle</span></button>
                                     
                                     <button id="micRecordBtn" onclick="toggleVoiceRecord('message')" class="icon-btn" style="background: transparent; border: none; color: #a09eb5; cursor: pointer; display: flex; align-items: center; padding: 0;" title="Record Voice Note"><span class="material-icons" style="font-size: 28px;">mic</span></button>
 
@@ -130,7 +159,7 @@
                                 <input type="file" id="msgVidUpload" accept="video/*" hidden onchange="previewMsgMedia(this, 'video')">
                                 <input type="file" id="msgDocUpload" accept=".pdf,.doc,.docx,.txt" hidden onchange="previewMsgMedia(this, 'document')">
                                 
-                                <textarea id="messageInput" placeholder="Start a new message..." style="flex: 1; padding: 12px 20px; border-radius: 20px; border: none; background: rgba(255,255,255,0.05); color: white; outline: none; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 15px; line-height: 20px; box-sizing: border-box;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
+                                <textarea id="messageInput" placeholder="Start a new message..." style="flex: 1; padding: 12px 10px; border-radius: 20px; border: none; background: rgba(255,255,255,0.05); color: white; outline: none; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 13px; line-height: 21px; box-sizing: border-box;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
                                 
                                 <button onclick="executeSendMessage()" class="chat-send-btn" style="margin-bottom: 2px;"><span class="material-icons">send</span></button>
                             </div>
@@ -151,11 +180,18 @@
 
     <div class="modal-overlay" id="mediaGalleryModal" style="display: none;">
         <div class="modal-card" style="width: 100%; max-width: 500px; height: 80vh; max-height: 80vh; display: flex; flex-direction: column; padding: 20px;">
-            <div id="mediaGalleryNormalHeader" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px;">
-                <h3 style="margin: 0;">Media, Links, and Docs</h3>
-                <span class="material-icons" style="cursor: pointer; color: #ff3366; font-size: 28px;" onclick="closeMediaGallery()">close</span>
+            <div id="mediaGalleryNormalHeader" style="display: flex; flex-direction: column; border-bottom: 1px solid #334155; padding-bottom: 0px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Media, Links, and Docs</h3>
+                    <span class="material-icons" style="cursor: pointer; color: #ff3366; font-size: 28px;" onclick="closeMediaGallery()">close</span>
+                </div>
+                <div style="display: flex; gap: 20px;">
+                    <div class="gallery-tab active" onclick="switchGalleryTab('media')" id="tab-media" style="cursor: pointer; padding-bottom: 10px; border-bottom: 2px solid #00e676; color: #00e676; font-weight: bold;">Media</div>
+                    <div class="gallery-tab" onclick="switchGalleryTab('docs')" id="tab-docs" style="cursor: pointer; padding-bottom: 10px; border-bottom: 2px solid transparent; color: gray; font-weight: bold;">Docs</div>
+                    <div class="gallery-tab" onclick="switchGalleryTab('links')" id="tab-links" style="cursor: pointer; padding-bottom: 10px; border-bottom: 2px solid transparent; color: gray; font-weight: bold;">Links</div>
+                </div>
             </div>
-            
+
             <div id="mediaGallerySelectionHeader" style="display: none; justify-content: space-between; align-items: center; border-bottom: 1px solid #00e676; padding-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span class="material-icons" style="cursor: pointer; color: #ff3366;" onclick="exitMediaSelectionMode()">close</span>
@@ -163,7 +199,7 @@
                 </div>
                 <button class="modal-follow-btn" style="background: white !important; color: black !important; border: none !important; padding: 6px 16px !important; flex-shrink: 0;" onclick="triggerMediaActionSheet()">Select</button>
             </div>
-            
+
             <div id="mediaGalleryContent" style="flex: 1; overflow-y: auto; padding-top: 15px;"></div>
         </div>
     </div>
@@ -346,6 +382,7 @@
         let activeChatUser = null;
         let activeGroupId = null;
         let pollInterval = null;
+        let isFetchingChat = false; // THE FIX: Global lock for race conditions
         let msgMediaBase64 = "";
         let msgVoiceNoteBase64 = ""; // Voice Note Storage
         let inboxUsersBuffer = []; 
@@ -353,7 +390,7 @@
         let longPressTimer;
         let isSelectionMode = false;
         let selectedMsgIds = [];
-        let selectedForwardUsers = [];
+        let selectedForwardTargets = [];
         let replyingToMsgId = null; 
 
         let currentGroupData = null;
@@ -595,9 +632,36 @@
                         cleanLastMessage = cleanLastMessage.replace(/\\n/g, ' ').replace(/\n/g, ' ');
                     }
                     
+                    // --- THE FIX: Decode the delimited media payload from the database! ---
+                    if (!cleanLastMessage || cleanLastMessage.trim() === "") {
+                        cleanLastMessage = `<span class="material-icons" style="font-size: 15px; vertical-align: middle; margin-right: 4px; color: #a09eb5;">image</span> Media`;
+                    } else if (cleanLastMessage.startsWith("[VOICE]")) {
+                        let duration = 0;
+                        if (cleanLastMessage.includes("|DUR:")) {
+                            duration = parseInt(cleanLastMessage.split("|DUR:")[1]) || 0;
+                        }
+                        const mins = Math.floor(duration / 60);
+                        const secs = duration % 60;
+                        const timeStr = ` (${mins}:${secs < 10 ? '0' : ''}${secs})`;
+                        cleanLastMessage = `<span class="material-icons" style="font-size: 15px; vertical-align: middle; margin-right: 4px; color: #00e676;">mic</span> Voice message${duration > 0 ? timeStr : ''}`;
+                    } else if (cleanLastMessage.startsWith("[MEDIA]")) {
+                        let mUrl = cleanLastMessage.substring(7).toLowerCase();
+                        if (mUrl.endsWith(".mp4") || mUrl.endsWith(".webm")) cleanLastMessage = `<span class="material-icons" style="font-size: 15px; vertical-align: middle; margin-right: 4px; color: #ff3366;">videocam</span> Video`;
+                        else if (mUrl.endsWith(".jpg") || mUrl.endsWith(".jpeg") || mUrl.endsWith(".png") || mUrl.endsWith(".gif") || mUrl.endsWith(".webp")) cleanLastMessage = `<span class="material-icons" style="font-size: 15px; vertical-align: middle; margin-right: 4px; color: #a09eb5;">image</span> Image`;
+                        else {
+                            let dName = mUrl.includes("_") ? mUrl.split("_").slice(1).join("_") : "Document";
+                            cleanLastMessage = `<span class="material-icons" style="font-size: 15px; vertical-align: middle; margin-right: 4px; color: #00a8ff;">description</span> ${dName}`;
+                        }
+                    }
+                    // --- END FIX ---
+
+                    // THE FIX: Prepend the Group Sender Name elegantly!
+                    if (chat.isGroup && chat.lastMessageSender && chat.lastMessage !== "Group created") {
+                        cleanLastMessage = `<span style="color: #a09eb5;">${chat.lastMessageSender}:</span> ${cleanLastMessage}`;
+                    }
+                    
                     let clickTargetStr = chat.isGroup ? `openChat('${String(chat.id)}', '${chat.avatar}', true, '${chat.username.replace("'", "\\'")}')` : `openChat('${chat.username.replace("'", "\\'")}', '${chat.avatar}', false, null)`;
                     
-                    // THE FIX: Flex constraint and username truncation in Inbox
                     html += `
                         <div class="inbox-item" 
                              onmousedown="startInboxPress(event, '${chatIdVal.replace("'", "\\'")}', ${chat.isGroup ? 'true' : 'false'}, '${chat.username.replace("'", "\\'")}')" 
@@ -633,7 +697,7 @@
                     openChat(targetFromUrl, avatar, false, null);
                 }
             });
-        }
+        } // THE FIX: This properly closes the loadInbox function!
 
         function toggleAttachmentMenu() {
             const menu = document.getElementById('attachmentMenu');
@@ -643,9 +707,9 @@
         document.addEventListener('click', function(event) {
             const menu = document.getElementById('attachmentMenu');
             if (!menu) return;
-            const addBtn = menu.previousElementSibling;
+            const addBtn = document.getElementById('attachPlusBtn');
             
-            if (menu.style.display === 'flex' && !menu.contains(event.target) && !addBtn.contains(event.target)) {
+            if (menu.style.display === 'flex' && !menu.contains(event.target) && addBtn && !addBtn.contains(event.target)) {
                 menu.style.display = 'none';
             }
         });
@@ -660,6 +724,9 @@
                     msgMediaBase64 = reader.result;
                     
                     let previewHtml = "";
+                    if (type === 'document') {
+                        msgMediaBase64 += "|NAME:" + file.name;
+                    }
                     if (type === 'image') {
                         previewHtml = `<img src="${msgMediaBase64}" style="max-height: 100px; border-radius: 8px; border: 1px solid #00e676;">`;
                     } else if (type === 'video') {
@@ -688,13 +755,28 @@
         window.attachMsgVoiceNote = function(base64Data) {
             msgVoiceNoteBase64 = base64Data;
             const previewContainer = document.getElementById('msgMediaPreview');
+            
+            let vnSecs = typeof voiceRecordSeconds !== 'undefined' ? voiceRecordSeconds : 0;
+            const m = Math.floor(vnSecs / 60);
+            const s = vnSecs % 60;
+            const timeText = m + ':' + (s < 10 ? '0' : '') + s;
+
+            // THE FIX: Synced the preview with the scrub bar design and enforced the fluid 100% width!
             previewContainer.innerHTML += `
-            <div class="preview-item" id="vnPreviewBox" style="position: relative; margin-bottom: 10px; background: rgba(0,0,0,0.4); padding: 8px 15px; border-radius: 30px; border: 1px solid rgba(0, 230, 118, 0.4); display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
-                <div style="background: rgba(0, 230, 118, 0.2); border-radius: 50%; width: 35px; height: 35px; display: flex; justify-content: center; align-items: center;">
-                    <span class="material-icons" style="color: #00e676; font-size: 20px;">mic</span>
+            <div class="preview-item" id="vnPreviewBox" style="position: relative; margin-bottom: 10px; background: rgba(0,0,0,0.3); padding: 10px 12px; border-radius: 20px; border: 1px solid rgba(0, 230, 118, 0.4); display: flex; flex-direction: column; width: 100%; max-width: 250px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                    <div onclick="toggleVn('${base64Data}', 'vn-btn-prev', 'vn-timer-prev', 'vn-slider-prev', ${vnSecs})" style="background: #00e676; border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                        <span id="vn-btn-prev" class="material-icons" style="color: #0b0f1a; font-size: 24px; margin-left: 2px;">play_arrow</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; flex: 1;">
+                        <input type="range" id="vn-slider-prev" class="vn-slider" value="0" max="100" oninput="seekVn(event, '${base64Data}')">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                            <span id="vn-timer-prev" style="color: #a09eb5; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: bold;">${timeText}</span>
+                            <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                        </div>
+                    </div>
                 </div>
-                <audio controls src="${base64Data}" style="height: 35px; outline: none; filter: invert(0.9) hue-rotate(180deg) grayscale(0.2);"></audio>
-                <button onclick="removeMsgVoiceNote()" style="position: absolute; top: -5px; right: -5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
+                <button onclick="removeMsgVoiceNote()" style="position: absolute; top: -6px; right: -6px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
             </div>`;
         };
 
@@ -706,6 +788,11 @@
 
         function openChat(targetId, targetAvatar, isGroup, groupName) {
             if (pollInterval) clearInterval(pollInterval);
+            window.currentPinCycleIndex = 0; 
+            window.unreadScrollCount = 0; // THE FIX: Resets the scroll badge!
+            
+            const badge = document.getElementById("unreadScrollBadge");
+            if (badge) badge.style.display = "none";
             
             currentChatMessages = [];
             document.getElementById("chatHistoryContainer").innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Say Hi👋...</p>";
@@ -782,6 +869,8 @@
 
         function fetchAndRenderChat() {
             if (!activeChatUser && !activeGroupId) return;
+            if (isFetchingChat) return; // THE FIX: Prevent overlapping database queries!
+            isFetchingChat = true;
 
             // THE FIX: Smart Delta Polling Tracking
             const lastMsgId = currentChatMessages.length > 0 ? currentChatMessages[currentChatMessages.length - 1].id : 0;
@@ -797,8 +886,9 @@
             })
             .then(res => res.json())
             .then(newMessages => {
+                isFetchingChat = false; // Release the lock!
                 // THE FIX: If there's nothing new, abort the render completely to save processing power!
-                if (newMessages.length === 0) return; 
+                if (newMessages.length === 0) return;
                 
                 // Append only the newly fetched messages to our active array
                 currentChatMessages = [...currentChatMessages, ...newMessages]; 
@@ -846,6 +936,14 @@
                     let isSystem = false;
                     let sysMsgStr = "";
                     
+                    let vnDurationSecs = 0;
+                    let cleanVoiceNote = msg.voiceNote;
+                    if (cleanVoiceNote && cleanVoiceNote.includes("|DUR:")) {
+                        const parts = cleanVoiceNote.split("|DUR:");
+                        cleanVoiceNote = parts[0];
+                        vnDurationSecs = parseInt(parts[1]) || 0;
+                    }
+                    
                     if (contentText.startsWith("[SYS]")) {
                         isSystem = true;
                         sysMsgStr = contentText.substring(5);
@@ -866,23 +964,40 @@
                     let mediaHtml = "";
                     if (msg.media && msg.media !== "") {
                         const mediaLower = msg.media.toLowerCase();
-                        if (mediaLower.startsWith("data:video") || mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm")) {
+                        const isVideo = mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm") || mediaLower.startsWith("data:video");
+                        const isImage = mediaLower.endsWith(".jpg") || mediaLower.endsWith(".jpeg") || mediaLower.endsWith(".png") || mediaLower.endsWith(".gif") || mediaLower.endsWith(".webp") || mediaLower.startsWith("data:image");
+                        
+                        if (isVideo) {
                             mediaHtml = `<video src="${msg.media}" controls style="display: block; max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px;"></video>`;
-                        } else if (mediaLower.startsWith("data:application") || mediaLower.startsWith("data:text") || mediaLower.endsWith(".pdf") || mediaLower.endsWith(".doc") || mediaLower.endsWith(".txt")) {
-                            const btnColor = isMe ? "#000" : "#00a8ff"; 
-                            mediaHtml = `<a href="${msg.media}" download="Chat_Attachment" style="display: flex; width: max-content; align-items: center; gap: 5px; color: ${btnColor}; background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; text-decoration: none; margin-top: 8px; font-weight: bold;"><span class="material-icons">download</span> Download File</a>`;
-                        } else {
+                        } else if (isImage) {
                             mediaHtml = `<img src="${msg.media}" style="display: block; max-width: 100%; max-height: 250px; width: auto; object-fit: contain; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="openLightbox('${msg.media}')">`;
+                        } else {
+                            const btnColor = isMe ? "#000" : "#00a8ff"; 
+                            let docName = msg.media.includes("_") ? msg.media.split("_").slice(1).join("_") : "Document";
+                            mediaHtml = `<a href="${msg.media}" download="${docName}" style="display: flex; width: max-content; align-items: center; gap: 8px; color: ${btnColor}; background: rgba(255,255,255,0.2); padding: 10px 15px; border-radius: 8px; text-decoration: none; margin-top: 8px; font-weight: bold; max-width: 100%;"><span class="material-icons" style="font-size: 20px; flex-shrink: 0;">description</span> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${docName}</span></a>`;
                         }
                     }
 
-                    if (msg.voiceNote && msg.voiceNote !== "") {
+                    if (cleanVoiceNote && cleanVoiceNote !== "") {
+                        const m = Math.floor(vnDurationSecs / 60);
+                        const s = vnDurationSecs % 60;
+                        const timeText = m + ':' + (s < 10 ? '0' : '') + s;
+                        
+                        // THE FIX: Swapped hardcoded 'width: 220px' for 'width: 100%; max-width: 250px; box-sizing: border-box;' so it shrinks smoothly!
                         mediaHtml += `
-                        <div style="margin-top: 10px; background: rgba(0,0,0,0.25); padding: 6px 12px 6px 6px; border-radius: 30px; border: 1px solid rgba(0, 230, 118, 0.2); display: flex; align-items: center; gap: 8px; width: max-content; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);">
-                            <div style="background: rgba(0, 230, 118, 0.15); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
-                                <span class="material-icons" style="color: #00e676;">graphic_eq</span>
+                        <div style="margin-top: 4px; background: rgba(0,0,0,0.3); padding: 10px 12px; border-radius: 20px; border: 1px solid rgba(0, 230, 118, 0.2); display: flex; flex-direction: column; width: 100%; max-width: 250px; box-sizing: border-box; position: relative; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                                <div onclick="toggleVn('${cleanVoiceNote}', 'vn-btn-${msg.id}', 'vn-timer-${msg.id}', 'vn-slider-${msg.id}', ${vnDurationSecs})" style="background: #00e676; border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                                    <span id="vn-btn-${msg.id}" class="material-icons" style="color: #0b0f1a; font-size: 24px; margin-left: 2px;">play_arrow</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; flex: 1;">
+                                    <input type="range" id="vn-slider-${msg.id}" class="vn-slider" value="0" max="100" oninput="seekVn(event, '${cleanVoiceNote}')">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                                        <span id="vn-timer-${msg.id}" style="color: #a09eb5; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: bold;">${timeText}</span>
+                                        <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                                    </div>
+                                </div>
                             </div>
-                            <audio controls src="${msg.voiceNote}" style="height: 35px; width: 200px; outline: none; filter: invert(0.9) hue-rotate(180deg) grayscale(0.2);"></audio>
                         </div>`;
                     }
 
@@ -894,7 +1009,13 @@
                         const isDeleted = !msg.replySender;
                         const replyColor = isDeleted ? "gray" : (isMe ? "rgba(255,255,255,0.7)" : "#00e676");
                         const rSender = isDeleted ? "Deleted Message" : msg.replySender;
-                        const rContent = isDeleted ? "This post has been deleted." : (msg.replyContent || "Attachment");
+                        const rContent = isDeleted ? "This post has been deleted." : (msg.replyContent || (() => {
+                            if (!msg.replyMedia) return "Media";
+                            let mLower = msg.replyMedia.toLowerCase();
+                            if (mLower.endsWith(".mp4") || mLower.endsWith(".webm")) return "Video";
+                            if (mLower.endsWith(".jpg") || mLower.endsWith(".jpeg") || mLower.endsWith(".png") || mLower.endsWith(".gif") || mLower.endsWith(".webp")) return "Image";
+                            return mLower.includes("_") ? mLower.split("_").slice(1).join("_") : "Document";
+                        })());
                         
                         const groupBadge = (!activeGroupId && msg.replyGroupName && !isDeleted) ? `<span style="font-size: 10px; color: #1e293b; background: rgba(255,255,255,0.7); padding: 2px 5px; border-radius: 4px; margin-left: 5px; font-weight: bold;">${msg.replyGroupName}</span>` : "";
                         const cleanReplyGroupName = msg.replyGroupName ? msg.replyGroupName.replace("'", "\\'") : '';
@@ -934,8 +1055,71 @@
                 
                 container.innerHTML = html;
                 
+                // --- THE CYCLING PINNED MESSAGE LOGIC ---
+                let pinnedMsgs = currentChatMessages.filter(m => m.isPinned);
+                const pinBanner = document.getElementById("pinnedMessageBanner");
+                
+                if (pinnedMsgs.length > 0 && pinBanner) {
+                    pinnedMsgs.sort((a, b) => {
+                        const dateA = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+                        const dateB = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+                        return dateB - dateA;
+                    });
+                    
+                    if (typeof window.currentPinCycleIndex === 'undefined' || window.currentPinCycleIndex >= pinnedMsgs.length) {
+                        window.currentPinCycleIndex = 0;
+                    }
+                    
+                    const displayPin = pinnedMsgs[window.currentPinCycleIndex];
+                    let pinText = displayPin.content;
+                    
+                    if (!pinText || pinText.trim() === "") {
+                        if (displayPin.voiceNote) pinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle;">mic</span> Voice Note`;
+                        else if (displayPin.media) {
+                            let mLower = displayPin.media.toLowerCase();
+                            if (mLower.endsWith(".mp4") || mLower.endsWith(".webm")) pinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #ff3366;">videocam</span> Video`;
+                            else if (mLower.endsWith(".jpg") || mLower.endsWith(".jpeg") || mLower.endsWith(".png") || mLower.endsWith(".gif") || mLower.endsWith(".webp")) pinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #a09eb5;">image</span> Image`;
+                            else {
+                                let dName = mLower.includes("_") ? mLower.split("_").slice(1).join("_") : "Document";
+                                pinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #00a8ff;">description</span> ${dName}`;
+                            }
+                        }
+                    } else {
+                        pinText = pinText.replace(/<[^>]*>|\[VOICE:\d+\]|/gi, "").replace(/\\n/g, ' ').replace(/\n/g, ' '); 
+                    }
+                    
+                    document.getElementById("pinnedMessageTitle").textContent = pinnedMsgs.length > 1 ? `Pinned Message (${window.currentPinCycleIndex + 1}/${pinnedMsgs.length})` : `Pinned Message`;
+                    document.getElementById("pinnedMessageContent").innerHTML = pinText; 
+                    
+                    pinBanner.style.display = "flex";
+                    // THE FIX: Hooked to the new bulletproof standalone function!
+                    pinBanner.onclick = window.executePinCycle;
+                } else if (pinBanner) {
+                    pinBanner.style.display = "none";
+                    window.currentPinCycleIndex = 0;
+                }
+                // --- END PINNED LOGIC ---
+                
                 if (isAtBottom && document.getElementById("chatSearchBar").style.display === "none") {
                     container.scrollTop = container.scrollHeight;
+                } else if (!isAtBottom && newMessages.length > 0 && currentChatMessages.length > newMessages.length) {
+                    // THE FIX: Only count messages NOT sent by the current user!
+                    const newForeignMessages = newMessages.filter(m => m.sender !== currentUser);
+                    if (newForeignMessages.length > 0) {
+                        window.unreadScrollCount = (window.unreadScrollCount || 0) + newForeignMessages.length;
+                        const badge = document.getElementById("unreadScrollBadge");
+                        if (badge) {
+                            badge.textContent = window.unreadScrollCount;
+                            badge.style.display = "flex";
+                        }
+                    }
+                } else if (!isAtBottom && newMessages.length > 0 && currentChatMessages.length > newMessages.length) {
+                    window.unreadScrollCount = (window.unreadScrollCount || 0) + newMessages.length;
+                    const badge = document.getElementById("unreadScrollBadge");
+                    if (badge) {
+                        badge.textContent = window.unreadScrollCount;
+                        badge.style.display = "flex";
+                    }
                 }
 
                 if (document.getElementById("chatSearchBar").style.display === "flex") {
@@ -946,8 +1130,12 @@
                         if (targetBubble) targetBubble.classList.add("search-highlight");
                     }
                 }
+            })
+            .catch(err => {
+                isFetchingChat = false; 
+                console.error("Chat Fetch Error:", err);
             });
-        }
+        } // THE FIX: This properly closes the fetchAndRenderChat function!
 
         function executeSendMessage() {
             const input = document.getElementById("messageInput");
@@ -959,14 +1147,21 @@
             input.style.height = "45px"; 
             const mediaToSend = msgMediaBase64;
             const voiceToSend = typeof msgVoiceNoteBase64 !== 'undefined' ? msgVoiceNoteBase64 : "";
+            
+            // THE FIX: Append duration natively to the Base64 audio payload!
+            let finalVoice = voiceToSend;
+            let vnSecs = typeof voiceRecordSeconds !== 'undefined' ? voiceRecordSeconds : 0;
+            if (finalVoice !== "") {
+                finalVoice = finalVoice + `|DUR:${vnSecs}`;
+            }
             if (typeof removeMsgVoiceNote === 'function') removeMsgVoiceNote();
             removeMsgMedia(); 
             removeMsgVoiceNote(); 
 
             const endpoint = activeGroupId ? '/api/sendGroupMessage' : '/api/sendMessage';
             const payload = activeGroupId 
-                ? { sender: currentUser, groupId: activeGroupId, content: content, media: mediaToSend, voiceNote: voiceToSend, replyToId: replyingToMsgId ? String(replyingToMsgId) : "" }
-                : { sender: currentUser, receiver: activeChatUser, content: content, media: mediaToSend, voiceNote: voiceToSend, isForwarded: false, replyToId: replyingToMsgId ? String(replyingToMsgId) : "" };
+                ? { sender: currentUser, groupId: activeGroupId, content: content, media: mediaToSend, voiceNote: finalVoice, replyToId: replyingToMsgId ? String(replyingToMsgId) : "" }
+                : { sender: currentUser, receiver: activeChatUser, content: content, media: mediaToSend, voiceNote: finalVoice, isForwarded: false, replyToId: replyingToMsgId ? String(replyingToMsgId) : "" };
 
             fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
@@ -977,6 +1172,16 @@
                 if (data === "SUCCESS") {
                     cancelReply(); 
                     fetchAndRenderChat(); 
+                    
+                    // THE FIX: Immediately auto-scroll to bottom and clear the badge when you send a message!
+                    setTimeout(() => {
+                        const box = document.getElementById("chatHistoryContainer");
+                        if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+                        window.unreadScrollCount = 0;
+                        const badge = document.getElementById("unreadScrollBadge");
+                        if (badge) badge.style.display = "none";
+                    }, 100);
+
                 } else if (data === "SPAM_LIMIT_REACHED") {
                     document.getElementById("spamErrorModal").style.display = "flex";
                 } else {
@@ -984,6 +1189,41 @@
                 }
             });
         }
+        
+        // THE FIX: The State Lock to prevent Click Event Collisions
+        window.longPressJustFired = false;
+
+        window.startLongPress = function(event, msgId) {
+            window.longPressTimer = setTimeout(() => {
+                window.longPressJustFired = true; // Engage the lock
+                if (!isSelectionMode) {
+                    isSelectionMode = true;
+                    selectedMsgIds = [msgId];
+                    updateSelectionUI();
+                }
+                // Safety release: Auto-unlocks after 500ms if the click event gets lost
+                setTimeout(() => { window.longPressJustFired = false; }, 500);
+            }, 800);
+        };
+
+        window.cancelLongPress = function() {
+            clearTimeout(window.longPressTimer);
+        };
+
+        window.startMediaLongPress = function(event, msgId) {
+            window.longPressTimer = setTimeout(() => {
+                window.longPressJustFired = true; // Engage the lock
+                if (!isSelectionMode) {
+                    isSelectionMode = true;
+                    selectedMsgIds = [msgId];
+                    document.getElementById("mediaGalleryNormalHeader").style.display = "none";
+                    document.getElementById("mediaGallerySelectionHeader").style.display = "flex";
+                    document.getElementById("mediaSelectionCountText").textContent = "1 Selected";
+                    renderMediaGrid();
+                }
+                setTimeout(() => { window.longPressJustFired = false; }, 500);
+            }, 800);
+        };
 
         function handleEnter(e) { if (e.key === 'Enter') executeSendMessage(); }
 
@@ -999,6 +1239,11 @@
         function cancelLongPress() { clearTimeout(longPressTimer); }
 
         function handleMessageClick(msgId) {
+            // THE FIX: Consume the rogue click from long-press release!
+            if (window.longPressJustFired) {
+                window.longPressJustFired = false; 
+                return; 
+            }
             if (!isSelectionMode) return; 
             const idx = selectedMsgIds.indexOf(msgId);
             if (idx > -1) selectedMsgIds.splice(idx, 1); 
@@ -1012,9 +1257,13 @@
             document.getElementById("normalChatHeader").style.display = "none";
             document.getElementById("selectionChatHeader").style.display = "flex";
             document.getElementById("selectionCountText").textContent = selectedMsgIds.length + " Selected";
-            const tempMessages = [...currentChatMessages];
-            currentChatMessages = []; 
-            fetchAndRenderChat(); 
+            
+            // THE FIX: Lightweight DOM toggling. NEVER redraw the chat here, or it breaks video buffers!
+            document.querySelectorAll('.msg-bubble').forEach(bubble => {
+                const bubbleId = parseInt(bubble.id.replace('msg-bubble-', ''));
+                if (selectedMsgIds.includes(bubbleId)) bubble.classList.add('selected');
+                else bubble.classList.remove('selected');
+            });
         }
 
         function exitSelectionMode() {
@@ -1022,9 +1271,11 @@
             selectedMsgIds = [];
             document.getElementById("normalChatHeader").style.display = "flex";
             document.getElementById("selectionChatHeader").style.display = "none";
-            const tempMessages = [...currentChatMessages];
-            currentChatMessages = []; 
-            fetchAndRenderChat(); 
+            
+            // THE FIX: Remove the classes cleanly without redrawing!
+            document.querySelectorAll('.msg-bubble.selected').forEach(bubble => {
+                bubble.classList.remove('selected');
+            });
         }
 
         function showMultiSelectOptions() {
@@ -1039,10 +1290,13 @@
             });
 
             if (selectedMsgIds.length === 1) {
+                const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
+                const pinText = msg && msg.isPinned ? "Unpin Message" : "Pin Message";
+                container.innerHTML += `<button style="${btnStyle}" onclick="executeTogglePinMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">push_pin</span> ${pinText}</button>`;
+                
                 if (allMine) container.innerHTML += `<button style="${btnStyle}" onclick="promptEditMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">edit</span> Edit</button>`;
                 container.innerHTML += `<button style="${btnStyle}" onclick="replyToMessage()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">reply</span> Reply</button>`;
                 
-                const msg = currentChatMessages.find(m => m.id === selectedMsgIds[0]);
                 if (activeGroupId && msg && msg.sender !== currentUser && (!msg.content || !msg.content.startsWith("[SYS]"))) {
                     container.innerHTML += `<button style="${btnStyle}" onclick="replyPrivately()"><span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 8px;">reply_all</span> Reply Privately</button>`;
                 }
@@ -1145,37 +1399,47 @@
 
         function openMultiForwardModal() {
             document.getElementById("msgContextMenu").style.display = "none";
-            selectedForwardUsers = [];
+            selectedForwardTargets = [];
             document.getElementById("forwardSearchInput").value = "";
             renderForwardList(""); 
             document.getElementById("forwardMessageModal").style.display = "flex";
         }
 
-        function toggleForwardUser(username) {
-            const idx = selectedForwardUsers.indexOf(username);
-            if (idx > -1) selectedForwardUsers.splice(idx, 1); else selectedForwardUsers.push(username);
+        window.filterForwardList = function() {
+            renderForwardList(document.getElementById("forwardSearchInput").value);
+        };
+
+        function toggleForwardTarget(id, isGroup, name) {
+            const idx = selectedForwardTargets.findIndex(t => t.id === id && t.isGroup === isGroup);
+            if (idx > -1) selectedForwardTargets.splice(idx, 1); 
+            else selectedForwardTargets.push({ id: id, isGroup: isGroup, name: name });
+            
             const sendBtn = document.getElementById("multiForwardSendBtn");
-            sendBtn.style.display = selectedForwardUsers.length > 0 ? "block" : "none";
-            sendBtn.textContent = `Forward to ${selectedForwardUsers.length} user(s)`;
+            sendBtn.style.display = selectedForwardTargets.length > 0 ? "block" : "none";
+            sendBtn.textContent = `Forward to ${selectedForwardTargets.length} chat(s)`;
             renderForwardList(document.getElementById("forwardSearchInput").value);
         }
 
         function renderForwardList(filterQuery) {
             const listContainer = document.getElementById("forwardUserList");
             listContainer.innerHTML = "";
-            const filtered = inboxUsersBuffer.filter(u => !u.isGroup && u.username.toLowerCase().includes(filterQuery.toLowerCase()));
+            const filtered = inboxUsersBuffer.filter(u => u.username.toLowerCase().includes(filterQuery.toLowerCase()));
             
             filtered.forEach(u => {
-                const isSel = selectedForwardUsers.includes(u.username);
+                const uId = u.isGroup ? u.id : u.username;
+                const isSel = selectedForwardTargets.some(t => t.id === uId && t.isGroup === u.isGroup);
                 const bg = isSel ? "rgba(0, 230, 118, 0.2)" : "rgba(255,255,255,0.05)";
                 const border = isSel ? "1px solid #00e676" : "1px solid transparent";
                 const icon = isSel ? "check_circle" : "radio_button_unchecked";
                 const iconColor = isSel ? "#00e676" : "gray";
+                const groupBadge = u.isGroup ? `<span class="material-icons" style="position: absolute; bottom: -2px; right: -2px; font-size: 14px; background: #0b0f1a; border-radius: 50%; color: #00e676; padding: 2px;">groups</span>` : "";
 
-                // THE FIX: Flex constraint and username truncation in Forward List
                 listContainer.innerHTML += `
-                    <button onclick="toggleForwardUser('${u.username}')" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; background: ${bg}; border: ${border}; border-radius: 8px; cursor: pointer; transition: 0.2s; min-width: 0;">
-                        <img src="${u.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                    <button onclick="toggleForwardTarget('${uId}', ${u.isGroup}, '${u.username.replace(/'/g, "\\'")}')" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; background: ${bg}; border: ${border}; border-radius: 8px; cursor: pointer; transition: 0.2s; min-width: 0; position: relative;">
+                        <div style="position: relative; flex-shrink: 0; width: 35px; height: 35px;">
+                            <img src="${u.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+                            ${groupBadge}
+                        </div>
                         <div style="flex: 1; min-width: 0; text-align: left;">
                             <strong class="username-truncate" style="color: white; font-size: 15px; max-width: 100%;">${u.username}</strong>
                         </div>
@@ -1193,11 +1457,20 @@
             for (let msgId of selectedMsgIds) {
                 const msg = currentChatMessages.find(m => m.id === msgId);
                 if (!msg) continue;
+                
+                // THE FIX: The new engine correctly identifies and captures Voice Notes
                 const safeMedia = msg.media ? msg.media : "";
-                for (let user of selectedForwardUsers) {
-                    const res = await fetch(`${API_BASE}/api/sendMessage`, {
+                const safeVoice = msg.voiceNote ? msg.voiceNote : "";
+                
+                for (let target of selectedForwardTargets) {
+                    const endpoint = target.isGroup ? '/api/sendGroupMessage' : '/api/sendMessage';
+                    const payload = target.isGroup 
+                        ? { sender: currentUser, groupId: target.id, content: msg.content, media: safeMedia, voiceNote: safeVoice, isForwarded: true, replyToId: "" }
+                        : { sender: currentUser, receiver: target.id, content: msg.content, media: safeMedia, voiceNote: safeVoice, isForwarded: true, replyToId: "" };
+
+                    const res = await fetch(`${API_BASE}${endpoint}`, {
                         method: 'POST',
-                        body: JSON.stringify({ sender: currentUser, receiver: user, content: msg.content, media: safeMedia, isForwarded: true, replyToId: "" })
+                        body: JSON.stringify(payload)
                     }).then(r => r.text());
 
                     if (res === "SUCCESS") {
@@ -1216,6 +1489,33 @@
             exitSelectionMode();
         }
 
+        function executeTogglePinMessage() {
+            document.getElementById("msgContextMenu").style.display = "none";
+            const msgId = selectedMsgIds[0];
+            
+            const targetMsg = currentChatMessages.find(m => m.id === msgId);
+            if (targetMsg && !targetMsg.isPinned) {
+                const pinnedCount = currentChatMessages.filter(m => m.isPinned).length;
+                if (pinnedCount >= 3) {
+                    showToast("You can only pin up to 3 messages.");
+                    exitSelectionMode();
+                    return;
+                }
+            }
+
+            fetch(`${API_BASE}/api/togglePinMessage`, {
+                method: 'POST',
+                body: JSON.stringify({ currentUser: currentUser, messageId: String(msgId) })
+            }).then(r => r.text()).then(res => {
+                if (res === "PINNED" || res === "UNPINNED") {
+                    showToast(res === "PINNED" ? "Message Pinned" : "Message Unpinned");
+                    exitSelectionMode();
+                    currentChatMessages = [];
+                    fetchAndRenderChat();
+                }
+            });
+        }
+
         async function executeMultiDelete() {
             document.getElementById("msgContextMenu").style.display = "none";
             for (let msgId of selectedMsgIds) {
@@ -1223,12 +1523,31 @@
                     method: 'POST',
                     body: JSON.stringify({ username: currentUser, messageId: String(msgId) })
                 });
+                
+                // THE FIX: Instantly remove the bubble from the live chat without waiting for a refresh!
+                currentChatMessages = currentChatMessages.filter(m => m.id !== msgId);
+                const bubble = document.getElementById(`msg-bubble-${msgId}`);
+                if (bubble) {
+                    const wrapper = bubble.closest('.msg-wrapper') || bubble;
+                    wrapper.remove();
+                }
+                
+                // THE FIX: Instantly purge it from the Media Gallery buffer so it vanishes!
+                if (typeof mediaGalleryBuffer !== 'undefined') {
+                    mediaGalleryBuffer = mediaGalleryBuffer.filter(m => m.id !== msgId);
+                }
             }
+            
             exitSelectionMode();
+            if (document.getElementById("mediaGalleryModal").style.display === "flex") {
+                exitMediaSelectionMode(); // This instantly triggers a gallery re-render!
+            }
+            showToast("Message deleted");
         }
 
-        function scrollToMessage(msgId, replyGroupId, replyGroupName) {
-            document.getElementById('mediaGalleryModal').style.display = 'none';
+        window.scrollToMessage = function(msgId, replyGroupId, replyGroupName) {
+            const modal = document.getElementById('mediaGalleryModal');
+            if (modal) modal.style.display = 'none';
 
             if (replyGroupId && String(replyGroupId) !== String(activeGroupId)) {
                 let groupAvatar = DEFAULT_AVATAR;
@@ -1242,29 +1561,46 @@
                     checks++;
                     if (document.getElementById(`msg-bubble-${msgId}`)) {
                         clearInterval(interval);
-                        highlightAndScroll(msgId);
+                        window.highlightAndScroll(msgId);
                     } else if (checks > 25) { 
                         clearInterval(interval);
                         showToast("Original message is no longer in view.");
                     }
                 }, 200);
             } else {
-                highlightAndScroll(msgId);
+                window.highlightAndScroll(msgId);
             }
-        }
+        };
 
-        function highlightAndScroll(msgId) {
+        window.highlightAndScroll = function(msgId) {
+            // 1. Safely wipe all previous animations
+            document.querySelectorAll('.pin-glow-active').forEach(el => {
+                el.classList.remove('pin-glow-active');
+            });
+            clearSearchHighlights();
+            
+            // 2. Target the exact bubble wrapper
             const targetBubble = document.getElementById(`msg-bubble-${msgId}`);
             if (targetBubble) {
-                targetBubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Find the parent wrapper to apply the border effect cleanly
+                const wrapper = targetBubble.closest('.msg-wrapper') || targetBubble;
                 
-                targetBubble.classList.remove("search-glow");
-                void targetBubble.offsetWidth; 
-                targetBubble.classList.add("search-glow");
+                wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Force a browser reflow so the animation restarts perfectly
+                void wrapper.offsetWidth; 
+                
+                wrapper.classList.add("pin-glow-active");
+                
+                // Remove the class slightly after the animation finishes (1.5s) to leave it clean
+                setTimeout(() => {
+                    wrapper.classList.remove("pin-glow-active");
+                }, 1600);
+                
             } else {
                 showToast("Original message is no longer in view.");
             }
-        }
+        };
 
         /* ========================================= */
         /* --- CHAT HEADER ROUTER & MODAL LOGIC ---  */
@@ -1340,37 +1676,103 @@
                 mediaGalleryBuffer = media;
                 selectedMsgIds = [];
                 isSelectionMode = false;
-                renderMediaGrid();
-                document.getElementById("mediaGalleryNormalHeader").style.display = "flex";
-                document.getElementById("mediaGallerySelectionHeader").style.display = "none";
-                document.getElementById("mediaGalleryModal").style.display = "flex";
+                
+                if (typeof switchGalleryTab === 'function') switchGalleryTab('media');
+                else renderMediaGrid(); // Fallback if tabs aren't loaded
+
+                const normalHeader = document.getElementById("mediaGalleryNormalHeader");
+                const selHeader = document.getElementById("mediaGallerySelectionHeader");
+                const modal = document.getElementById("mediaGalleryModal");
+                
+                if (normalHeader) normalHeader.style.display = "flex";
+                if (selHeader) selHeader.style.display = "none";
+                if (modal) {
+                    modal.style.display = "flex";
+                    modal.style.zIndex = "10000"; // Ensure it's on top of everything!
+                } else {
+                    console.error("CRITICAL: mediaGalleryModal element not found in DOM!");
+                }
+            })
+            .catch(err => {
+                console.error("Error opening media gallery:", err);
+                showToast("Failed to load media gallery.");
             });
         }
 
         function closeMediaGallery() { document.getElementById("mediaGalleryModal").style.display = "none"; }
 
+        let currentGalleryTab = 'media';
+        window.switchGalleryTab = function(tab) {
+            currentGalleryTab = tab;
+            ['media', 'docs', 'links'].forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if (t === tab) { el.style.borderBottom = '2px solid #00e676'; el.style.color = '#00e676'; }
+                else { el.style.borderBottom = '2px solid transparent'; el.style.color = 'gray'; }
+            });
+            renderMediaGrid();
+        };
+
         function renderMediaGrid() {
             const grid = document.getElementById("mediaGalleryContent");
             if (mediaGalleryBuffer.length === 0) {
-                grid.innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>No media found in this chat.</p>";
+                grid.innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Nothing found here.</p>";
                 return;
             }
             
-            grid.innerHTML = '<div class="media-grid" id="mediaGridBox"></div>';
+            grid.innerHTML = '<div class="media-grid" id="mediaGridBox" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>';
             const box = document.getElementById("mediaGridBox");
+            let hasItems = false;
+            
             mediaGalleryBuffer.forEach(m => {
                 const isSelected = selectedMsgIds.includes(m.id);
                 const cls = isSelected ? "media-grid-item selected" : "media-grid-item";
+                const mediaLower = (m.media || "").toLowerCase();
                 
-                const mediaLower = m.media.toLowerCase();
+                const isDoc = mediaLower.endsWith(".pdf") || mediaLower.endsWith(".doc") || mediaLower.endsWith(".docx") || mediaLower.endsWith(".txt");
+                const isVideo = mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm") || mediaLower.startsWith("data:video");
+                const isImage = m.media && m.media !== "" && !isDoc && !isVideo;
                 
-                let el = "";
-                if (mediaLower.startsWith("data:video") || mediaLower.endsWith(".mp4") || mediaLower.endsWith(".webm")) el = `<video src="${m.media}" class="${cls}"></video>`;
-                else if (mediaLower.startsWith("data:application") || mediaLower.startsWith("data:text") || mediaLower.endsWith(".pdf") || mediaLower.endsWith(".txt")) el = `<div class="${cls}" style="display: flex; justify-content: center; align-items: center; background: rgba(0, 168, 255, 0.1); color: #00a8ff; border: 1px solid #00a8ff;"><span class="material-icons" style="font-size: 30px;">description</span></div>`;
-                else el = `<img src="${m.media}" class="${cls}">`;
-                
-                box.innerHTML += `<div style="position: relative;" onclick="handleMediaClick(${m.id})" oncontextmenu="event.preventDefault(); startMediaSelection(${m.id});" onmousedown="startMediaLongPress(event, ${m.id})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startMediaLongPress(event, ${m.id})" ontouchend="cancelLongPress()">${el}</div>`;
+                let links = [];
+                if (m.content) {
+                    const urlRegex = /(https?:\/\/[^\s<]+)/g;
+                    links = m.content.match(urlRegex) || [];
+                }
+
+                // THE FIX: Restoring true Long Press for all gallery elements on PC and Mobile
+                const interactions = `onmousedown="startMediaLongPress(event, ${m.id})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startMediaLongPress(event, ${m.id})" ontouchend="cancelLongPress()" onclick="handleMediaClick(${m.id})" oncontextmenu="return false;"`;
+
+                if (currentGalleryTab === 'media') {
+                    if (!isImage && !isVideo) return;
+                    hasItems = true;
+                    let el = isVideo ? `<video src="${m.media}#t=0.001" preload="metadata" class="${cls}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; background: #0b0f1a;" onloadedmetadata="this.currentTime=0.001;"></video>` : `<img src="${m.media}" class="${cls}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px;">`;
+                    box.innerHTML += `<div style="position: relative; width: 100%; height: max-content;" ${interactions}>${el}</div>`;
+                } 
+                else if (currentGalleryTab === 'docs') {
+                    if (!isDoc) return;
+                    hasItems = true;
+                    let docName = m.media.includes("_") ? m.media.split("_").slice(1).join("_") : "Document";
+                    let el = `<div class="${cls}" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0, 168, 255, 0.1); color: #00a8ff; border: 1px solid #00a8ff; border-radius: 8px; height: 100px; padding: 10px; text-align: center;"><span class="material-icons" style="font-size: 30px; margin-bottom: 5px;">description</span><span style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;">${docName}</span></div>`;
+                    box.innerHTML += `<div style="position: relative; width: 100%; height: max-content;" ${interactions}>${el}</div>`;
+                }
+                else if (currentGalleryTab === 'links') {
+                    if (links.length === 0) return;
+                    hasItems = true;
+                    links.forEach(link => {
+                        // THE FIX: Links are now perfectly square 100px containers, identical to the Docs!
+                        let el = `<div class="${cls}" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid #00e676; border-radius: 8px; height: 100px; padding: 10px; text-align: center;"><span class="material-icons" style="font-size: 30px; margin-bottom: 5px;">link</span><span style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;">${link}</span></div>`;
+                        box.innerHTML += `<div style="position: relative; width: 100%; height: max-content;" ${interactions}>${el}</div>`;
+                    });
+                }
             });
+            
+            if (!hasItems) grid.innerHTML = `<p style='text-align: center; color: gray; margin-top: 20px; grid-column: span 3;'>No ${currentGalleryTab} found.</p>`;
+            
+            if (currentGalleryTab !== 'media') {
+                box.style.display = 'flex';
+                box.style.flexDirection = 'column';
+                box.style.justifyContent = 'flex-start'; // THE FIX: Stops Links/Docs from stretching!
+                box.style.gap = '8px';
+            }
         }
 
         function startMediaLongPress(e, msgId) {
@@ -1388,6 +1790,11 @@
         }
 
         function handleMediaClick(msgId) {
+            // THE FIX: Consume the rogue click in the media gallery!
+            if (window.longPressJustFired) {
+                window.longPressJustFired = false; 
+                return; 
+            }
             if (isSelectionMode) {
                 const idx = selectedMsgIds.indexOf(msgId);
                 if (idx > -1) selectedMsgIds.splice(idx, 1); else selectedMsgIds.push(msgId);
@@ -1679,6 +2086,153 @@
             document.getElementById('newChatModal').style.display = 'none';
             openChat(username, avatar, false, null);
         }
+
+        /* ========================================= */
+        /* --- MASTER SCROLL & PIN CYCLER ENGINE --- */
+        /* ========================================= */
+
+        window.executePinCycle = function() {
+            let pinnedMsgs = currentChatMessages.filter(m => m.isPinned);
+            if (pinnedMsgs.length === 0) return;
+            
+            pinnedMsgs.sort((a, b) => {
+                const dateA = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+                const dateB = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            // 1. Scroll to the CURRENT active pin first
+            const activePin = pinnedMsgs[window.currentPinCycleIndex];
+            if (activePin) window.scrollToMessage(activePin.id);
+
+            // 2. Mathematically advance the cycle for the next click
+            window.currentPinCycleIndex++;
+            if (window.currentPinCycleIndex >= pinnedMsgs.length) window.currentPinCycleIndex = 0;
+
+            // 3. Immediately redraw the banner with the NEXT pin's text
+            const nextPin = pinnedMsgs[window.currentPinCycleIndex];
+            let nextPinText = nextPin.content;
+            
+            if (!nextPinText || nextPinText.trim() === "") {
+                if (nextPin.voiceNote) nextPinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle;">mic</span> Voice Note`;
+                else if (nextPin.media) {
+                    let mLower = nextPin.media.toLowerCase();
+                    if (mLower.endsWith(".mp4") || mLower.endsWith(".webm")) nextPinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #ff3366;">videocam</span> Video`;
+                    else if (mLower.endsWith(".jpg") || mLower.endsWith(".jpeg") || mLower.endsWith(".png") || mLower.endsWith(".gif") || mLower.endsWith(".webp")) nextPinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #a09eb5;">image</span> Image`;
+                    else {
+                        let dName = mLower.includes("_") ? mLower.split("_").slice(1).join("_") : "Document";
+                        nextPinText = `<span class="material-icons" style="font-size: 14px; vertical-align: middle; color: #00a8ff;">description</span> ${dName}`;
+                    }
+                }
+            } else {
+                nextPinText = nextPinText.replace(/<[^>]*>|\[VOICE:\d+\]|/gi, "").replace(/\\n/g, ' ').replace(/\n/g, ' ');
+            }
+
+            document.getElementById("pinnedMessageTitle").textContent = `Pinned Message (${window.currentPinCycleIndex + 1}/${pinnedMsgs.length})`;
+            document.getElementById("pinnedMessageContent").innerHTML = nextPinText; 
+        };
+
+        // --- The Scroll FAB Native Listener ---
+        document.getElementById("chatHistoryContainer").addEventListener("scroll", function() {
+            const isScrolledUp = this.scrollHeight - this.scrollTop > this.clientHeight + 150;
+            const btn = document.getElementById("scrollToBottomBtn");
+            if (btn) btn.style.display = isScrolledUp ? "flex" : "none";
+            
+            if (!isScrolledUp) {
+                window.unreadScrollCount = 0;
+                const badge = document.getElementById("unreadScrollBadge");
+                if (badge) badge.style.display = "none";
+            }
+        });
+        
+        document.getElementById("scrollToBottomBtn").addEventListener("click", function() {
+            const box = document.getElementById("chatHistoryContainer");
+            box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+            window.unreadScrollCount = 0;
+            document.getElementById("unreadScrollBadge").style.display = "none";
+        });
+
+        /* ========================================= */
+        /* --- CUSTOM AUDIO ENGINE (SCRUB BAR) ---   */
+        /* ========================================= */
+        window.currentVnAudio = null;
+        window.currentVnBtn = null;
+        window.currentVnTimer = null;
+        window.currentVnSlider = null;
+        window.currentVnInterval = null;
+
+        window.toggleVn = function(src, btnId, timerId, sliderId, totalSecs) {
+            const btn = document.getElementById(btnId);
+            const timer = document.getElementById(timerId);
+            const slider = document.getElementById(sliderId);
+
+            if (window.currentVnAudio && window.currentVnAudio.src.includes(src) && !window.currentVnAudio.paused) {
+                window.currentVnAudio.pause();
+                btn.textContent = 'play_arrow';
+                clearInterval(window.currentVnInterval);
+                return;
+            }
+
+            if (window.currentVnAudio && window.currentVnAudio.src.includes(src) && window.currentVnAudio.paused) {
+                window.currentVnAudio.play();
+                btn.textContent = 'pause';
+                startVnEngine(totalSecs);
+                return;
+            }
+
+            if (window.currentVnAudio) {
+                window.currentVnAudio.pause();
+                if (window.currentVnBtn) window.currentVnBtn.textContent = 'play_arrow';
+                clearInterval(window.currentVnInterval);
+            }
+
+            window.currentVnAudio = new Audio(src);
+            window.currentVnBtn = btn;
+            window.currentVnTimer = timer;
+            window.currentVnSlider = slider;
+            btn.textContent = 'pause';
+            window.currentVnAudio.play();
+            
+            startVnEngine(totalSecs);
+
+            window.currentVnAudio.onended = () => {
+                btn.textContent = 'play_arrow';
+                clearInterval(window.currentVnInterval);
+                if (slider) slider.value = 0;
+                let m = Math.floor(totalSecs / 60);
+                let s = totalSecs % 60;
+                timer.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            };
+        };
+
+        function startVnEngine(totalSecs) {
+            window.currentVnInterval = setInterval(() => {
+                if (!window.currentVnAudio) return;
+                
+                let current = window.currentVnAudio.currentTime;
+                let duration = window.currentVnAudio.duration || totalSecs;
+                
+                if (window.currentVnSlider) {
+                    let progress = (current / duration) * 100;
+                    window.currentVnSlider.value = isNaN(progress) ? 0 : progress;
+                }
+
+                let left = Math.ceil(duration - current);
+                if (isNaN(left) || !isFinite(left)) left = totalSecs || 0;
+                if (left < 0) left = 0;
+                let m = Math.floor(left / 60);
+                let s = left % 60;
+                window.currentVnTimer.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            }, 100);
+        }
+
+        window.seekVn = function(event, src) {
+            const slider = event.target;
+            if (window.currentVnAudio && window.currentVnAudio.src.includes(src)) {
+                const seekTime = (slider.value / 100) * (window.currentVnAudio.duration || 0);
+                window.currentVnAudio.currentTime = seekTime;
+            }
+        };
 
         loadInbox();
     </script>

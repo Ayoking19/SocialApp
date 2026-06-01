@@ -219,16 +219,21 @@
                                 <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
                                 
                                 <div style="display: flex; gap: 8px; align-items: flex-end; width: 100%; max-width: 1200px; margin: 0 auto;">
-                                    <div style="display: flex; align-items: center; padding-bottom: 10px;">
-                                        <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s; flex-shrink: 0; padding: 4px;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
-                                            <span class="material-icons">add_photo_alternate</span>
+                                    
+                                    <div style="display: flex; align-items: center; height: 45px; padding-bottom: 0;">
+                                        <label for="main-comment-upload" style="cursor: pointer; color: #a09eb5; transition: 0.2s; flex-shrink: 0; display: flex; align-items: center; padding: 4px;" onmouseover="this.style.color='#00e676'" onmouseout="this.style.color='#a09eb5'">
+                                            <span class="material-icons" style="font-size: 24px;">add_photo_alternate</span>
                                         </label>
                                     </div>
                                     <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
                                     
                                     <textarea id="comment-input-${post.id}" class="comment-input" placeholder="Write your reply..." style="flex: 1; min-width: 0; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 14px; line-height: 20px; box-sizing: border-box; padding: 12px 12px; border-radius: 20px;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
                                     
-                                    <button onclick="submitThreadedComment(${post.id})" class="post-comment-btn" style="margin-bottom: 10px;">Post</button>
+                                    <div style="display: flex; align-items: center; height: 45px; padding-bottom: 0;">
+                                        <button onclick="submitThreadedComment(${post.id})" class="chat-send-btn" style="width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; border: none; background: #00e676; color: #0b0f1a; cursor: pointer; box-shadow: 0 4px 10px rgba(0,230,118,0.3);">
+                                            <span class="material-icons" style="font-size: 20px; margin: 0; padding: 0; line-height: 1;">send</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
