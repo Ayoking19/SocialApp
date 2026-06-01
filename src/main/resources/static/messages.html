@@ -725,20 +725,20 @@
                     
                     let previewHtml = "";
                     if (type === 'document') {
-                        msgMediaBase64 += "|NAME:" + file.name;
-                    }
-                    if (type === 'image') {
-                        previewHtml = `<img src="${msgMediaBase64}" style="max-height: 100px; border-radius: 8px; border: 1px solid #00e676;">`;
-                    } else if (type === 'video') {
-                        previewHtml = `<video src="${msgMediaBase64}" style="max-height: 100px; border-radius: 8px; border: 1px solid #ff3366;"></video>`;
-                    } else {
-                        previewHtml = `<div style="padding: 10px; background: rgba(0, 168, 255, 0.1); border: 1px solid #00a8ff; border-radius: 8px; color: #00a8ff; display: flex; align-items: center; gap: 5px;"><span class="material-icons">description</span> Document Attached</div>`;
-                    }
+                msgMediaBase64 += "|NAME:" + file.name;
+            }
+            if (type === 'image') {
+                previewHtml = `<img src="${msgMediaBase64}" style="max-height: 100px; border-radius: 8px; border: 1px solid #00e676;">`;
+            } else if (type === 'video') {
+                previewHtml = `<video src="${msgMediaBase64}" style="max-height: 100px; border-radius: 8px; border: 1px solid #ff3366;"></video>`;
+            } else {
+                previewHtml = `<div style="padding: 10px; background: rgba(0, 168, 255, 0.1); border: 1px solid #00a8ff; border-radius: 8px; color: #00a8ff; display: flex; align-items: center; gap: 5px;"><span class="material-icons">description</span> Document Attached</div>`;
+            }
 
-                    previewContainer.innerHTML = `<div class="preview-item" style="position: relative; margin-bottom: 10px;">
-                        ${previewHtml}
-                        <button onclick="removeMsgMedia()" style="position: absolute; top: -5px; right: -5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px;">X</button>
-                    </div>`;
+            previewContainer.innerHTML = `<div class="preview-item" style="position: relative; margin-bottom: 10px; display: inline-block;">
+                ${previewHtml}
+                <button onclick="removeMsgMedia()" style="position: absolute; top: 5px; right: 5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
+            </div>`;
                 }
                 reader.readAsDataURL(file);
             }
@@ -772,11 +772,14 @@
                         <input type="range" id="vn-slider-prev" class="vn-slider" value="0" max="100" oninput="seekVn(event, '${base64Data}')">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
                             <span id="vn-timer-prev" style="color: #a09eb5; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: bold;">${timeText}</span>
-                            <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="vn-speed-btn" onclick="changeVnSpeed(event)" data-speed="1" style="color: #00e676; font-size: 11px; font-weight: bold; background: rgba(0,230,118,0.1); padding: 2px 6px; border-radius: 10px; cursor: pointer; user-select: none;">1x</span>
+                                <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <button onclick="removeMsgVoiceNote()" style="position: absolute; top: -6px; right: -6px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
+                <button onclick="removeMsgVoiceNote()" style="position: absolute; top: 5px; right: 5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); z-index: 10;">X</button>
             </div>`;
         };
 
@@ -994,7 +997,10 @@
                                     <input type="range" id="vn-slider-${msg.id}" class="vn-slider" value="0" max="100" oninput="seekVn(event, '${cleanVoiceNote}')">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
                                         <span id="vn-timer-${msg.id}" style="color: #a09eb5; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: bold;">${timeText}</span>
-                                        <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span class="vn-speed-btn" onclick="changeVnSpeed(event)" data-speed="1" style="color: #00e676; font-size: 11px; font-weight: bold; background: rgba(0,230,118,0.1); padding: 2px 6px; border-radius: 10px; cursor: pointer; user-select: none;">1x</span>
+                                            <span class="material-icons" style="color: rgba(0, 230, 118, 0.4); font-size: 16px;">mic</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1719,9 +1725,9 @@
                 return;
             }
             
-            grid.innerHTML = '<div class="media-grid" id="mediaGridBox" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>';
-            const box = document.getElementById("mediaGridBox");
-            let hasItems = false;
+            grid.innerHTML = `<div class="media-grid" id="mediaGridBox" style="display: grid; grid-template-columns: ${currentGalleryTab === 'links' ? '1fr' : 'repeat(3, 1fr)'}; gap: 10px;"></div>`;
+        const box = document.getElementById("mediaGridBox");
+        let hasItems = false;
             
             mediaGalleryBuffer.forEach(m => {
                 const isSelected = selectedMsgIds.includes(m.id);
@@ -2187,11 +2193,13 @@
             }
 
             window.currentVnAudio = new Audio(src);
-            window.currentVnBtn = btn;
-            window.currentVnTimer = timer;
-            window.currentVnSlider = slider;
-            btn.textContent = 'pause';
-            window.currentVnAudio.play();
+            window.currentVnAudio.playbackRate = window.globalVnSpeed || 1; // THE FIX: Apply active speed profile!
+        window.currentVnBtn = btn;
+        window.currentVnTimer = timer;
+        window.currentVnSlider = slider;
+        window.currentVnTotalSecs = totalSecs;
+        btn.textContent = 'pause';
+        window.currentVnAudio.play();
             
             startVnEngine(totalSecs);
 
@@ -2210,7 +2218,10 @@
                 if (!window.currentVnAudio) return;
                 
                 let current = window.currentVnAudio.currentTime;
-                let duration = window.currentVnAudio.duration || totalSecs;
+                
+                // THE FIX: Defeat the NaN Race Condition AND the Infinity bug
+                let duration = window.currentVnAudio.duration;
+                if (!duration || isNaN(duration) || duration === Infinity || duration < 0.1) duration = window.currentVnTotalSecs || totalSecs;
                 
                 if (window.currentVnSlider) {
                     let progress = (current / duration) * 100;
@@ -2229,8 +2240,30 @@
         window.seekVn = function(event, src) {
             const slider = event.target;
             if (window.currentVnAudio && window.currentVnAudio.src.includes(src)) {
-                const seekTime = (slider.value / 100) * (window.currentVnAudio.duration || 0);
+                let duration = window.currentVnAudio.duration;
+                if (!duration || isNaN(duration) || duration === Infinity || duration < 0.1) duration = window.currentVnTotalSecs || 0;
+                const seekTime = (slider.value / 100) * duration;
                 window.currentVnAudio.currentTime = seekTime;
+            }
+        };
+
+        // THE FIX: The Playback Speed State Machine
+        window.globalVnSpeed = 1;
+        window.changeVnSpeed = function(event) {
+            event.stopPropagation();
+            let btn = event.currentTarget;
+            let currentSpeed = parseFloat(btn.dataset.speed || "1");
+            let newSpeed = currentSpeed === 1 ? 1.5 : (currentSpeed === 1.5 ? 2 : 1);
+            
+            window.globalVnSpeed = newSpeed;
+            
+            document.querySelectorAll('.vn-speed-btn').forEach(el => {
+                el.dataset.speed = newSpeed;
+                el.textContent = newSpeed + "x";
+            });
+            
+            if (window.currentVnAudio) {
+                window.currentVnAudio.playbackRate = newSpeed;
             }
         };
 

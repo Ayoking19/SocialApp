@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -731,6 +731,24 @@ window.savePost = function(id, btnElement, type = 'post') {
     }).catch(err => console.error("Save Error:", err));
 };
 
+// THE FIX: The Profile Pinned Post Engine (Frontend Native Cache)
+window.toggleProfilePin = function(id) {
+    let currentPin = localStorage.getItem('pinnedProfilePost_' + currentUser);
+    if (currentPin === String(id)) {
+        localStorage.removeItem('pinnedProfilePost_' + currentUser);
+        if (typeof showToast === "function") showToast("Post unpinned from profile");
+    } else {
+        localStorage.setItem('pinnedProfilePost_' + currentUser, String(id));
+        if (typeof showToast === "function") showToast("Post pinned to profile!");
+    }
+    document.querySelectorAll('.dropdown-menu').forEach(menu => menu.style.display = 'none');
+    
+    // Auto-reload the profile feed if they are currently looking at it
+    if (window.location.pathname.includes('profile.html') && typeof showAllPosts === 'function') {
+        loadUserPosts();
+    }
+};
+
 // The Universal Kebab Generator (DRY Architecture)
 window.generateKebabMenu = function(item, type = 'post') {
     const id = type === 'comment' ? item.id : item.id;
@@ -756,6 +774,11 @@ window.generateKebabMenu = function(item, type = 'post') {
                     <button class="dropdown-item" onclick="event.stopPropagation(); savePost(${id}, this, '${type}')">
                         <span class="material-icons" style="font-size: 18px;">${isSaved ? 'bookmark' : 'bookmark_border'}</span> ${isSaved ? 'Unsave' : 'Save'}
                     </button>
+                    ${type === 'post' ? `
+                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleProfilePin(${id})">
+                        <span class="material-icons" style="font-size: 18px; transform: rotate(45deg);">push_pin</span> ${localStorage.getItem('pinnedProfilePost_' + currentUser) === String(id) ? 'Unpin from Profile' : 'Pin to Profile'}
+                    </button>
+                    ` : ''}
                 </div>
             </div>
         `;
