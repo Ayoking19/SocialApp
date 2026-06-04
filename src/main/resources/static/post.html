@@ -114,6 +114,7 @@
             if (!currentPostId) {
                 document.getElementById('singlePostContainer').innerHTML = "<p style='color: white; padding: 20px;'>Error: No post selected.</p>";
             } else {
+                document.getElementById('singlePostContainer').innerHTML = typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(1) : "<p style='text-align:center;'>Loading...</p>";
                 fetchSinglePost(currentPostId);
             }
         };
@@ -139,14 +140,7 @@
                     followBadgeHTML = `<button class="modal-follow-btn" style="margin-left: auto; padding: 6px 12px; font-size: 13px; ${btnStyle}" onclick="feedFollowUser(this, '${post.username}')">${btnText}</button>`;
                 }
 
-                let mediaHTML = "";
-                if (post.media && post.media !== "") {
-                    if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
-                        mediaHTML = `<video src="${post.media}" controls style="width: 100%; max-height: 400px; border-radius: 10px; margin-top: 10px; background: #000;"></video>`;
-                    } else {
-                        mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;" alt="Post media">`;
-                    }
-                }
+                let mediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(post.media, post.id) : "";
 
                 const quoteBoxHTML = typeof buildQuoteBox === "function" ? buildQuoteBox(post.parentPost) : "";
                 const likeColorStyle = post.isLiked ? 'background: rgba(255, 51, 102, 0.1); color: #ff3366;' : '';
@@ -206,7 +200,7 @@
                         <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                             
                             <div id="comment-list-${post.id}" style="margin-bottom: 100px; max-height: none;">
-                                <p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>
+                                ${typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(2) : '<p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>'}
                             </div>
                             
                             <div style="position: fixed; bottom: 70px; left: 0; width: 100%; background: #0b0f1a; border-top: 1px solid #334155; padding: 12px 20px; z-index: 1000; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
@@ -431,14 +425,7 @@
                 ? `<span class="reply-action-btn" style="color: #00e676;" onclick="viewReplies(${c.id}, ${currentPostId})">Replies (${c.replyCount}) <span class="material-icons" style="font-size: 16px; margin-left: 2px;">expand_more</span></span>` 
                 : '';
 
-            let commentMediaHTML = "";
-            if (c.media && c.media !== "") {
-                if (c.media.toLowerCase().endsWith(".mp4") || c.media.startsWith("data:video")) {
-                    commentMediaHTML = `<video src="${c.media}" controls style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px;"></video>`;
-                } else {
-                    commentMediaHTML = `<img src="${c.media}" style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 8px; object-fit: cover;">`;
-                }
-            }
+            let commentMediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(c.media, c.id) : "";
 
             const containerStyle = isFocused ? 'border-left: 4px solid #00e676; background: rgba(255,255,255,0.06); padding: 15px;' : 'background: rgba(255,255,255,0.03); padding: 12px; margin-top: 15px; border: 1px solid rgba(255,255,255,0.05);';
 
@@ -599,12 +586,9 @@
         function renderModalItems(posts, container) {
             let quotesHTML = "";
             posts.forEach(post => {
-                let mediaHTML = "";
-                if (post.media && post.media !== "") {
-                    mediaHTML = `<img src="${post.media}" style="width: 100%; border-radius: 10px; margin-top: 10px; object-fit: cover;">`;
-                }
+                let mediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(post.media, post.id) : "";
                 
-                const shortPostTime = post.timestamp && post.timestamp.length > 16 ? post.timestamp.substring(0, 16) : post.timestamp;
+                const shortPostTime = post.timestamp && String(post.timestamp).length > 16 ? String(post.timestamp).substring(0, 16) : (post.timestamp || "");
 
                 quotesHTML += `
                     <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer; transition: 0.2s;" onclick="window.location.href='post.html?id=${post.id}'">
@@ -613,7 +597,7 @@
                             <strong style="color: white;">${post.username}</strong>
                             <span style="color: gray; font-size: 12px; margin-left: auto;">${shortPostTime}</span>
                         </div>
-                        <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${post.content}</p>
+                        <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${typeof parseSocialText === "function" ? parseSocialText(post.content) : post.content}</p>
                         ${mediaHTML}
                     </div>
                 `;

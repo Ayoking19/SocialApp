@@ -17,9 +17,21 @@ document.head.insertAdjacentHTML("beforeend", `
             animation: shimmer 1.2s infinite;
         }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
         .skel-avatar { width: 40px; height: 40px; border-radius: 50%; }
         .skel-line { height: 14px; margin-bottom: 10px; width: 100%; }
         .skel-media { height: 250px; border-radius: 15px; margin-top: 15px; }
+
+        /* MULTI-MEDIA 2x2 GRID CSS */
+        .media-gallery { display: grid; gap: 5px; margin-top: 15px; border-radius: 15px; overflow: hidden; width: 100%; border: 1px solid rgba(0, 230, 118, 0.3); }
+        .media-grid-1 { grid-template-columns: 1fr; grid-auto-rows: 300px; }
+        .media-grid-2 { grid-template-columns: 1fr 1fr; grid-auto-rows: 200px; }
+        .media-grid-3 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
+        .media-grid-3 .media-cell:first-child { grid-column: span 2; grid-row: span 1; }
+        .media-grid-4 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
+        .media-cell { position: relative; width: 100%; height: 100%; overflow: hidden; display: flex; }
+        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; }
+        .grid-controls { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 8px; z-index: 10; }
 
         /* THE VOICE NOTE CSS */
         @keyframes pulseMic { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
@@ -182,6 +194,11 @@ function showToast(message) {
 function editPost(postId, currentContent) {
     openEditModal("Edit Post", currentContent, (newContent) => {
         if (newContent && newContent.trim() !== "") {
+            // OPTIMISTIC UI: INSTANT UPDATE
+            document.querySelectorAll(`[id="post-content-text-${postId}"]`).forEach(el => {
+                el.innerHTML = parseSocialText(newContent);
+            });
+
             fetch(`${API_BASE}/api/editPost`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser, postId: postId.toString(), content: newContent })
@@ -190,14 +207,10 @@ function editPost(postId, currentContent) {
             .then(data => {
                 if (data === "SUCCESS") {
                     showToast("Post updated!");
-                    const contentElem = document.getElementById(`post-content-text-${postId}`);
-                    if (contentElem) contentElem.innerHTML = parseSocialText(newContent);
-                    
-                    const editBtn = document.getElementById(`edit-btn-${postId}`);
-                    if (editBtn) {
+                    document.querySelectorAll(`[id="edit-btn-${postId}"]`).forEach(editBtn => {
                         const escapedContent = newContent.replace(/'/g, "\\'");
                         editBtn.setAttribute("onclick", `event.stopPropagation(); editPost(${postId}, '${escapedContent}')`);
-                    }
+                    });
                 }
             });
         }
@@ -206,17 +219,16 @@ function editPost(postId, currentContent) {
 
 function deletePost(postId) {
     openConfirmModal("Are you sure you want to permanently delete this post?", () => {
+        // OPTIMISTIC UI: INSTANT HIDE
+        document.querySelectorAll(`[id="post-card-${postId}"]`).forEach(el => el.style.display = 'none');
+
         fetch(`${API_BASE}/api/deletePost`, {
             method: 'POST',
             body: JSON.stringify({ username: currentUser, postId: postId.toString() })
         })
         .then(res => res.text())
         .then(data => {
-            if (data === "SUCCESS") {
-                showToast("Post deleted.");
-                const postElem = document.getElementById(`post-card-${postId}`);
-                if (postElem) postElem.remove();
-            }
+            if (data === "SUCCESS") showToast("Post deleted.");
         });
     });
 }
@@ -446,6 +458,75 @@ function openRepostMenu(postId, isReposted = false, commentId = null) {
     document.getElementById('quoteConfirm').onclick = () => { openQuoteEditor(postId, commentId); overlay.remove(); };
 }
 
+// THE FIX: Extracted to the Global Scope so Kebab Menus can access it from anywhere!
+window.openDynamicListModal = function(title, endpoint, bodyPayload) {
+    let existing = document.getElementById('dynamicListModalOverlay');
+    if (existing) existing.remove();
+
+    const listOverlay = document.createElement('div');
+    listOverlay.id = 'dynamicListModalOverlay';
+    listOverlay.className = 'modal-overlay';
+    listOverlay.style.zIndex = '6000';
+    
+    listOverlay.innerHTML = `
+        <div class="modal-card" style="max-width: 500px; width: 98%; padding: 25px 15px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: white;">${title}</h3>
+                <button onclick="document.getElementById('dynamicListModalOverlay').remove()" style="background: transparent; border: none; color: #ff3366; cursor: pointer; display: flex; align-items: center;"><span class="material-icons">close</span></button>
+            </div>
+            <div id="dynamicListContainer" style="overflow-y: auto; flex: 1; padding-right: 10px;">
+                <div style="text-align: center; margin-top: 20px; color: #00e676; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span class="material-icons" style="animation: spin 1s linear infinite;">autorenew</span>
+                    <span style="font-weight: bold;">Fetching...</span>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(listOverlay);
+
+    fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        body: JSON.stringify(bodyPayload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        const container = document.getElementById('dynamicListContainer');
+        if (data.length === 0) {
+            container.innerHTML = `<p style="text-align: center; color: gray; margin-top: 20px;">Nothing to show yet.</p>`;
+            return;
+        }
+        
+        let html = "";
+        data.forEach(item => {
+            if (item.content !== undefined) {
+                html += `
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer;" onclick="window.location.href='post.html?id=${item.id}'">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="${item.avatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+                        <strong style="color: white;">${item.username}</strong>
+                        <span style="color: gray; font-size: 12px; margin-left: auto;">${item.timestamp.substring(0,16)}</span>
+                    </div>
+                    <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${item.content}</p>
+                    ${item.media ? `<div style="margin-top: 10px; color: #00e676; font-size: 12px;"><span class="material-icons" style="font-size:14px; vertical-align:middle;">image</span> Attached Media</div>` : ''}
+                </div>`;
+            } else {
+                html += `
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05);">
+                    <img src="${item.avatar}" onclick="window.location.href='profile.html?user=${item.username}'" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; cursor: pointer; flex-shrink: 0;">
+                    <div style="flex: 1; cursor: pointer; min-width: 0; display: flex; flex-direction: column;" onclick="window.location.href='profile.html?user=${item.username}'">
+                        <strong class="username-truncate" style="color: white; display: block; max-width: 100%;">${item.username}</strong>
+                        <span class="truncate-text" style="font-size: 11px; color: #a09eb5;">${item.bio || "No bio yet."}</span>
+                    </div>
+                </div>`;
+            }
+        });
+        container.innerHTML = html;
+    });
+};
+
+window.openQuotesModal = function(postId) {
+    openDynamicListModal("Quoted By", "/api/getPostQuotes", { postId: postId.toString(), currentUser: currentUser });
+};
+
 function openQuoteEditor(postId, commentId = null) {
     let existingMenu = document.getElementById('quoteMenuOverlay');
     if (existingMenu) existingMenu.remove();
@@ -519,6 +600,26 @@ function openQuoteEditor(postId, commentId = null) {
             showToast("Please add text or media to your quote.");
             return;
         }
+
+        // THE FIX: Contextually target the exact active timeline container to isolate layout contexts!
+        let feedElement = null;
+        if (window.location.pathname.includes('index.html')) feedElement = document.getElementById("feedContainer");
+        else if (window.location.pathname.includes('profile.html')) feedElement = document.getElementById("profileFeedContainer");
+        else if (window.location.pathname.includes('top.html')) feedElement = document.getElementById("topFeedContainer");
+        else if (window.location.pathname.includes('saved.html')) feedElement = document.getElementById("feed");
+        else feedElement = document.getElementById("feedContainer");
+
+        if (feedElement) {
+            const tempHTML = `
+            <div class="post" style="opacity: 0.7; border-left: 3px solid #00e676; margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span class="material-icons" style="color: #00e676;">format_quote</span>
+                    <strong style="color: white;">Processing Quote...</strong>
+                </div>
+                <p style="color: #e0e0e0; margin-top: 10px;">${parseSocialText(textArea.value)}</p>
+            </div>`;
+            feedElement.insertAdjacentHTML('afterbegin', tempHTML);
+        }
         
         if (typeof executeQuote === 'function') {
             executeQuote(postId, textArea.value, quoteMediaBase64, commentId);
@@ -537,7 +638,12 @@ function openQuoteEditor(postId, commentId = null) {
             .then(data => {
                 if(data === "SUCCESS") {
                     showToast("Quote Posted!");
-                    if(typeof loadFeed === 'function') loadFeed();
+                    currentPage = 1;
+                    if (typeof loadFeed === 'function' && document.getElementById("feedContainer")) { document.getElementById("feedContainer").innerHTML = ""; loadFeed(); }
+                    else if (typeof loadUserPosts === 'function' && document.getElementById("profileFeedContainer")) { document.getElementById("profileFeedContainer").innerHTML = ""; loadUserPosts(); }
+                    else if (typeof fetchTopPosts === 'function' && document.getElementById("topFeedContainer")) fetchTopPosts();
+                    else if (typeof loadSavedData === 'function' && document.getElementById("feed")) { document.getElementById("feed").innerHTML = ""; loadSavedData(); }
+                    else if (typeof fetchSinglePost === 'function' && currentPostId) fetchSinglePost(currentPostId);
                 }
             });
         }
@@ -546,6 +652,25 @@ function openQuoteEditor(postId, commentId = null) {
 }
 
 function executeRepost(postId, isCurrentlyReposted, commentId = null) {
+    // THE FIX: Contextually target the exact active timeline container to isolate layout contexts!
+    let feedElement = null;
+    if (window.location.pathname.includes('index.html')) feedElement = document.getElementById("feedContainer");
+    else if (window.location.pathname.includes('profile.html')) feedElement = document.getElementById("profileFeedContainer");
+    else if (window.location.pathname.includes('top.html')) feedElement = document.getElementById("topFeedContainer");
+    else if (window.location.pathname.includes('saved.html')) feedElement = document.getElementById("feed");
+    else feedElement = document.getElementById("feedContainer");
+
+    if (!isCurrentlyReposted && feedElement) {
+        const tempHTML = `
+        <div class="post" style="opacity: 0.7; border-left: 3px solid #00a8ff; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span class="material-icons" style="color: #00a8ff;">repeat</span>
+                <strong style="color: white;">Processing Repost...</strong>
+            </div>
+        </div>`;
+        feedElement.insertAdjacentHTML('afterbegin', tempHTML);
+    }
+
     fetch(`${API_BASE}/api/createPost`, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -559,25 +684,33 @@ function executeRepost(postId, isCurrentlyReposted, commentId = null) {
     .then(response => response.text())
     .then(data => {
         if (data === "SUCCESS") {
-            showToast(isCurrentlyReposted ? "Repost Removed" : "Reposted!");
-            
-            const btn = document.getElementById(commentId ? `comment-repost-btn-${commentId}` : `repost-btn-${postId}`);
-            if (btn) {
-                const countSpan = btn.querySelector('.repost-count');
-                let currentCount = countSpan ? (parseInt(countSpan.textContent) || 0) : 0;
-                
-                if (isCurrentlyReposted) {
-                    btn.style.background = '';
-                    btn.style.color = '';
-                    if (countSpan) countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
-                    btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, false, ${commentId || 'null'})`);
-                } else {
-                    btn.style.background = 'rgba(0, 168, 255, 0.1)';
-                    btn.style.color = '#00a8ff';
-                    if (countSpan) countSpan.textContent = currentCount + 1;
-                    btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, true, ${commentId || 'null'})`);
-                }
+            showToast(isCurrentlyReposted ? "Undo Repost Successful" : "Reposted!");
+            if (!isCurrentlyReposted) {
+                currentPage = 1;
+                if (typeof loadFeed === 'function' && document.getElementById("feedContainer")) { document.getElementById("feedContainer").innerHTML = ""; loadFeed(); }
+                else if (typeof loadUserPosts === 'function' && document.getElementById("profileFeedContainer")) { document.getElementById("profileFeedContainer").innerHTML = ""; loadUserPosts(); }
+                else if (typeof fetchTopPosts === 'function' && document.getElementById("topFeedContainer")) fetchTopPosts();
+                else if (typeof loadSavedData === 'function' && document.getElementById("feed")) { document.getElementById("feed").innerHTML = ""; loadSavedData(); }
             }
+        }
+    });
+
+    // OPTIMISTIC UI: SYNC ALL REPOST BUTTONS INSTANTLY
+    const targetBtns = document.querySelectorAll(commentId ? `[id="comment-repost-btn-${commentId}"]` : `[id="repost-btn-${postId}"]`);
+    targetBtns.forEach(btn => {
+        const countSpan = btn.querySelector('.repost-count');
+        let currentCount = countSpan ? (parseInt(countSpan.textContent) || 0) : 0;
+        
+        if (isCurrentlyReposted) {
+            btn.style.background = '';
+            btn.style.color = '';
+            if (countSpan) countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
+            btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, false, ${commentId || 'null'})`);
+        } else {
+            btn.style.background = 'rgba(0, 168, 255, 0.1)';
+            btn.style.color = '#00a8ff';
+            if (countSpan) countSpan.textContent = currentCount + 1;
+            btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, true, ${commentId || 'null'})`);
         }
     });
 }
@@ -586,20 +719,13 @@ function executeRepost(postId, isCurrentlyReposted, commentId = null) {
 function buildQuoteBox(parentPost) {
     if (!parentPost) return ""; 
     
-    let pMediaHTML = "";
-    if (parentPost.media && parentPost.media !== "") {
-        if (parentPost.media.toLowerCase().endsWith(".mp4") || parentPost.media.startsWith("data:video")) {
-            pMediaHTML = `<video src="${parentPost.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 10px; background: #000;"></video>`;
-        } else {
-            pMediaHTML = `<img src="${parentPost.media}" style="width: 100%; max-height: 250px; border-radius: 8px; margin-top: 10px; object-fit: cover;">`;
-        }
-    }
+    // Safety routing through the Grid Engine prevents the Array TypeError crash!
+    let pMediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(parentPost.media, parentPost.id, 'quote') : "";
 
     const pEditedTag = parentPost.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px; flex-shrink: 0;"> (edited)</span>` : "";
-    // [THE FIX]: Quote boxes now fire deep-link coordinates if they are quoting a comment
     const linkTarget = parentPost.isComment ? `post.html?id=${parentPost.postId}&commentId=${parentPost.id}` : `post.html?id=${parentPost.id}`;
 
-    const shortTime = parentPost.timestamp && parentPost.timestamp.length > 16 ? parentPost.timestamp.substring(0, 16) : parentPost.timestamp;
+    const shortTime = parentPost.timestamp && String(parentPost.timestamp).length > 16 ? String(parentPost.timestamp).substring(0, 16) : (parentPost.timestamp || "");
 
     return `
     <div class="embedded-quote" onclick="event.stopPropagation(); window.location.href='${linkTarget}'" style="border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-top: 10px; background: rgba(255,255,255,0.02); cursor: pointer; transition: background 0.2s;">
@@ -608,7 +734,7 @@ function buildQuoteBox(parentPost) {
             <strong class="username-truncate" style="font-size: 13px; color: white;">${parentPost.username}</strong>
             ${pEditedTag}
         </div>
-        <div style="font-size: 14px; color: #e0e0e0; line-height: 1.4;">${parentPost.content}</div>
+        <div style="font-size: 14px; color: #e0e0e0; line-height: 1.4;">${typeof parseSocialText === "function" ? parseSocialText(parentPost.content) : (parentPost.content || "")}</div>
         ${pMediaHTML}
         
         <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
@@ -754,7 +880,7 @@ window.generateKebabMenu = function(item, type = 'post') {
     const id = type === 'comment' ? item.id : item.id;
     const isSaved = item.isSaved || false;
     const isFollowing = item.isFollowing || false;
-    const contentEscaped = item.content ? item.content.replace(/'/g, "\\'") : "";
+    const contentEscaped = item.content ? String(item.content).replace(/'/g, "\\'") : "";
    const itemOwner = item.username;
     
     let kebabHTML = "";
@@ -765,7 +891,7 @@ window.generateKebabMenu = function(item, type = 'post') {
                     <span class="material-icons">more_vert</span>
                 </button>
                 <div id="dropdown-${type}-${id}" class="dropdown-menu">
-                    <button class="dropdown-item" onclick="event.stopPropagation(); ${type === 'comment' ? `editComment(${id}, '${contentEscaped}')` : `window.location.href='edit-post.html?id=${id}'`}">
+                    <button class="dropdown-item" onclick="event.stopPropagation(); ${type === 'comment' ? `editComment(${id}, '${contentEscaped}')` : `editPost(${id}, '${contentEscaped}')`}">
                         <span class="material-icons" style="font-size: 18px;">edit</span> Edit
                     </button>
                     <button class="dropdown-item danger" onclick="event.stopPropagation(); ${type === 'comment' ? `deleteComment(${id})` : `deletePost(${id})`}">
@@ -777,6 +903,12 @@ window.generateKebabMenu = function(item, type = 'post') {
                     ${type === 'post' ? `
                     <button class="dropdown-item" onclick="event.stopPropagation(); toggleProfilePin(${id})">
                         <span class="material-icons" style="font-size: 18px; transform: rotate(45deg);">push_pin</span> ${localStorage.getItem('pinnedProfilePost_' + currentUser) === String(id) ? 'Unpin from Profile' : 'Pin to Profile'}
+                    </button>
+                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Liked By', '/api/getPostLikes', { postId: '${id}' })">
+                        <span class="material-icons" style="font-size: 18px;">favorite</span> Liked by
+                    </button>
+                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Reposted By', '/api/getPostReposts', { postId: '${id}' })">
+                        <span class="material-icons" style="font-size: 18px;">repeat</span> Reposted by
                     </button>
                     ` : ''}
                 </div>
@@ -963,7 +1095,7 @@ window.toggleVoiceRecord = function(context) {
 function parseSocialText(text) {
     if (!text) return "";
     
-    let html = text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+    let html = String(text).replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
     
     // THE FIX: Swapped #00a8ff for rgb() so the Hashtag parser below doesn't shatter the HTML!
     html = html.replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" target="_blank" style="color: rgb(0, 168, 255); text-decoration: underline;" onclick="event.stopPropagation();">$1</a>`);
@@ -982,6 +1114,77 @@ Element.prototype.requestFullscreen = function() {
     if (nativeRequestFullscreen) {
         return nativeRequestFullscreen.call(this); 
     }
+};
+
+/* ========================================= */
+/* --- THE UNIVERSAL 2x2 MEDIA GRID ENGINE   */
+/* ========================================= */
+window.generateMediaGridHTML = function(mediaData, postId, context = 'feed') {
+    if (!mediaData) return "";
+    if (typeof mediaData === 'string' && mediaData.trim() === "") return "";
+    if (Array.isArray(mediaData) && mediaData.length === 0) return "";
+
+    let mediaArray = [];
+    try {
+        if (typeof mediaData === 'string') {
+            if (mediaData.startsWith("[")) mediaArray = JSON.parse(mediaData);
+            else mediaArray = [mediaData]; 
+        } else if (Array.isArray(mediaData)) {
+            mediaArray = mediaData;
+        }
+    } catch (e) { mediaArray = [mediaData]; }
+    
+    // Strict Type-Checking: Filter out nulls to prevent crashes
+    mediaArray = mediaArray.filter(item => item && typeof item === 'string' && item.trim() !== "");
+    if (mediaArray.length === 0) return "";
+
+    let gridClass = "media-grid-1";
+    if (mediaArray.length === 2) gridClass = "media-grid-2";
+    if (mediaArray.length === 3) gridClass = "media-grid-3";
+    if (mediaArray.length >= 4) { gridClass = "media-grid-4"; mediaArray = mediaArray.slice(0, 4); } // Hard cap at 4
+
+    let html = `<div class="media-gallery ${gridClass}">`;
+
+    mediaArray.forEach((item, index) => {
+        // THE FIX: Protect raw Base64 'data:' strings from being corrupted by getFullMediaUrl
+        const isBase64 = item.startsWith("data:");
+        const mediaUrl = isBase64 ? item : (typeof getFullMediaUrl === 'function' ? getFullMediaUrl(item) : item);
+        
+        const ext = item.split('.').pop() || "png";
+        const isVideo = item.toLowerCase().endsWith(".mp4") || item.startsWith("data:video");
+        
+        html += `<div class="media-cell">`;
+        if (isVideo) {
+            // THE FIX: Restored native thumbnails. #t=0.1 safely triggers a thumbnail for server files, but is stripped from Base64 to prevent corruption!
+            const finalVideoSrc = isBase64 ? mediaUrl : mediaUrl + "#t=0.1";
+            html += `
+            <video 
+                src="${finalVideoSrc}" 
+                preload="metadata" 
+                controls 
+                onclick="event.stopPropagation();" 
+                class="grid-media-item" 
+                style="background: #0b0f1a; object-fit: contain;">
+            </video>`;
+        } else {
+            // Prevent lightbox from opening while in preview mode
+            html += `<img src="${mediaUrl}" onclick="event.stopPropagation(); ${context !== 'preview' ? `openLightbox('${mediaUrl}')` : ''}" class="grid-media-item">`;
+        }
+
+        if (context === 'preview') {
+            // THE FIX: Inject specific "X" button for each individual media item during Post Creation
+            html += `<button type="button" onclick="event.stopPropagation(); window.removeSpecificMedia(${index})" style="position: absolute; top: 5px; right: 5px; z-index: 20; width: 28px; height: 28px; font-size: 14px; padding: 0; background: rgba(255,51,102,0.9); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove this item">X</button>`;
+        } else if (context !== 'chat' && !isVideo) {
+            // THE FIX: Only render custom overlays for images. Videos retain their native controls.
+            html += `<div class="grid-controls">`;
+            html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Image_${postId}_${index}.${ext}') : window.open('${mediaUrl}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Download"><span class="material-icons" style="font-size: 18px;">download</span></button>`;
+            html += `<button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
+            html += `</div>`;
+        }
+        html += `</div>`;
+    });
+    html += `</div>`;
+    return html;
 };
 
 checkNotifications();

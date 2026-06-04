@@ -13,7 +13,15 @@ public class DatabaseManager {
         Connection conn = null;
         try {
             conn = DriverManager.getConnection(DATABASE_URL);
-            System.out.println("Connection to SQLite has been established.");
+            
+            // THE FIX: Injecting WAL mode to prevent database locking and connection bleed!
+            try (Statement pragmaStmt = conn.createStatement()) {
+                pragmaStmt.execute("PRAGMA journal_mode=WAL;");
+                pragmaStmt.execute("PRAGMA synchronous=NORMAL;");
+                pragmaStmt.execute("PRAGMA cache_size=-64000;");
+            }
+            
+            System.out.println("Connection to SQLite has been established with WAL mode active.");
         } catch (SQLException e) {
             System.out.println("Connection Error: " + e.getMessage());
         }

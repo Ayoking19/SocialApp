@@ -231,25 +231,7 @@
             if (postArray.length === 0) return "<p style='text-align: center; color: #a09eb5;'>No posts found.</p>";
             let html = "";
             postArray.forEach(post => {
-                let mediaHTML = "";
-                if (post.media && post.media.trim() !== "") {
-                    if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
-                        mediaHTML = `<video src="${post.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 400px; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(0, 230, 118, 0.3); background: #000;"></video>`;
-                    } else {
-                        // THE FIX: Web-only circular buttons (Both Download and Full Screen) with Hover State Restored
-                        mediaHTML = `<div style="position: relative; margin-top: 15px;">
-                            <img src="${post.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);">
-                            <div style="margin-top: 8px; display: flex; gap: 10px;">
-                                <a href="${post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Download">
-                                    <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">download</span>
-                                </a>
-                                <button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important; cursor: pointer;" title="Full Screen">
-                                    <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">fullscreen</span>
-                                </button>
-                            </div>
-                        </div>`;
-                    }
-                }
+                let mediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(post.media, post.id) : "";
                 
                 let snippetHTML = (post.matchedSnippet && post.matchedSnippet !== "") ? `<div style="background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; padding: 8px 12px; margin-top: 10px; border-radius: 4px; font-size: 13px; color: #a09eb5; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="font-size: 16px; color: #00e676;">chat</span> <span style="color: white; font-style: italic;">"${post.matchedSnippet}"</span></div>` : "";
 

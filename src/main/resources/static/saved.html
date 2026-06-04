@@ -87,14 +87,20 @@
             // Reset state and show loading text so it isn't blank
             currentPage = 1;
             hasMorePosts = true;
-            document.getElementById("feed").innerHTML = `<p style="text-align: center; color: gray; margin-top: 50px;">Loading ${tab}...</p>`;
+            document.getElementById("feed").innerHTML = typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(3) : `<p style="text-align: center; color: gray; margin-top: 50px;">Loading ${tab}...</p>`;
             loadSavedData();
         }
 
         function loadSavedData() {
             if (isLoading || !hasMorePosts) return;
             isLoading = true;
-            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            // THE FIX: If it is the first page, show skeletons. Otherwise, show the bottom loading spinner.
+            if (currentPage === 1) {
+                document.getElementById("feed").innerHTML = typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(3) : `<p style="text-align: center; color: gray; margin-top: 50px;">Loading ${activeTab}...</p>`;
+            } else {
+                document.getElementById('loadingIndicator').style.display = 'block';
+            }
 
             const endpoint = activeTab === 'posts' ? '/api/getSavedPosts' : '/api/getSavedComments';
 
@@ -102,9 +108,17 @@
                 method: 'POST',
                 body: JSON.stringify({ currentUser: currentUser, page: currentPage.toString() })
             })
-            .then(response => {
-                if (!response.ok) throw new Error("Server rejected the request.");
-                return response.json();
+            .then(async response => {
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Server Error ${response.status}: ` + errText.substring(0, 100));
+                }
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (err) {
+                    throw new Error("Java Server crashed and returned HTML instead of JSON.");
+                }
             })
             .then(items => {
                 document.getElementById('loadingIndicator').style.display = 'none';
@@ -126,25 +140,19 @@
 
                 let feedHTML = "";
                 items.forEach(item => {
-                    const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(item, activeTab === 'posts' ? 'post' : 'comment') : "";
-                    const editedTag = item.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
-                    const shortTime = item.timestamp && item.timestamp.length > 16 ? item.timestamp.substring(0, 16) : item.timestamp;
+                    if (!item) return;
+                    try {
+                        const kebabMenuHTML = typeof generateKebabMenu === "function" ? generateKebabMenu(item, activeTab === 'posts' ? 'post' : 'comment') : "";
+                        const editedTag = item.isEdited ? `<span style="font-size: 11px; color: #6a6680; font-style: italic; margin-left: 5px;"> (edited)</span>` : "";
+                        const shortTime = item.timestamp && String(item.timestamp).length > 16 ? String(item.timestamp).substring(0, 16) : (item.timestamp || "");
 
-                    // MEDIA GENERATOR
-                    let mediaHTML = "";
-                    if (item.media && item.media.trim() !== "") {
-                        if (item.media.toLowerCase().endsWith(".mp4") || item.media.startsWith("data:video")) {
-                            mediaHTML = `<video src="${item.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 400px; border-radius: 12px; margin-top: 10px; background: #000; border: 1px solid rgba(0, 230, 118, 0.3);"></video>`;
-                        } else {
-                            mediaHTML = `<div style="position: relative; margin-top: 15px;">
-                                <img src="${item.media}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3);">
-                            </div>`;
-                        }
-                    }
+                        // MULTI-MEDIA GRID GENERATOR
+                        let mediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(item.media, item.id) : "";
 
-                    if (activeTab === 'posts') {
-                        // POST RENDERER
-                        const isPureRepost = (!item.content || item.content.trim() === "") && (!item.media || item.media === "") && item.parentPost;
+                        if (activeTab === 'posts') {
+                            // POST RENDERER
+                            const hasMedia = item.media && (typeof item.media === 'string' ? item.media.trim() !== "" : item.media.length > 0);
+                            const isPureRepost = (!item.content || String(item.content).trim() === "") && !hasMedia && item.parentPost;
                         const targetUrl = isPureRepost ? (item.parentPost.isComment ? `post.html?id=${item.parentPost.postId}&commentId=${item.parentPost.id}` : `post.html?id=${item.parentPost.id}`) : `post.html?id=${item.id}`;
                         const quoteBoxHTML = typeof buildQuoteBox === "function" ? buildQuoteBox(item.parentPost) : "";
                         
@@ -196,6 +204,9 @@
                                 ${mediaHTML}
                                 <div style="margin-top: 10px; color: #00e676; font-size: 12px; font-weight: bold;">View Original Post ➔</div>
                             </div>`;
+                        }
+                    } catch (err) {
+                        console.error("Skipped corrupted saved item:", err);
                     }
                 });
                 

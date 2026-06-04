@@ -1229,37 +1229,69 @@ public class Main {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
                     String path = exchange.getRequestURI().getPath();
-                    
-                    if (path.equals("/")) {
-                        path = "/index.html";
-                    }
+                    if (path.equals("/")) path = "/index.html";
 
                     File file = new File("src/main/resources/static" + path);
 
                     if (file.exists() && !file.isDirectory()) {
-                        byte[] bytes = Files.readAllBytes(file.toPath());
-
                         String contentType = "text/html";
                         if (path.endsWith(".css")) contentType = "text/css";
                         else if (path.endsWith(".js")) contentType = "application/javascript";
                         else if (path.endsWith(".png")) contentType = "image/png";
-                        else if (path.endsWith(".jpg")) contentType = "image/jpeg";
+                        else if (path.endsWith(".jpg") || path.endsWith(".jpeg")) contentType = "image/jpeg";
                         else if (path.endsWith(".mp4")) contentType = "video/mp4"; 
                         else if (path.endsWith(".pdf")) contentType = "application/pdf"; 
                         else if (path.endsWith(".txt")) contentType = "text/plain"; 
 
                         exchange.getResponseHeaders().set("Content-Type", contentType);
-                        exchange.sendResponseHeaders(200, bytes.length);
-                        
-                        OutputStream os = exchange.getResponseBody();
-                        os.write(bytes);
-                        os.close();
+                        exchange.getResponseHeaders().set("Accept-Ranges", "bytes");
+
+                        String rangeHeader = exchange.getRequestHeaders().getFirst("Range");
+                        long fileLength = file.length();
+
+                        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                            String[] ranges = rangeHeader.substring(6).split("-");
+                            long start = Long.parseLong(ranges[0]);
+                            long end = ranges.length > 1 && !ranges[1].isEmpty() ? Long.parseLong(ranges[1]) : fileLength - 1;
+                            
+                            if (start >= fileLength) {
+                                exchange.getResponseHeaders().set("Content-Range", "bytes */" + fileLength);
+                                exchange.sendResponseHeaders(416, -1);
+                                return;
+                            }
+                            
+                            long contentLength = end - start + 1;
+                            exchange.getResponseHeaders().set("Content-Range", "bytes " + start + "-" + end + "/" + fileLength);
+                            exchange.sendResponseHeaders(206, contentLength);
+                            
+                            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r");
+                                 OutputStream os = exchange.getResponseBody()) {
+                                raf.seek(start);
+                                byte[] buffer = new byte[8192];
+                                long bytesToRead = contentLength;
+                                int read;
+                                while (bytesToRead > 0 && (read = raf.read(buffer, 0, (int)Math.min(buffer.length, bytesToRead))) != -1) {
+                                    os.write(buffer, 0, read);
+                                    bytesToRead -= read;
+                                }
+                            }
+                        } else {
+                            exchange.sendResponseHeaders(200, fileLength);
+                            try (InputStream fis = new java.io.FileInputStream(file);
+                                 OutputStream os = exchange.getResponseBody()) {
+                                byte[] buffer = new byte[8192];
+                                int read;
+                                while ((read = fis.read(buffer)) != -1) {
+                                    os.write(buffer, 0, read);
+                                }
+                            }
+                        }
                     } else {
                         String response = "404 File Not Found";
                         exchange.sendResponseHeaders(404, response.length());
-                        OutputStream os = exchange.getResponseBody();
-                        os.write(response.getBytes());
-                        os.close();
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(response.getBytes());
+                        }
                     }
                 }
             });
@@ -1548,9 +1580,53 @@ public class Main {
                     }
                 }
             });
+
+            /* ========================================= */
+            /* --- 47. DYNAMIC INTERACTION MODAL ROUTES ---  */
+            /* ========================================= */
+            server.createContext("/api/getPostReposts", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        int postId = Integer.parseInt(extractJsonValue(body, "postId"));
+                        
+                        String jsonResponse = PostSystem.getPostReposts(postId);
+                        
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
+
+            server.createContext("/api/getPostLikes", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        int postId = Integer.parseInt(extractJsonValue(body, "postId"));
+                        
+                        String jsonResponse = PostSystem.getPostLikes(postId);
+                        
+                        byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                        exchange.sendResponseHeaders(200, responseBytes.length);
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(responseBytes);
+                        os.close();
+                    }
+                }
+            });
                      
-            server.setExecutor(null);
-            server.start();
+            // THE FIX: Implementing a dynamic thread pool to prevent Server Thread Starvation!
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
+        server.start();
             System.out.println("\n API Server is running live on http://localhost:8080");
             
         } catch (IOException e) {
@@ -1563,11 +1639,23 @@ public class Main {
     /* ========================================= */
     private static String extractJsonValue(String json, String key) {
         String searchKey = "\"" + key + "\":\"";
-        int startIndex = json.indexOf(searchKey) + searchKey.length();
-        int endIndex = json.indexOf("\"", startIndex);
+        int startIndex = json.indexOf(searchKey);
+        if (startIndex == -1) return "";
         
-        if (startIndex >= searchKey.length() && endIndex > startIndex) {
-            return json.substring(startIndex, endIndex);
+        startIndex += searchKey.length();
+        int endIndex = startIndex;
+        
+        // THE FIX: Smart loop that ignores escaped internal quotes!
+        while (endIndex < json.length()) {
+            if (json.charAt(endIndex) == '"' && json.charAt(endIndex - 1) != '\\') {
+                break;
+            }
+            endIndex++;
+        }
+        
+        if (endIndex > startIndex) {
+            String extracted = json.substring(startIndex, endIndex);
+            return extracted.replace("\\\"", "\"").replace("\\\\", "\\");
         }
         return "";
     }
@@ -1600,7 +1688,28 @@ public class Main {
     private static String saveMediaFile(String base64Data) {
         if (base64Data == null || base64Data.trim().isEmpty()) return "";
         
-        // THE FIX: Extract the original filename from the hidden payload tag
+        // THE FIX: If it's an Array of images, loop through and save each one!
+        if (base64Data.startsWith("[")) {
+            StringBuilder paths = new StringBuilder("[");
+            String inner = base64Data.substring(1, base64Data.length() - 1);
+            String[] items = inner.split("\",\"");
+            boolean first = true;
+            for (String item : items) {
+                item = item.replace("\"", "").replace("\\", "");
+                String savedPath = saveSingleMediaFile(item);
+                if (!first) paths.append(",");
+                paths.append("\"").append(savedPath).append("\"");
+                first = false;
+            }
+            paths.append("]");
+            return paths.toString();
+        } else {
+            return saveSingleMediaFile(base64Data);
+        }
+    }
+
+    private static String saveSingleMediaFile(String base64Data) {
+        if (base64Data == null || base64Data.trim().isEmpty()) return "";
         String originalName = "";
         if (base64Data.contains("|NAME:")) {
             int nameIdx = base64Data.indexOf("|NAME:");
@@ -1630,18 +1739,14 @@ public class Main {
             else if (header.contains("application/") || header.contains("text/")) ext = ".doc";
             
             byte[] decodedBytes = Base64.getDecoder().decode(data);
-            
-            // THE FIX: Uses the original name if present, otherwise defaults to UUID
             String fileName = System.currentTimeMillis() + "_" + (originalName.isEmpty() ? UUID.randomUUID().toString().substring(0, 8) + ext : originalName);
             
             File dir = new File("src/main/resources/static/uploads");
             if (!dir.exists()) dir.mkdirs();
-            
             File file = new File(dir, fileName);
             Files.write(file.toPath(), decodedBytes);
             
             return "uploads/" + fileName;
-            
         } catch (Exception e) {
             System.out.println("Media Save Error: " + e.getMessage());
             return base64Data; 

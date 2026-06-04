@@ -339,6 +339,7 @@ body.in-chat .bottom-nav {
     max-width: 700px; 
     margin: 0 auto; 
     padding: 0 20px;
+    padding-bottom: 250px !important; /* THE FIX: Ghost padding for Kebab Menu overflow */
 }
 
 .post {
@@ -1310,7 +1311,7 @@ textarea {
     .nav-links a { font-size: 14px; padding: 10px; }
     .nav-links a.logout { margin-top: 0; }
     
-    .feed { height: auto !important; padding-top: 65px !important; padding-bottom: 70px !important; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
+    .feed { height: auto !important; padding-top: 65px !important; padding-bottom: 250px !important; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
     
     body.in-chat .feed { height: 100dvh !important; overflow: hidden; }
     
