@@ -157,6 +157,23 @@ function executeLogout() {
     window.location.href = "login.html"; 
 }
 
+window.forceDownload = function(url, filename) {
+    fetch(url)
+        .then(response => response.blob())
+        .then(blob => {
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+        })
+        .catch(() => window.open(url));
+};
+
 function showToast(message) {
     let toast = document.getElementById('custom-toast');
     if (!toast) {
@@ -900,15 +917,15 @@ window.generateKebabMenu = function(item, type = 'post') {
                     <button class="dropdown-item" onclick="event.stopPropagation(); savePost(${id}, this, '${type}')">
                         <span class="material-icons" style="font-size: 18px;">${isSaved ? 'bookmark' : 'bookmark_border'}</span> ${isSaved ? 'Unsave' : 'Save'}
                     </button>
+                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Liked By', '/api/get${type === 'comment' ? 'Comment' : 'Post'}Likes', { ${type === 'comment' ? 'commentId' : 'postId'}: '${id}' })">
+                        <span class="material-icons" style="font-size: 18px;">favorite</span> Liked by
+                    </button>
+                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Reposted By', '/api/get${type === 'comment' ? 'Comment' : 'Post'}Reposts', { ${type === 'comment' ? 'commentId' : 'postId'}: '${id}' })">
+                        <span class="material-icons" style="font-size: 18px;">repeat</span> Reposted by
+                    </button>
                     ${type === 'post' ? `
                     <button class="dropdown-item" onclick="event.stopPropagation(); toggleProfilePin(${id})">
                         <span class="material-icons" style="font-size: 18px; transform: rotate(45deg);">push_pin</span> ${localStorage.getItem('pinnedProfilePost_' + currentUser) === String(id) ? 'Unpin from Profile' : 'Pin to Profile'}
-                    </button>
-                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Liked By', '/api/getPostLikes', { postId: '${id}' })">
-                        <span class="material-icons" style="font-size: 18px;">favorite</span> Liked by
-                    </button>
-                    <button class="dropdown-item" onclick="event.stopPropagation(); toggleDropdown('dropdown-${type}-${id}'); openDynamicListModal('Reposted By', '/api/getPostReposts', { postId: '${id}' })">
-                        <span class="material-icons" style="font-size: 18px;">repeat</span> Reposted by
                     </button>
                     ` : ''}
                 </div>
@@ -1177,7 +1194,7 @@ window.generateMediaGridHTML = function(mediaData, postId, context = 'feed') {
         } else if (context !== 'chat' && !isVideo) {
             // THE FIX: Only render custom overlays for images. Videos retain their native controls.
             html += `<div class="grid-controls">`;
-            html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Image_${postId}_${index}.${ext}') : window.open('${mediaUrl}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Download"><span class="material-icons" style="font-size: 18px;">download</span></button>`;
+            html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Image_${postId}_${index}.${ext}') : window.forceDownload('${mediaUrl}', 'Image_${postId}_${index}.${ext}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Download"><span class="material-icons" style="font-size: 18px;">download</span></button>`;
             html += `<button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
             html += `</div>`;
         }

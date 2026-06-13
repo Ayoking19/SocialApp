@@ -131,7 +131,8 @@
             const newUrl = window.location.pathname + "?q=" + encodeURIComponent(query);
             window.history.pushState({ path: newUrl }, '', newUrl);
 
-            document.getElementById("searchResults").innerHTML = "<p class='search-placeholder-text' style='color:#00e676;'>Searching the network...</p>";
+            // THE FIX: Utilizing the Global Skeleton Engine instead of hardcoded text
+            document.getElementById("searchResults").innerHTML = typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(3) : "<p class='search-placeholder-text' style='color:#00e676;'>Searching the network...</p>";
 
             fetch(`${API_BASE}/api/search`, {
                 method: 'POST',
@@ -182,19 +183,9 @@
 
                 // THE FIX: Completely hide the parent post's images if we are focusing purely on a matched comment
                 let mediaHTML = "";
-                if (!isCommentMatch && post.media && post.media.trim() !== "") {
-                    if (post.media.toLowerCase().endsWith(".mp4") || post.media.startsWith("data:video")) {
-                        mediaHTML = `<video src="${typeof getFullMediaUrl === 'function' ? getFullMediaUrl(post.media) : post.media}" controls onclick="event.stopPropagation();" style="width: 100%; max-height: 400px; border-radius: 12px; margin-top: 10px; background: #000; border: 1px solid rgba(0, 230, 118, 0.3);"></video>`;
-                    } else {
-                        mediaHTML = `<div style="position: relative; margin-top: 15px;">
-                            <img src="${typeof getFullMediaUrl === 'function' ? getFullMediaUrl(post.media) : post.media}" onclick="event.stopPropagation(); openLightbox('${typeof getFullMediaUrl === 'function' ? getFullMediaUrl(post.media) : post.media}')" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 15px; border: 1px solid rgba(0, 230, 118, 0.3); cursor: pointer;">
-                            <div style="margin-top: 8px; display: flex; gap: 10px;">
-                                <a href="${typeof getFullMediaUrl === 'function' ? getFullMediaUrl(post.media) : post.media}" download="SocialApp_Image.png" onclick="event.stopPropagation();" class="media-control-btn" style="width: 35px !important; height: 35px !important; max-width: 35px !important; min-width: 35px !important; border-radius: 50% !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important;" title="Download">
-                                    <span class="material-icons" style="font-size: 18px; margin: 0; padding: 0;">download</span>
-                                </a>
-                            </div>
-                        </div>`;
-                    }
+                if (!isCommentMatch && post.media && post.media !== "") {
+                    // THE FIX: Integrating the Global Multi-Media Grid array processor!
+                    mediaHTML = typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(post.media, post.id) : "";
                 }
                 
                 const quoteBoxHTML = typeof buildQuoteBox === "function" ? buildQuoteBox(post.parentPost) : "";

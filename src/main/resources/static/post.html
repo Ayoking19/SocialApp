@@ -205,12 +205,14 @@
                             
                             <div style="position: fixed; bottom: 70px; left: 0; width: 100%; background: #0b0f1a; border-top: 1px solid #334155; padding: 12px 20px; z-index: 1000; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -5px 15px rgba(0,0,0,0.5);">
                                 
-                                <div id="reply-banner" style="display: none; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #a09eb5;">
-                                    <span id="reply-banner-text"></span>
-                                    <span class="material-icons" style="cursor: pointer; font-size: 16px; color: #ff3366;" onclick="cancelReply()">close</span>
-                                </div>
+                                <div style="max-height: 35vh; overflow-y: auto; overflow-x: hidden; width: 100%; max-width: 1200px; margin: 0 auto; padding-right: 5px;">
+                                    <div id="reply-banner" style="display: none; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0, 230, 118, 0.1); border-left: 3px solid #00e676; border-radius: 4px; margin-bottom: 10px; font-size: 12px; color: #a09eb5;">
+                                        <span id="reply-banner-text"></span>
+                                        <span class="material-icons" style="cursor: pointer; font-size: 16px; color: #ff3366;" onclick="cancelReply()">close</span>
+                                    </div>
 
-                                <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                                    <div id="main-comment-media-preview" style="display: none; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                                </div>
                                 
                                 <div style="display: flex; gap: 8px; align-items: flex-end; width: 100%; max-width: 1200px; margin: 0 auto;">
                                     
@@ -219,7 +221,7 @@
                                             <span class="material-icons" style="font-size: 24px;">add_photo_alternate</span>
                                         </label>
                                     </div>
-                                    <input type="file" id="main-comment-upload" accept="image/*,video/*" hidden onchange="handleMainCommentMedia(this)">
+                                    <input type="file" id="main-comment-upload" accept="image/*,video/*" multiple hidden onchange="handleMainCommentMedia(this)">
                                     
                                     <textarea id="comment-input-${post.id}" class="comment-input" placeholder="Write your reply..." style="flex: 1; min-width: 0; resize: none; overflow-y: auto; min-height: 45px; height: 45px; max-height: 120px; font-family: inherit; font-size: 14px; line-height: 20px; box-sizing: border-box; padding: 12px 12px; border-radius: 20px;" oninput="this.style.height = '45px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
                                     
@@ -295,7 +297,7 @@
         /* ========================================= */
         
         let globalCommentsData = [];
-        let mainCommentMedia = ""; 
+        let mainCommentMediaArray = []; // THE FIX: Upgraded to Array for Multi-Media Comments
         let globalReplyParentId = null; 
         let viewStack = []; // Remembers your navigation path
 
@@ -496,43 +498,57 @@
         };
 
         window.handleMainCommentMedia = function(input) {
-            const file = input.files[0];
-            if (file) {
+            const files = Array.from(input.files);
+            if (mainCommentMediaArray.length + files.length > 4) {
+                if(typeof showToast === 'function') showToast("Maximum of 4 files allowed.");
+                else alert("Maximum of 4 files allowed.");
+                return;
+            }
+
+            files.forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = function() {
-                    mainCommentMedia = reader.result;
-                    const previewDiv = document.getElementById(`main-comment-media-preview`);
-                    let previewHTML = '';
-                    if (file.type.startsWith('image/')) {
-                        previewHTML = `<img src="${reader.result}" style="max-height: 80px; border-radius: 8px; border: 1px solid #00e676;">`;
-                    } else if (file.type.startsWith('video/')) {
-                        previewHTML = `<video src="${reader.result}" style="max-height: 80px; border-radius: 8px; border: 1px solid #ff3366;"></video>`;
-                    }
-                    previewDiv.innerHTML = `<div style="position: relative; display: inline-block;">
-                        ${previewHTML}
-                        <button onclick="removeMainCommentMedia()" style="position: absolute; top: -5px; right: -5px; background: #ff3366; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">X</button>
-                    </div>`;
-                    previewDiv.style.display = "flex";
-                };
+                    mainCommentMediaArray.push(reader.result);
+                    renderMainCommentMediaPreview();
+                }
                 reader.readAsDataURL(file);
-            }
+            });
+            input.value = ""; // Clear input so the same file can be selected again if needed
         };
 
-        window.removeMainCommentMedia = function() {
-            mainCommentMedia = "";
+        window.renderMainCommentMediaPreview = function() {
             const previewDiv = document.getElementById(`main-comment-media-preview`);
-            if (previewDiv) {
+            if (mainCommentMediaArray.length === 0) {
                 previewDiv.style.display = "none";
                 previewDiv.innerHTML = "";
+                return;
             }
-            const input = document.getElementById(`main-comment-upload`);
-            if (input) input.value = "";
+            
+            // THE FIX: Use global grid engine to neatly render multiple files!
+            previewDiv.innerHTML = generateMediaGridHTML(JSON.stringify(mainCommentMediaArray), 'preview', 'preview');
+            previewDiv.innerHTML += `<div style="width: 100%; text-align: right; margin-top: 5px;"><button class="modal-cancel-btn" onclick="clearAllMainCommentMedia()" style="padding: 2px 10px; font-size: 11px;">Clear All</button></div>`;
+            previewDiv.style.display = "flex";
         };
+
+        window.removeSpecificMedia = function(index) {
+            mainCommentMediaArray.splice(index, 1);
+            renderMainCommentMediaPreview();
+        };
+
+        window.clearAllMainCommentMedia = function() {
+            mainCommentMediaArray = [];
+            renderMainCommentMediaPreview();
+        };
+
+        // Fallback for existing reset calls
+        window.removeMainCommentMedia = window.clearAllMainCommentMedia;
 
         window.submitThreadedComment = function(postId) {
             const inputEl = document.getElementById(`comment-input-${postId}`);
             const text = inputEl.value.trim();
-            const mediaPayload = mainCommentMedia;
+            
+            // THE FIX: Stringify the array payload for the backend!
+            const mediaPayload = mainCommentMediaArray.length > 0 ? JSON.stringify(mainCommentMediaArray) : "";
             
             // It grabs the parent ID directly from memory, no messy nested boxes!
             const parentCommentId = globalReplyParentId; 
