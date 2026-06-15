@@ -1457,3 +1457,14 @@ textarea {
 .msg-bubble.selected { border: 2px solid #00e676; background-color: rgba(0, 230, 118, 0.2) !important; }
 .msg-sent { background: #00e676; color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
 .msg-received { background: #334155; color: #fff; align-self: flex-start; border-bottom-left-radius: 4px; }
+
+/* ========================================= */
+/* --- NATIVE VIDEO PLAYER OVERRIDES ---     */
+/* ========================================= */
+/* THE FIX: Eradicate the native 3-dot menu so it can never be clipped by the screen edge! */
+video::-webkit-media-controls-overflow-button {
+    display: none !important;
+}
+video::-webkit-media-controls-fullscreen-button {
+    display: none !important; /* Hidden because we will provide our own perfectly aligned custom button */
+}

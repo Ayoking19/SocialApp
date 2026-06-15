@@ -23,15 +23,16 @@ document.head.insertAdjacentHTML("beforeend", `
         .skel-media { height: 250px; border-radius: 15px; margin-top: 15px; }
 
         /* MULTI-MEDIA 2x2 GRID CSS */
-        .media-gallery { display: grid; gap: 5px; margin-top: 15px; border-radius: 15px; overflow: hidden; width: 100%; border: 1px solid rgba(0, 230, 118, 0.3); }
+        /* THE FIX: Add padding and visible overflow so video menus can escape the bounding box! */
+        .media-gallery { display: grid; gap: 5px; margin-top: 15px; border-radius: 15px; overflow: visible; width: 100%; border: 1px solid rgba(0, 230, 118, 0.3); padding: 5px; }
         .media-grid-1 { grid-template-columns: 1fr; grid-auto-rows: 300px; }
         .media-grid-2 { grid-template-columns: 1fr 1fr; grid-auto-rows: 200px; }
         .media-grid-3 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
         .media-grid-3 .media-cell:first-child { grid-column: span 2; grid-row: span 1; }
         .media-grid-4 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
-        .media-cell { position: relative; width: 100%; height: 100%; overflow: hidden; display: flex; }
-        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; }
-        .grid-controls { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 8px; z-index: 10; }
+        .media-cell { position: relative; width: 100%; height: 100%; overflow: visible; display: flex; }
+        /* THE FIX: Move the border-radius directly to the image/video so they stay beautifully rounded without a clipping mask! */
+        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; border-radius: 10px; }
 
         /* THE VOICE NOTE CSS */
         @keyframes pulseMic { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
@@ -1179,6 +1180,8 @@ window.generateMediaGridHTML = function(mediaData, postId, context = 'feed') {
                 src="${finalVideoSrc}" 
                 preload="metadata" 
                 controls 
+                controlsList="nodownload noplaybackrate nofullscreen noremoteplayback"
+                disablePictureInPicture
                 onclick="event.stopPropagation();" 
                 class="grid-media-item" 
                 style="background: #0b0f1a; object-fit: contain;">
@@ -1191,11 +1194,11 @@ window.generateMediaGridHTML = function(mediaData, postId, context = 'feed') {
         if (context === 'preview') {
             // THE FIX: Inject specific "X" button for each individual media item during Post Creation
             html += `<button type="button" onclick="event.stopPropagation(); window.removeSpecificMedia(${index})" style="position: absolute; top: 5px; right: 5px; z-index: 20; width: 28px; height: 28px; font-size: 14px; padding: 0; background: rgba(255,51,102,0.9); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove this item">X</button>`;
-        } else if (context !== 'chat' && !isVideo) {
-            // THE FIX: Only render custom overlays for images. Videos retain their native controls.
-            html += `<div class="grid-controls">`;
-            html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Image_${postId}_${index}.${ext}') : window.forceDownload('${mediaUrl}', 'Image_${postId}_${index}.${ext}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Download"><span class="material-icons" style="font-size: 18px;">download</span></button>`;
-            html += `<button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
+        } else if (context !== 'chat') {
+            // THE FIX: Lock custom buttons strictly to the TOP RIGHT corner for all media types!
+            html += `<div class="grid-controls" style="position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; z-index: 10;">`;
+            html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Media_${postId}_${index}_' + Date.now() + '.${ext}') : window.forceDownload('${mediaUrl}', 'Media_${postId}_${index}_' + Date.now() + '.${ext}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid #00e676; color: #00e676;" title="Download"><span class="material-icons" style="font-size: 16px;">download</span></button>`;
+            html += `<button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid #00e676; color: #00e676;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
             html += `</div>`;
         }
         html += `</div>`;
