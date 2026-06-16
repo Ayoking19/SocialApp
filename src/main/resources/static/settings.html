@@ -47,17 +47,6 @@
                 <p id="usernameStatus" style="margin-top: 10px; font-size: 14px;"></p>
             </div>
 
-            <div class="post">
-                <h3 style="color: #00e676; margin-bottom: 20px;">Change Password</h3>
-                <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <input type="password" id="currentPass" placeholder="Current Password" class="comment-input" style="width: 100%;">
-                    <input type="password" id="newPass" placeholder="New Password" class="comment-input" style="width: 100%;">
-                    <input type="password" id="confirmPass" placeholder="Confirm New Password" class="comment-input" style="width: 100%;">
-                    <button onclick="updatePassword()" class="main-post-btn">Update Password</button>
-                </div>
-                <p id="passwordStatus" style="margin-top: 10px; font-size: 14px;"></p>
-            </div>
-
             <div class="post" style="border: 1px solid rgba(255, 51, 102, 0.3);">
                 <h3 style="color: #ff3366; margin-bottom: 10px;">Danger Zone</h3>
                 <p style="color: #a09eb5; font-size: 14px; margin-bottom: 20px;">
@@ -144,36 +133,6 @@
             .catch(err => {
                 status.innerText = "Network Error.";
                 status.style.color = "#ff3366";
-            });
-        }
-
-        /* --- PASSWORD LOGIC --- */
-        function updatePassword() {
-            const currentPass = document.getElementById('currentPass').value;
-            const newPass = document.getElementById('newPass').value;
-            const confirmPass = document.getElementById('confirmPass').value;
-            const status = document.getElementById('passwordStatus');
-
-            if (newPass !== confirmPass) {
-                status.innerText = "New passwords do not match!";
-                status.style.color = "#ff3366";
-                return;
-            }
-
-            fetch(`${API_BASE}/api/updatePassword`, {
-                method: 'POST',
-                body: JSON.stringify({ username: currentUser, currentPassword: currentPass, newPassword: newPass })
-            })
-            .then(res => res.text())
-            .then(data => {
-                if (data === "SUCCESS") {
-                    status.innerText = "Password updated successfully!";
-                    status.style.color = "#00e676";
-                    document.querySelectorAll('input[type="password"]').forEach(i => i.value = "");
-                } else {
-                    status.innerText = "Incorrect current password.";
-                    status.style.color = "#ff3366";
-                }
             });
         }
 

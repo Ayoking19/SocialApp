@@ -60,6 +60,12 @@ public class Main {
             System.out.println("[SYSTEM]: Voice Note schema patched successfully.");
         } catch (Exception e) {}
 
+        // [HOT PATCH]: Adds Profile Pinned Post Support to Users Table
+        try (java.sql.Connection conn = DatabaseManager.connect()) {
+            conn.createStatement().execute("ALTER TABLE users ADD COLUMN pinned_post_id INT");
+            System.out.println("[SYSTEM]: Pinned Post schema patched successfully.");
+        } catch (Exception e) {}
+
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
@@ -270,6 +276,32 @@ public class Main {
                         String newBio = extractJsonValue(body, "bio");
                         
                         boolean success = ProfileSystem.updateBio(username, newBio);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
+            /* --- 7.5. THE PROFILE PIN ENDPOINT ---     */
+            /* ========================================= */
+            server.createContext("/api/togglePin", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        String postIdStr = extractJsonValue(body, "postId");
+                        Integer postId = (postIdStr != null && !postIdStr.trim().isEmpty() && !postIdStr.equals("null")) ? Integer.parseInt(postIdStr) : null;
+                        
+                        boolean success = ProfileSystem.setPinnedPost(username, postId);
                         String response = success ? "SUCCESS" : "FAILURE";
                         
                         exchange.sendResponseHeaders(200, response.length());

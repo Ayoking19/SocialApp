@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -891,10 +891,12 @@ window.savePost = function(id, btnElement, type = 'post') {
     }).catch(err => console.error("Save Error:", err));
 };
 
-// THE FIX: The Profile Pinned Post Engine (Frontend Native Cache)
+// THE FIX: The Profile Pinned Post Engine (Database Sync + Local Cache)
 window.toggleProfilePin = function(id) {
     let currentPin = localStorage.getItem('pinnedProfilePost_' + currentUser);
-    if (currentPin === String(id)) {
+    let isPinning = currentPin !== String(id);
+
+    if (!isPinning) {
         localStorage.removeItem('pinnedProfilePost_' + currentUser);
         if (typeof showToast === "function") showToast("Post unpinned from profile");
     } else {
@@ -903,6 +905,12 @@ window.toggleProfilePin = function(id) {
     }
     document.querySelectorAll('.dropdown-menu').forEach(menu => menu.style.display = 'none');
     
+    // THE FIX: Sync with the backend database so other users can see your pinned post!
+    fetch(`${API_BASE}/api/togglePin`, {
+        method: 'POST',
+        body: JSON.stringify({ username: currentUser, postId: isPinning ? String(id) : null })
+    }).catch(err => console.warn("Silent Pin Sync", err));
+
     // Auto-reload the profile feed if they are currently looking at it
     if (window.location.pathname.includes('profile.html') && typeof showAllPosts === 'function') {
         loadUserPosts();
@@ -1230,9 +1238,9 @@ setInterval(checkNotifications, 30000);
 setInterval(checkUnreadMessages, 30000);
 
 /* ========================================= */
-/* --- GLOBAL OFFLINE UI INTERCEPTOR ---     */
+/* --- ACTION-TRIGGERED OFFLINE INTERCEPTOR --- */
 /* ========================================= */
-window.addEventListener('offline', () => {
+window.showGlobalOfflineModal = function() {
     let offlineModal = document.getElementById('globalOfflineModal');
     if (!offlineModal) {
         offlineModal = document.createElement('div');
@@ -1244,16 +1252,29 @@ window.addEventListener('offline', () => {
             <div class="modal-card" style="border-color: #ff3366; box-shadow: 0 15px 50px rgba(255, 51, 102, 0.2);">
                 <div class="modal-icon"><span class="material-icons" style="font-size: 60px; color: #ff3366;">wifi_off</span></div>
                 <h3 style="color: white; margin-top: 10px;">Connection Lost</h3>
-                <p style="color: #a09eb5; margin: 15px 0;">It seems you are offline. Please check your network connection to continue using the app.</p>
-                <button class="modal-confirm-btn" style="background: #ff3366; color: white; width: 100%; border: none; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);" onclick="window.location.reload()">Retry Connection</button>
+                <p style="color: #a09eb5; margin: 15px 0;">We couldn't reach the server. Please check your network connection and try again.</p>
+                <button class="modal-confirm-btn" style="background: #ff3366; color: white; width: 100%; border: none; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);" onclick="document.getElementById('globalOfflineModal').style.display='none';">Okay</button>
             </div>
         `;
         document.body.appendChild(offlineModal);
     }
     offlineModal.style.display = 'flex';
-});
+};
 
-window.addEventListener('online', () => {
-    const offlineModal = document.getElementById('globalOfflineModal');
-    if (offlineModal) offlineModal.style.display = 'none';
-});
+// THE FIX: Override the global fetch API to ONLY show the error when an action is taken and fails!
+const originalFetch = window.fetch;
+window.fetch = async function(...args) {
+    if (!navigator.onLine) {
+        window.showGlobalOfflineModal();
+        return Promise.reject(new Error("Offline"));
+    }
+    try {
+        const response = await originalFetch(...args);
+        return response;
+    } catch (error) {
+        if (error.name === 'TypeError' || error.message === 'Failed to fetch') {
+            window.showGlobalOfflineModal();
+        }
+        throw error;
+    }
+};
