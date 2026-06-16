@@ -23,16 +23,16 @@ document.head.insertAdjacentHTML("beforeend", `
         .skel-media { height: 250px; border-radius: 15px; margin-top: 15px; }
 
         /* MULTI-MEDIA 2x2 GRID CSS */
-        /* THE FIX: Add padding and visible overflow so video menus can escape the bounding box! */
-        .media-gallery { display: grid; gap: 5px; margin-top: 15px; border-radius: 15px; overflow: visible; width: 100%; border: 1px solid rgba(0, 230, 118, 0.3); padding: 5px; }
-        .media-grid-1 { grid-template-columns: 1fr; grid-auto-rows: 300px; }
-        .media-grid-2 { grid-template-columns: 1fr 1fr; grid-auto-rows: 200px; }
-        .media-grid-3 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
+        /* THE FIX: Enforce flex-shrink and box-sizing to protect grids from keyboard crushing and horizontal bleeding! */
+        .media-gallery { display: grid; gap: 5px; margin-top: 15px; border-radius: 15px; overflow: visible; width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid rgba(0, 230, 118, 0.3); padding: 5px; flex-shrink: 0; }
+        .media-grid-1 { grid-template-columns: 1fr; grid-auto-rows: minmax(200px, 300px); }
+        .media-grid-2 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(150px, 200px); }
+        .media-grid-3 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(100px, 150px); }
         .media-grid-3 .media-cell:first-child { grid-column: span 2; grid-row: span 1; }
-        .media-grid-4 { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
-        .media-cell { position: relative; width: 100%; height: 100%; overflow: visible; display: flex; }
+        .media-grid-4 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(100px, 150px); }
+        .media-cell { position: relative; width: 100%; height: 100%; max-width: 100%; overflow: visible; display: flex; box-sizing: border-box; }
         /* THE FIX: Move the border-radius directly to the image/video so they stay beautifully rounded without a clipping mask! */
-        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; border-radius: 10px; }
+        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-width: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; border-radius: 10px; box-sizing: border-box; }
 
         /* THE VOICE NOTE CSS */
         @keyframes pulseMic { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
@@ -82,7 +82,23 @@ function generateSkeletonHTML(count = 3) {
 }
 
 function checkSecurity() {
-    if (!currentUser) window.location.href = "login.html";
+    if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+    }
+    // THE FIX: Secure Auth Validation to prevent stale localStorage ghost logins!
+    fetch(`${API_BASE}/api/validateSession`, {
+        method: 'POST',
+        body: JSON.stringify({ username: currentUser })
+    })
+    .then(res => res.text())
+    .then(data => {
+        if (data === "INVALID" || data === "NOT_FOUND") {
+            localStorage.removeItem("currentUser");
+            window.location.href = "login.html";
+        }
+    })
+    .catch(err => console.warn("Session check offline or failed"));
 }
 
 /* --- THE NEW DESIGN-STANDARD MODAL ENGINE --- */
@@ -1212,3 +1228,32 @@ checkUnreadMessages();
 highlightActiveNav();
 setInterval(checkNotifications, 30000);
 setInterval(checkUnreadMessages, 30000);
+
+/* ========================================= */
+/* --- GLOBAL OFFLINE UI INTERCEPTOR ---     */
+/* ========================================= */
+window.addEventListener('offline', () => {
+    let offlineModal = document.getElementById('globalOfflineModal');
+    if (!offlineModal) {
+        offlineModal = document.createElement('div');
+        offlineModal.id = 'globalOfflineModal';
+        offlineModal.className = 'modal-overlay';
+        offlineModal.style.zIndex = '100000'; 
+        offlineModal.style.backgroundColor = 'rgba(11, 15, 26, 0.95)';
+        offlineModal.innerHTML = `
+            <div class="modal-card" style="border-color: #ff3366; box-shadow: 0 15px 50px rgba(255, 51, 102, 0.2);">
+                <div class="modal-icon"><span class="material-icons" style="font-size: 60px; color: #ff3366;">wifi_off</span></div>
+                <h3 style="color: white; margin-top: 10px;">Connection Lost</h3>
+                <p style="color: #a09eb5; margin: 15px 0;">It seems you are offline. Please check your network connection to continue using the app.</p>
+                <button class="modal-confirm-btn" style="background: #ff3366; color: white; width: 100%; border: none; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);" onclick="window.location.reload()">Retry Connection</button>
+            </div>
+        `;
+        document.body.appendChild(offlineModal);
+    }
+    offlineModal.style.display = 'flex';
+});
+
+window.addEventListener('online', () => {
+    const offlineModal = document.getElementById('globalOfflineModal');
+    if (offlineModal) offlineModal.style.display = 'none';
+});

@@ -81,7 +81,10 @@
                     </div>
 
                     <div id="inboxListContainer">
-                        <p style="text-align: center; color: gray; margin-top: 20px;">Loading chats...</p>
+                        <div style="text-align: center; color: #00e676; margin-top: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <span class="material-icons" style="animation: spin 1s linear infinite; font-size: 45px;">autorenew</span>
+                            <p style="color: #a09eb5; font-weight: bold; margin-top: 15px; font-size: 16px;">Loading Inbox...</p>
+                        </div>
                     </div>
                 </div>
 
@@ -798,8 +801,8 @@
             if (badge) badge.style.display = "none";
             
             currentChatMessages = [];
-            document.getElementById("chatHistoryContainer").innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Say Hi👋...</p>";
-            document.body.classList.add('in-chat'); 
+            document.getElementById("chatHistoryContainer").innerHTML = `<div style="text-align: center; color: #00e676; margin-top: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center;"><span class="material-icons" style="animation: spin 1s linear infinite; font-size: 45px;">autorenew</span><p style="color: #a09eb5; font-weight: bold; margin-top: 15px; font-size: 16px;">Decrypting Messages...</p></div>`;
+            document.body.classList.add('in-chat');
 
             if (isGroup) {
                 activeGroupId = String(targetId);
@@ -900,7 +903,7 @@
                 const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
                 if (currentChatMessages.length === 0) {
-                    container.innerHTML = "<p style='text-align: center; color: gray; margin-top: 20px;'>Say hello!</p>";
+                    container.innerHTML = `<div style='text-align: center; margin-top: 40px;'><span class='material-icons' style='font-size: 50px; color: #334155; margin-bottom: 10px;'>waving_hand</span><p style='color: #a09eb5; font-weight: bold; font-size: 16px;'>Say Hi👋...</p></div>`;
                     return;
                 }
 
