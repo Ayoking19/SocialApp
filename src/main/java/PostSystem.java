@@ -981,6 +981,48 @@ public class PostSystem {
         } catch (Exception e) { System.out.println("Error deleting comment: " + e.getMessage()); return false; }
     }
 
+    /* ========================================= */
+    /* --- THE NUCLEAR WIPE ENGINE (CASCADING) --- */
+    /* ========================================= */
+    public static boolean executeNuclearWipe(String username) {
+        String findUserSQL = "SELECT id FROM users WHERE username = ?";
+        try (Connection conn = DatabaseManager.connect();
+             PreparedStatement findUserStmt = conn.prepareStatement(findUserSQL)) {
+            findUserStmt.setString(1, username);
+            ResultSet rsUser = findUserStmt.executeQuery();
+            if (rsUser.next()) {
+                int userId = rsUser.getInt("id");
+                
+                // THE FIX: Array of precise Cascading SQL Delete commands to eradicate all ghost data!
+                String[] cascadeQueries = {
+                    "DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE user_id = " + userId + " OR post_id IN (SELECT id FROM posts WHERE user_id = " + userId + "))",
+                    "DELETE FROM likes WHERE post_id IN (SELECT id FROM posts WHERE user_id = " + userId + ")",
+                    "DELETE FROM saved_comments WHERE comment_id IN (SELECT id FROM comments WHERE user_id = " + userId + " OR post_id IN (SELECT id FROM posts WHERE user_id = " + userId + "))",
+                    "DELETE FROM saved_posts WHERE post_id IN (SELECT id FROM posts WHERE user_id = " + userId + ")",
+                    "DELETE FROM comments WHERE parent_comment_id IN (SELECT id FROM comments WHERE user_id = " + userId + ")",
+                    "DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = " + userId + ")",
+                    "DELETE FROM comments WHERE user_id = " + userId,
+                    "DELETE FROM posts WHERE parent_post_id IN (SELECT id FROM posts WHERE user_id = " + userId + ") AND (content IS NULL OR trim(content) = '') AND (image_url IS NULL OR trim(image_url) = '')",
+                    "DELETE FROM posts WHERE user_id = " + userId,
+                    "DELETE FROM likes WHERE user_id = " + userId,
+                    "DELETE FROM comment_likes WHERE user_id = " + userId,
+                    "DELETE FROM saved_posts WHERE user_id = " + userId,
+                    "DELETE FROM saved_comments WHERE user_id = " + userId
+                };
+                
+                for (String sql : cascadeQueries) {
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.executeUpdate();
+                    } catch (Exception ignored) {} 
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            System.out.println("Nuclear Wipe Error: " + e.getMessage());
+        }
+        return false;
+    }
+
     public static String toggleCommentLike(String identifier, int commentId) {
         String findUserSQL = "SELECT id FROM users WHERE username = ?";
         String checkLikeSQL = "SELECT id FROM comment_likes WHERE user_id = ? AND comment_id = ?";

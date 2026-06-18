@@ -84,26 +84,35 @@
                 </div>
 
                 <div class="profile-details" style="display: flex; flex-direction: column; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; min-width: 0;">
-                        <h1 class="profile-display-name truncate-text" id="displayName" style="margin: 0; max-width: 100%; font-size: 20px;"></h1>
-                        
-                        <button id="profileFollowBtn" class="modal-follow-btn" style="display: none;" onclick="executeProfileFollow()">Follow</button>
-                        
-                        <button id="profileMessageBtn" class="modal-follow-btn" style="display: none; background: rgba(0, 230, 118, 0.1); color: #00e676; padding: 6px 10px; border-color: rgba(0, 230, 118, 0.3);" onclick="window.location.href='messages.html?user=' + profileUser" title="Message User">
-                            <span class="material-icons" style="font-size: 18px; vertical-align: middle;">mail</span>
-                        </button>
-                        <button id="profileBlockBtn" class="modal-follow-btn" style="display: none; background: rgba(255, 51, 102, 0.1); color: #ff3366; padding: 6px 10px; border-color: rgba(255, 51, 102, 0.3);" onclick="executeBlockToggle()" title="Block User">
-                            <span class="material-icons" style="font-size: 18px; vertical-align: middle;">block</span>
-                        </button>
-                        <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0;">Follows you</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0;">
+                            <h1 class="profile-display-name truncate-text" id="displayName" style="margin: 0; max-width: 100%; font-size: 20px;"></h1>
+                            
+                            <button id="profileFollowBtn" class="modal-follow-btn" style="display: none;" onclick="executeProfileFollow()">Follow</button>
+                            
+                            <button id="profileMessageBtn" class="modal-follow-btn" style="display: none; background: rgba(0, 230, 118, 0.1); color: #00e676; padding: 6px 10px; border-color: rgba(0, 230, 118, 0.3);" onclick="window.location.href='messages.html?user=' + profileUser" title="Message User">
+                                <span class="material-icons" style="font-size: 18px; vertical-align: middle;">mail</span>
+                            </button>
+                            <span id="followsYouBadge" style="display: none; background: rgba(255,255,255,0.1); color: #a09eb5; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0;">Follows you</span>
+                        </div>
+
+                        <div class="kebab-menu-container" style="position: relative; flex-shrink: 0; margin-left: 10px;">
+                            <span class="material-icons" style="cursor: pointer; color: #a09eb5; font-size: 28px; padding: 5px; transition: 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#a09eb5'" onclick="document.getElementById('profileKebabMenu').style.display = document.getElementById('profileKebabMenu').style.display === 'flex' ? 'none' : 'flex'">more_vert</span>
+                            
+                            <div id="profileKebabMenu" class="dropdown-menu" style="display: none; position: absolute; top: 40px; right: 0; background: #1a1525; border: 1px solid #334155; border-radius: 10px; flex-direction: column; overflow: hidden; z-index: 10000; width: 180px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                                <button class="dropdown-item" onclick="window.copyToClipboard(API_BASE + '/profile.html?user=' + profileUser)"><span class="material-icons">link</span> Copy Link</button>
+                                <button id="kebabBlockBtn" class="dropdown-item" style="color: #ff3366; display: none;" onclick="executeBlockToggle(); document.getElementById('profileKebabMenu').style.display='none';"><span class="material-icons">block</span> Block User</button>
+                                <button id="kebabNuclearBtn" class="dropdown-item danger" style="display: none;" onclick="window.executeNuclearWipe();"><span class="material-icons">delete_forever</span> Delete Posts</button>
+                            </div>
+                        </div>
                     </div>
 
                     <p class="profile-username truncate-text" id="displayUsername" style="margin-top: 5px; max-width: 100%;"></p>
                     
                     <div id="invisibilityCloak" style="display: none; text-align: center; padding: 50px 20px; background: rgba(255, 255, 255, 0.02); border-radius: 12px; border: 1px solid #334155; margin-top: 20px;">
-                        <span class="material-icons" style="font-size: 60px; color: #334155; margin-bottom: 15px;">lock</span>
-                        <h3 style="color: white; margin-bottom: 10px;">Profile Unavailable</h3>
-                        <p style="color: #a09eb5; font-size: 14px;">You cannot view this user's posts, followers, or bio.</p>
+                        <span id="cloakIcon" class="material-icons" style="font-size: 60px; color: #334155; margin-bottom: 15px;">lock</span>
+                        <h3 id="cloakTitle" style="color: white; margin-bottom: 10px;">Profile Unavailable</h3>
+                        <p id="cloakDesc" style="color: #a09eb5; font-size: 14px;">You cannot view this user's posts, followers, or bio.</p>
                     </div>
 
                     <div id="secureProfileContent">
@@ -313,7 +322,12 @@
         }
 
         function checkBlockStatus() {
-            if (profileUser === currentUser) return; 
+            if (profileUser === currentUser) {
+                // Show Nuclear wipe if it's your own profile!
+                const nuclearBtn = document.getElementById("kebabNuclearBtn");
+                if (nuclearBtn) nuclearBtn.style.display = "flex";
+                return; 
+            }
             
             fetch(`${API_BASE}/api/getBlockStatus`, {
                 method: 'POST',
@@ -321,28 +335,47 @@
             })
             .then(res => res.text())
             .then(status => {
-                const blockBtn = document.getElementById("profileBlockBtn");
+                const blockBtn = document.getElementById("kebabBlockBtn");
                 const followBtn = document.getElementById("profileFollowBtn");
                 const messageBtn = document.getElementById("profileMessageBtn");
                 const secureContent = document.getElementById("secureProfileContent");
+                
+                // THE FIX: Target the new DOM elements we just created
                 const cloak = document.getElementById("invisibilityCloak");
+                const cloakTitle = document.getElementById("cloakTitle");
+                const cloakDesc = document.getElementById("cloakDesc");
+                const cloakIcon = document.getElementById("cloakIcon");
+
+                if (blockBtn) blockBtn.style.display = "flex";
 
                 if (status === "BLOCKED_BY_YOU") {
                     if (secureContent) secureContent.style.display = "none";
-                    if (cloak) cloak.style.display = "block";
+                    if (cloak) {
+                        cloak.style.display = "block";
+                        if (cloakTitle) {
+                            cloakTitle.textContent = "You blocked this user";
+                            cloakTitle.style.color = "#ff3366";
+                        }
+                        if (cloakDesc) cloakDesc.textContent = "Unblock them to view their timeline and interactions.";
+                        if (cloakIcon) cloakIcon.style.color = "#ff3366";
+                    }
                     if (followBtn) followBtn.style.display = "none";
                     if (messageBtn) messageBtn.style.display = "none";
                     
                     if (blockBtn) {
-                        blockBtn.style.display = "inline-block";
-                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px; vertical-align: middle;">lock_open</span> Unblock`;
-                        blockBtn.style.color = "#00e676";
-                        blockBtn.style.background = "rgba(0, 230, 118, 0.1)";
-                        blockBtn.style.borderColor = "rgba(0, 230, 118, 0.3)";
+                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px;">lock_open</span> Unblock User`;
                     }
                 } else if (status === "BLOCKED_YOU") {
                     if (secureContent) secureContent.style.display = "none";
-                    if (cloak) cloak.style.display = "block";
+                    if (cloak) {
+                        cloak.style.display = "block";
+                        if (cloakTitle) {
+                            cloakTitle.textContent = "You have been blocked";
+                            cloakTitle.style.color = "#ff3366";
+                        }
+                        if (cloakDesc) cloakDesc.textContent = "You cannot view this user's timeline or interactions.";
+                        if (cloakIcon) cloakIcon.style.color = "#ff3366";
+                    }
                     
                     if (followBtn) followBtn.style.display = "none";
                     if (messageBtn) messageBtn.style.display = "none";
@@ -351,11 +384,7 @@
                     if (secureContent) secureContent.style.display = "block";
                     if (cloak) cloak.style.display = "none";
                     if (blockBtn) {
-                        blockBtn.style.display = "inline-block";
-                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px; vertical-align: middle;">block</span>`;
-                        blockBtn.style.color = "#ff3366";
-                        blockBtn.style.background = "rgba(255, 51, 102, 0.1)";
-                        blockBtn.style.borderColor = "rgba(255, 51, 102, 0.3)";
+                        blockBtn.innerHTML = `<span class="material-icons" style="font-size: 18px;">block</span> Block User`;
                     }
                 }
             });

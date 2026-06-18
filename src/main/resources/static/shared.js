@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "http://localhost:8080";
 
 const currentUser = localStorage.getItem("currentUser");
 
@@ -30,19 +30,40 @@ document.head.insertAdjacentHTML("beforeend", `
         .media-grid-3 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(100px, 150px); }
         .media-grid-3 .media-cell:first-child { grid-column: span 2; grid-row: span 1; }
         .media-grid-4 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(100px, 150px); }
-        .media-cell { position: relative; width: 100%; height: 100%; max-width: 100%; overflow: visible; display: flex; box-sizing: border-box; }
+        /* THE FIX: Force z-index: 1 on all grid items so they stay beneath the Kebab menu */
+        .media-cell { position: relative; width: 100%; height: 100%; max-width: 100%; overflow: visible; display: flex; box-sizing: border-box; z-index: 1 !important; }
         /* THE FIX: Move the border-radius directly to the image/video so they stay beautifully rounded without a clipping mask! */
-        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-width: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; border-radius: 10px; box-sizing: border-box; }
+        .grid-media-item { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-width: 100%; object-fit: cover; background: #0b0f1a; cursor: pointer; border: none; border-radius: 10px; box-sizing: border-box; z-index: 1 !important; }
 
         /* THE VOICE NOTE CSS */
         @keyframes pulseMic { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
         .recording-pulse { animation: pulseMic 1.2s infinite; }
 
         /* THE KEBAB MENU CSS */
-        .kebab-menu-container { position: relative; display: inline-block; }
+        .kebab-menu-container { position: relative; display: inline-block; z-index: 10000 !important; transform: translateZ(0); }
         .kebab-btn { background: transparent; border: none; color: #a09eb5; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: 0.2s; outline: none; }
         .kebab-btn:hover { background: rgba(255,255,255,0.1); color: white; }
-        .dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 1000; min-width: 150px; overflow: hidden; flex-direction: column; }
+
+        /* THE FIX: translateZ(0) forces GPU rendering, and max-height forces scrolling right at the Delete option! */
+        .dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 10005 !important; transform: translateZ(0); min-width: 170px; overflow-y: auto !important; overflow-x: hidden !important; max-height: 125px !important; flex-direction: column; }
+
+        /* Custom Scrollbar for the Kebab Menu to maintain the UI design */
+        .dropdown-menu::-webkit-scrollbar { width: 6px; }
+        .dropdown-menu::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .dropdown-menu::-webkit-scrollbar-thumb:hover { background: #00e676; }
+
+        /* Custom Scrollbar for the Kebab Menu to maintain the UI design */
+        .dropdown-menu::-webkit-scrollbar { width: 6px; }
+        .dropdown-menu::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .dropdown-menu::-webkit-scrollbar-thumb:hover { background: #00e676; }
+
+        /* THE FIX: Pointer Event Stealing Shield! 
+        If a post has an open Kebab menu, instantly disable mouse interactions on all media inside that post 
+        so the video player cannot steal the mouse cursor from the dropdown menu! */
+        .post:has(.dropdown-menu[style*="display: flex"]) .media-gallery,
+        .post:has(.dropdown-menu[style*="display: block"]) .media-gallery {
+        pointer-events: none !important;
+        }
         .dropdown-item { padding: 12px 15px; color: white; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; border: none; background: transparent; width: 100%; text-align: left; transition: 0.2s; font-family: inherit; }
         .dropdown-item:hover { background: rgba(255,255,255,0.05); }
         .dropdown-item.danger { color: #ff3366; }
@@ -923,7 +944,12 @@ window.generateKebabMenu = function(item, type = 'post') {
     const isSaved = item.isSaved || false;
     const isFollowing = item.isFollowing || false;
     const contentEscaped = item.content ? String(item.content).replace(/'/g, "\\'") : "";
-   const itemOwner = item.username;
+    const itemOwner = item.username;
+    
+    // THE FIX: Dynamically generate the exact URL whether it is a post or a deep-linked comment!
+    const linkUrl = type === 'comment' && item.postId 
+        ? `${API_BASE}/post.html?id=${item.postId}&commentId=${id}` 
+        : `${API_BASE}/post.html?id=${id}`;
     
     let kebabHTML = "";
     if (itemOwner === currentUser) {
@@ -933,6 +959,9 @@ window.generateKebabMenu = function(item, type = 'post') {
                     <span class="material-icons">more_vert</span>
                 </button>
                 <div id="dropdown-${type}-${id}" class="dropdown-menu">
+                    <button class="dropdown-item" onclick="event.stopPropagation(); window.copyToClipboard('${linkUrl}')">
+                        <span class="material-icons" style="font-size: 18px;">link</span> Copy Link
+                    </button>
                     <button class="dropdown-item" onclick="event.stopPropagation(); ${type === 'comment' ? `editComment(${id}, '${contentEscaped}')` : `editPost(${id}, '${contentEscaped}')`}">
                         <span class="material-icons" style="font-size: 18px;">edit</span> Edit
                     </button>
@@ -966,6 +995,9 @@ window.generateKebabMenu = function(item, type = 'post') {
                     <span class="material-icons">more_vert</span>
                 </button>
                 <div id="dropdown-${type}-${id}" class="dropdown-menu">
+                    <button class="dropdown-item" onclick="event.stopPropagation(); window.copyToClipboard('${linkUrl}')">
+                        <span class="material-icons" style="font-size: 18px;">link</span> Copy Link
+                    </button>
                     <button class="dropdown-item" onclick="event.stopPropagation(); savePost(${id}, this, '${type}')">
                         <span class="material-icons" style="font-size: 18px;">${isSaved ? 'bookmark' : 'bookmark_border'}</span> ${isSaved ? 'Unsave' : 'Save'}
                     </button>
@@ -1222,7 +1254,7 @@ window.generateMediaGridHTML = function(mediaData, postId, context = 'feed') {
             // THE FIX: Lock custom buttons strictly to the TOP RIGHT corner for all media types!
             html += `<div class="grid-controls" style="position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; z-index: 10;">`;
             html += `<button onclick="event.stopPropagation(); window.NativeStorage ? window.NativeStorage.saveFile('${mediaUrl}', 'Media_${postId}_${index}_' + Date.now() + '.${ext}') : window.forceDownload('${mediaUrl}', 'Media_${postId}_${index}_' + Date.now() + '.${ext}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid #00e676; color: #00e676;" title="Download"><span class="material-icons" style="font-size: 16px;">download</span></button>`;
-            html += `<button onclick="event.stopPropagation(); this.parentElement.previousElementSibling.requestFullscreen()" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid #00e676; color: #00e676;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
+            html += `<button onclick="event.stopPropagation(); window.openCinematicVideo('${mediaUrl}')" class="media-control-btn" style="width: 35px!important; height: 35px!important; padding: 0!important; display: flex; justify-content: center; align-items: center; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid #00e676; color: #00e676;" title="Full Screen"><span class="material-icons" style="font-size: 18px;">fullscreen</span></button>`;
             html += `</div>`;
         }
         html += `</div>`;
@@ -1238,48 +1270,69 @@ setInterval(checkNotifications, 30000);
 setInterval(checkUnreadMessages, 30000);
 
 /* ========================================= */
-/* --- ACTION-TRIGGERED OFFLINE INTERCEPTOR --- */
+/* --- UNIVERSAL UTILITY FUNCTIONS ---       */
 /* ========================================= */
-window.showGlobalOfflineModal = function() {
-    let offlineModal = document.getElementById('globalOfflineModal');
-    if (!offlineModal) {
-        offlineModal = document.createElement('div');
-        offlineModal.id = 'globalOfflineModal';
-        offlineModal.className = 'modal-overlay';
-        offlineModal.style.zIndex = '100000'; 
-        offlineModal.style.backgroundColor = 'rgba(11, 15, 26, 0.95)';
-        offlineModal.innerHTML = `
-            <div class="modal-card" style="border-color: #ff3366; box-shadow: 0 15px 50px rgba(255, 51, 102, 0.2);">
-                <div class="modal-icon"><span class="material-icons" style="font-size: 60px; color: #ff3366;">wifi_off</span></div>
-                <h3 style="color: white; margin-top: 10px;">Connection Lost</h3>
-                <p style="color: #a09eb5; margin: 15px 0;">We couldn't reach the server. Please check your network connection and try again.</p>
-                <button class="modal-confirm-btn" style="background: #ff3366; color: white; width: 100%; border: none; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);" onclick="document.getElementById('globalOfflineModal').style.display='none';">Okay</button>
-            </div>
-        `;
-        document.body.appendChild(offlineModal);
-    }
-    offlineModal.style.display = 'flex';
+window.copyToClipboard = function(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        if (typeof showToast === 'function') showToast("Link copied to clipboard!");
+        else alert("Link copied to clipboard!");
+    }).catch(err => {
+        console.error("Could not copy text: ", err);
+    });
+    document.querySelectorAll('.dropdown-menu').forEach(menu => menu.style.display = 'none');
 };
 
-// THE FIX: Upgraded Fetch Interceptor that ignores silent background loops!
-const originalFetch = window.fetch;
-window.fetch = async function(...args) {
-    const url = args[0];
-    const isBackgroundActivity = typeof url === 'string' && (url.includes('/getNotifications') || url.includes('/getUnreadCount'));
+/* ========================================= */
+/* --- CINEMATIC VIDEO LIGHTBOX ---          */
+/* ========================================= */
+window.openCinematicVideo = function(videoUrl) {
+    let videoModal = document.getElementById('cinematicVideoModal');
+    if (!videoModal) {
+        videoModal = document.createElement('div');
+        videoModal.id = 'cinematicVideoModal';
+        videoModal.style.position = 'fixed';
+        videoModal.style.top = '0';
+        videoModal.style.left = '0';
+        videoModal.style.width = '100vw';
+        videoModal.style.height = '100vh';
+        videoModal.style.backgroundColor = '#000000';
+        videoModal.style.zIndex = '999999';
+        videoModal.style.display = 'flex';
+        videoModal.style.alignItems = 'center';
+        videoModal.style.justifyContent = 'center';
+        
+        videoModal.innerHTML = `
+            <button onclick="document.getElementById('cinematicVideoModal').style.display='none'; document.getElementById('cinematicVideoPlayer').pause();" style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); border: none; border-radius: 50%; color: white; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;">
+                <span class="material-icons" style="font-size: 28px;">arrow_back</span>
+            </button>
+            <video id="cinematicVideoPlayer" controls autoplay style="width: 100%; height: 100%; max-height: 100vh; object-fit: contain; outline: none;"></video>
+        `;
+        document.body.appendChild(videoModal);
+    }
+    
+    const player = document.getElementById('cinematicVideoPlayer');
+    player.src = videoUrl;
+    videoModal.style.display = 'flex';
+};
 
-    if (!navigator.onLine && !isBackgroundActivity) {
-        window.showGlobalOfflineModal();
-        return Promise.reject(new Error("Offline"));
-    }
-    try {
-        const response = await originalFetch(...args);
-        return response;
-    } catch (error) {
-        if (!isBackgroundActivity && (error.name === 'TypeError' || error.message === 'Failed to fetch')) {
-            window.showGlobalOfflineModal();
-        }
-        throw error;
-    }
+/* ========================================= */
+/* --- THE NUCLEAR WIPE ENGINE ---           */
+/* ========================================= */
+window.executeNuclearWipe = function() {
+    // THE FIX: Replaced the legacy browser confirm() with the beautiful custom modal engine
+    openConfirmModal("WARNING: This will permanently delete EVERY post and reply you have ever made. Proceed?", () => {
+        fetch(`${API_BASE}/api/nuclearWipe`, {
+            method: 'POST',
+            body: JSON.stringify({ username: currentUser })
+        }).then(res => res.text()).then(data => {
+            if (data === "SUCCESS") {
+                if (typeof showToast === 'function') showToast("Account history completely wiped.");
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                if (typeof showToast === 'function') showToast("Wipe failed. Server error.");
+            }
+        }).catch(err => console.error("Wipe Error:", err));
+    });
 };
 
 /* ========================================= */

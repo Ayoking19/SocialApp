@@ -744,6 +744,30 @@ public class Main {
             });
 
             /* ========================================= */
+            /* --- 23.5. THE NUCLEAR WIPE ENDPOINT ---   */
+            /* ========================================= */
+            server.createContext("/api/nuclearWipe", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    if ("POST".equals(exchange.getRequestMethod())) {
+                        InputStream is = exchange.getRequestBody();
+                        String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        
+                        String username = extractJsonValue(body, "username");
+                        
+                        boolean success = PostSystem.executeNuclearWipe(username);
+                        String response = success ? "SUCCESS" : "FAILURE";
+                        
+                        exchange.sendResponseHeaders(200, response.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(response.getBytes());
+                        os.close();
+                    }
+                }
+            });
+
+            /* ========================================= */
             /* --- 24. THE QUOTES ENDPOINT --- */
             /* ========================================= */
             server.createContext("/api/getPostQuotes", new HttpHandler() {

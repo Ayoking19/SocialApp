@@ -1320,7 +1320,8 @@ textarea {
     .nav-links a { font-size: 14px; padding: 10px; }
     .nav-links a.logout { margin-top: 0; }
     
-    .feed { height: auto !important; padding-top: 65px !important; padding-bottom: 250px !important; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
+    /* THE FIX: Changed padding-top from 65px to 0 to prevent the massive Double Padding void on mobile! */
+    .feed { height: auto !important; padding-top: 0 !important; padding-bottom: 250px !important; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 100vw; }
     
     body.in-chat .feed { height: 100dvh !important; overflow: hidden; }
     
