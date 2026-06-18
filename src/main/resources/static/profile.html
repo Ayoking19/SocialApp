@@ -555,6 +555,11 @@
                 } else {
                     window.currentProfilePinnedId = null;
                 }
+                
+                // THE FIX: Eradicate the Race Condition! If posts loaded first, re-render them now that we finally know the pinned post ID!
+                if (profilePostsBuffer && profilePostsBuffer.length > 0) {
+                    showAllPosts();
+                }
             })
             .catch(error => console.error("Error loading profile:", error));
         }
