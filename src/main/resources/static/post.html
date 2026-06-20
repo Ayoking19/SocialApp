@@ -199,6 +199,23 @@
                         
                         <div class="comments-section" id="comments-${post.id}" style="display: block; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                             
+                            <div class="comment-sort-container">
+                                <span class="comment-sort-label">Sort by:</span>
+                                <div class="custom-sort-wrapper" onclick="toggleCustomSort(event)">
+                                    <div class="custom-sort-btn">
+                                        <span id="active-sort-text">Top</span>
+                                        <span class="material-icons" style="font-size: 18px;">expand_more</span>
+                                    </div>
+                                    <div class="custom-sort-menu" id="custom-sort-menu" style="display: none;">
+                                        <div class="custom-sort-option active" onclick="applyCustomSort('top', 'Top', ${post.id}, event)">Top</div>
+                                        <div class="custom-sort-option" onclick="applyCustomSort('latest', 'Latest', ${post.id}, event)">Latest</div>
+                                        <div class="custom-sort-option" onclick="applyCustomSort('oldest', 'Oldest', ${post.id}, event)">Oldest</div>
+                                        <div class="custom-sort-option" onclick="applyCustomSort('liked', 'Most Liked', ${post.id}, event)">Most Liked</div>
+                                        <div class="custom-sort-option" onclick="applyCustomSort('following', 'Following', ${post.id}, event)">Following</div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div id="comment-list-${post.id}" style="margin-bottom: 100px; max-height: none;">
                                 ${typeof generateSkeletonHTML === 'function' ? generateSkeletonHTML(2) : '<p style="color: gray; font-size: 14px; text-align: center;">Loading comments...</p>'}
                             </div>
@@ -297,9 +314,79 @@
         /* ========================================= */
         
         let globalCommentsData = [];
-        let mainCommentMediaArray = []; // THE FIX: Upgraded to Array for Multi-Media Comments
+        let mainCommentMediaArray = []; 
         let globalReplyParentId = null; 
-        let viewStack = []; // Remembers your navigation path
+        let viewStack = []; 
+        let currentSortMethod = 'top'; // Default sorting method
+
+        // THE FIX: The Sorting Engine logic
+        function sortCommentsArray(comments) {
+            return comments.sort((a, b) => {
+                const interactionA = (a.likes || 0) + (a.repostCount || 0) + (a.quoteCount || 0) + (a.replyCount || 0);
+                const interactionB = (b.likes || 0) + (b.repostCount || 0) + (b.quoteCount || 0) + (b.replyCount || 0);
+                const timeA = new Date(a.timestamp).getTime();
+                const timeB = new Date(b.timestamp).getTime();
+
+                if (currentSortMethod === 'top') {
+                    if (interactionB !== interactionA) return interactionB - interactionA;
+                    return timeB - timeA; // Tie-breaker: latest
+                } 
+                else if (currentSortMethod === 'latest') {
+                    return timeB - timeA;
+                } 
+                else if (currentSortMethod === 'oldest') {
+                    return timeA - timeB;
+                } 
+                else if (currentSortMethod === 'liked') {
+                    if (b.likes !== a.likes) return (b.likes || 0) - (a.likes || 0);
+                    return timeB - timeA; // Tie-breaker: latest
+                } 
+                else if (currentSortMethod === 'following') {
+                    // Assuming 'isFollowing' is passed from the backend for each comment's author
+                    const followA = a.isFollowing ? 1 : 0;
+                    const followB = b.isFollowing ? 1 : 0;
+                    if (followA !== followB) return followB - followA;
+                    // If both are followed (or both unfollowed), sort by Top interactions
+                    if (interactionB !== interactionA) return interactionB - interactionA;
+                    return timeB - timeA;
+                }
+                return 0;
+            });
+        }
+
+        window.toggleCustomSort = function(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('custom-sort-menu');
+            if (menu) {
+                menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            }
+        };
+
+        window.applyCustomSort = function(method, text, postId, event) {
+            event.stopPropagation();
+            currentSortMethod = method;
+            
+            // Re-label the button text
+            document.getElementById('active-sort-text').textContent = text;
+            
+            // Move the neon green highlight to the correct option
+            document.querySelectorAll('.custom-sort-option').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Shut the menu
+            document.getElementById('custom-sort-menu').style.display = 'none';
+            
+            // Re-calculate the math and redraw the comments
+            renderThreadView(postId);
+        };
+
+        // A global security check: closes the menu if you click anywhere else on the screen
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('custom-sort-menu');
+            if (menu && !event.target.closest('.custom-sort-wrapper')) {
+                menu.style.display = 'none';
+            }
+        });
 
         window.loadComments = function(postId) {
             fetch(`${API_BASE}/api/getComments`, {
@@ -388,11 +475,13 @@
             }
 
             // 2. Draw the direct children
-            const children = globalCommentsData.filter(c => c.parentCommentId === currentParentId);
+            let children = globalCommentsData.filter(c => c.parentCommentId === currentParentId);
 
             if (children.length === 0) {
                 html += "<p style='color: gray; font-size: 14px; text-align: center; margin-top: 20px;'>No replies yet. Be the first!</p>";
             } else {
+                // THE FIX: Pass the children array through the Sorting Engine before drawing them!
+                children = sortCommentsArray(children);
                 children.forEach(c => {
                     html += generateSingleCommentHTML(c, postId, false);
                 });
