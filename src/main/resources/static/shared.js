@@ -553,6 +553,10 @@ window.openDynamicListModal = function(title, endpoint, bodyPayload) {
         let html = "";
         data.forEach(item => {
             if (item.content !== undefined) {
+                /* THE FIX: Replaced the lazy "Attached Media" text with the actual Media Grid Engine, and wrapped the content in parseSocialText to fix line-breaks! */
+                let itemMediaHTML = item.media && typeof generateMediaGridHTML === 'function' ? generateMediaGridHTML(item.media, item.id, 'quote') : "";
+                let parsedContent = typeof parseSocialText === 'function' ? parseSocialText(item.content) : item.content;
+                
                 html += `
                 <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 3px solid #00e676; cursor: pointer;" onclick="window.location.href='post.html?id=${item.id}'">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -560,8 +564,8 @@ window.openDynamicListModal = function(title, endpoint, bodyPayload) {
                         <strong style="color: white;">${item.username}</strong>
                         <span style="color: gray; font-size: 12px; margin-left: auto;">${item.timestamp.substring(0,16)}</span>
                     </div>
-                    <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${item.content}</p>
-                    ${item.media ? `<div style="margin-top: 10px; color: #00e676; font-size: 12px;"><span class="material-icons" style="font-size:14px; vertical-align:middle;">image</span> Attached Media</div>` : ''}
+                    <p style="margin-top: 10px; color: #e0e0e0; font-size: 14px;">${parsedContent}</p>
+                    ${itemMediaHTML}
                 </div>`;
             } else {
                 html += `
@@ -586,7 +590,8 @@ function openQuoteEditor(postId, commentId = null) {
     let existingMenu = document.getElementById('quoteMenuOverlay');
     if (existingMenu) existingMenu.remove();
 
-    let quoteMediaBase64 = "";
+    // THE FIX: Upgraded from a string to an Array to hold multiple media items!
+    let quoteMediaArray = [];
 
     const overlay = document.createElement('div');
     overlay.id = 'quoteMenuOverlay';
@@ -596,24 +601,35 @@ function openQuoteEditor(postId, commentId = null) {
 
     const menuCard = document.createElement('div');
     menuCard.className = 'modal-card';
+    /* THE FIX: Forced the modal to act as a Flexbox column layout [a CSS layout method that stacks elements vertically] with restricted height so it can scroll internally! */
+    menuCard.style.display = 'flex';
+    menuCard.style.flexDirection = 'column';
+    menuCard.style.maxHeight = '85vh';
+    
     menuCard.innerHTML = `
-        <h3>Quote this post</h3>
-        <textarea id="quoteTextArea" class="bio-edit-input" style="height:100px; margin: 20px 0;" placeholder="Add your thoughts..."></textarea>
+        <h3 style="flex-shrink: 0; margin-bottom: 15px;">Quote this post</h3>
         
-        <div id="quoteMediaPreview" class="media-preview-container"></div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <div style="display: flex; gap: 10px;">
-                <input type="file" id="quoteImgUpload" accept="image/*" hidden>
-                <input type="file" id="quoteVidUpload" accept="video/*" hidden>
-                <label for="quoteImgUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">image</span></label>
-                <label for="quoteVidUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">videocam</span></label>
-            </div>
+        <!-- THE FIX: The Scrollable Middle Chamber -->
+        <div style="flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 5px; min-height: 0; display: flex; flex-direction: column;">
+            <textarea id="quoteTextArea" class="bio-edit-input" style="min-height: 100px; flex-shrink: 0; margin-bottom: 15px; width: 100%; box-sizing: border-box;" placeholder="Add your thoughts..."></textarea>
+            <div id="quoteMediaPreview" class="media-preview-container" style="display: none; flex-direction: column; width: 100%; margin-bottom: 15px; flex-shrink: 0;"></div>
         </div>
+        
+        <!-- THE FIX: Locked Footer for Buttons and Actions so they never scroll off the screen -->
+        <div style="flex-shrink: 0; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="file" id="quoteImgUpload" accept="image/*" multiple hidden>
+                    <input type="file" id="quoteVidUpload" accept="video/*" multiple hidden>
+                    <label for="quoteImgUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">image</span></label>
+                    <label for="quoteVidUpload" class="icon-btn" style="cursor: pointer;"><span class="material-icons">videocam</span></label>
+                </div>
+            </div>
 
-        <div class="modal-buttons">
-            <button class="modal-cancel-btn" id="cancelQuoteBtn">Cancel</button>
-            <button class="main-post-btn" id="submitQuote">Quote</button>
+            <div class="modal-buttons">
+                <button class="modal-cancel-btn" id="cancelQuoteBtn">Cancel</button>
+                <button class="main-post-btn" id="submitQuote">Quote</button>
+            </div>
         </div>
     `;
 
@@ -622,41 +638,65 @@ function openQuoteEditor(postId, commentId = null) {
     
     document.getElementById('cancelQuoteBtn').onclick = () => overlay.remove();
 
-    const handleQuoteMedia = (input, type) => {
-        const file = input.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = function() {
-                quoteMediaBase64 = reader.result;
-                const preview = document.getElementById('quoteMediaPreview');
-                if (type === 'image') {
-                    preview.innerHTML = `<div class="preview-item"><img src="${quoteMediaBase64}"><button class="remove-media-btn" id="rmQuoteMedia">X</button></div>`;
-                } else {
-                    preview.innerHTML = `<div class="preview-item"><video src="${quoteMediaBase64}" controls style="max-height: 200px; border-radius: 10px;"></video><button class="remove-media-btn" id="rmQuoteMedia">X</button></div>`;
-                }
-                document.getElementById('rmQuoteMedia').onclick = () => {
-                    quoteMediaBase64 = "";
-                    preview.innerHTML = "";
-                    input.value = "";
-                };
-            };
-            reader.readAsDataURL(file);
-        }
+    // THE FIX: Global functions so the grid "X" buttons can trigger them inside the modal
+    window.removeQuoteMedia = function(index) {
+        quoteMediaArray.splice(index, 1);
+        renderQuoteMediaPreview();
     };
 
-    document.getElementById('quoteImgUpload').onchange = function() { handleQuoteMedia(this, 'image'); };
-    document.getElementById('quoteVidUpload').onchange = function() { handleQuoteMedia(this, 'video'); };
+    window.clearAllQuoteMedia = function() {
+        quoteMediaArray = [];
+        renderQuoteMediaPreview();
+    };
+
+    const renderQuoteMediaPreview = () => {
+        const previewDiv = document.getElementById('quoteMediaPreview');
+        if (quoteMediaArray.length === 0) {
+            previewDiv.style.display = "none";
+            previewDiv.innerHTML = "";
+            return;
+        }
+        
+        // THE FIX: Use the Universal Grid Engine, but intelligently swap the X button logic to our quote context!
+        let gridHTML = generateMediaGridHTML(JSON.stringify(quoteMediaArray), 'quote', 'preview');
+        gridHTML = gridHTML.replace(/window\.removeSpecificMedia/g, 'window.removeQuoteMedia');
+        
+        previewDiv.innerHTML = gridHTML;
+        previewDiv.innerHTML += `<div style="width: 100%; text-align: right; margin-top: 5px;"><button class="modal-cancel-btn" onclick="clearAllQuoteMedia()" style="padding: 2px 10px; font-size: 11px;">Clear All</button></div>`;
+        previewDiv.style.display = "flex";
+    };
+
+    const handleQuoteMedia = (input) => {
+        const files = Array.from(input.files);
+        if (quoteMediaArray.length + files.length > 4) {
+            if (typeof showToast === 'function') showToast("Maximum of 4 files allowed.");
+            else alert("Maximum of 4 files allowed.");
+            return;
+        }
+
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                quoteMediaArray.push(reader.result);
+                renderQuoteMediaPreview();
+            };
+            reader.readAsDataURL(file);
+        });
+        input.value = ""; // Clear input to allow re-selecting the same file if needed
+    };
+
+    document.getElementById('quoteImgUpload').onchange = function() { handleQuoteMedia(this); };
+    document.getElementById('quoteVidUpload').onchange = function() { handleQuoteMedia(this); };
 
     const textArea = document.getElementById('quoteTextArea');
     textArea.focus();
 
     document.getElementById('submitQuote').onclick = () => {
-        if (textArea.value.trim() === "" && quoteMediaBase64 === "") {
+        if (textArea.value.trim() === "" && quoteMediaArray.length === 0) {
             showToast("Please add text or media to your quote.");
             return;
         }
 
-        // THE FIX: Contextually target the exact active timeline container to isolate layout contexts!
         let feedElement = null;
         if (window.location.pathname.includes('index.html')) feedElement = document.getElementById("feedContainer");
         else if (window.location.pathname.includes('profile.html')) feedElement = document.getElementById("profileFeedContainer");
@@ -676,15 +716,18 @@ function openQuoteEditor(postId, commentId = null) {
             feedElement.insertAdjacentHTML('afterbegin', tempHTML);
         }
         
+        // THE FIX: Stringify the array payload for the backend!
+        let finalMediaPayload = quoteMediaArray.length > 0 ? JSON.stringify(quoteMediaArray) : "";
+
         if (typeof executeQuote === 'function') {
-            executeQuote(postId, textArea.value, quoteMediaBase64, commentId);
+            executeQuote(postId, textArea.value, finalMediaPayload, commentId);
         } else {
             fetch(`${API_BASE}/api/createPost`, {
                 method: 'POST',
                 body: JSON.stringify({ 
                     username: currentUser, 
                     content: textArea.value, 
-                    media: quoteMediaBase64, 
+                    media: finalMediaPayload, 
                     parentPostId: postId,
                     parentCommentId: commentId 
                 })
@@ -1361,6 +1404,8 @@ const svgIcons = {
     "image": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>`,
     "videocam": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
     "warning": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
+    /* THE FIX: Injected the mathematical SVG path for arrow_back so the global engine converts it everywhere! */
+    "arrow_back": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>`,
     "arrow_forward": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>`,
     "format_quote": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>`,
     "undo": `<svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C20.08 11.03 16.63 8 12.5 8z"/></svg>`,
