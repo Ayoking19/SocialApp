@@ -893,8 +893,17 @@
             .then(res => res.json())
             .then(newMessages => {
                 isFetchingChat = false; // Release the lock!
-                // THE FIX: If there's nothing new, abort the render completely to save processing power!
-                if (newMessages.length === 0) return;
+                
+                // THE FIX: Abort render if nothing new, BUT gracefully handle completely empty brand-new chats!
+                if (newMessages.length === 0) {
+                    if (currentChatMessages.length === 0) {
+                        const container = document.getElementById("chatHistoryContainer");
+                        if (container) {
+                            container.innerHTML = `<div style='text-align: center; margin-top: 40px;'><span class='material-icons' style='font-size: 50px; color: #334155; margin-bottom: 10px;'>waving_hand</span><p style='color: #a09eb5; font-weight: bold; font-size: 16px;'>Say Hi👋...</p></div>`;
+                        }
+                    }
+                    return;
+                }
                 
                 // Append only the newly fetched messages to our active array
                 currentChatMessages = [...currentChatMessages, ...newMessages]; 

@@ -41,11 +41,17 @@ public class NotificationSystem {
                             String pushTitle = "SocialApp";
                             String pushBody = actor + " interacted with you.";
                             
+                            // THE FIX: Explicitly separated post and comment notifications for maximum clarity
                             if (type.equals("LIKE")) { pushTitle = "New Like"; pushBody = actor + " liked your post."; }
+                            else if (type.equals("COMMENT_LIKE")) { pushTitle = "New Like"; pushBody = actor + " liked your comment."; }
                             else if (type.equals("COMMENT")) { pushTitle = "New Comment"; pushBody = actor + " commented on your post."; }
+                            else if (type.equals("COMMENT_REPLY")) { pushTitle = "New Reply"; pushBody = actor + " replied to your comment."; }
                             else if (type.equals("FOLLOW")) { pushTitle = "New Follower"; pushBody = actor + " started following you."; }
                             else if (type.contains("MESSAGE")) { pushTitle = "New Message"; pushBody = actor + " sent a message."; }
-                            else if (type.equals("QUOTE")) { pushTitle = "New Quote"; pushBody = actor + " quoted your post."; }
+                            else if (type.equals("QUOTE_POST")) { pushTitle = "New Quote"; pushBody = actor + " quoted your post."; }
+                            else if (type.equals("QUOTE_COMMENT")) { pushTitle = "New Quote"; pushBody = actor + " quoted your comment."; }
+                            else if (type.equals("REPOST_POST") || type.equals("REPOST_REPOST")) { pushTitle = "New Repost"; pushBody = actor + " reposted your post."; }
+                            else if (type.equals("REPOST_COMMENT")) { pushTitle = "New Repost"; pushBody = actor + " reposted your comment."; }
                             else if (type.contains("REPOST")) { pushTitle = "New Repost"; pushBody = actor + " reposted your content."; }
                             
                             // [THE NEW TRIGGER]: Fire the native Java Firebase Cannon!

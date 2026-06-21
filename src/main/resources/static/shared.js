@@ -340,6 +340,13 @@ function toggleCommentLike(element, commentId) {
 function editComment(commentId, currentContent) {
     openEditModal("Edit Comment", currentContent, (newContent) => {
         if (newContent && newContent.trim() !== "") {
+            // THE FIX: Optimistic UI instantly injects the new text into the comment bubble!
+            const commentBoxes = document.querySelectorAll(`[id="comment-container-${commentId}"]`);
+            commentBoxes.forEach(box => {
+                const p = box.querySelector('p');
+                if (p) p.innerHTML = parseSocialText(newContent);
+            });
+
             fetch(`${API_BASE}/api/editComment`, {
                 method: 'POST',
                 body: JSON.stringify({ username: currentUser, commentId: commentId.toString(), content: newContent })
@@ -348,11 +355,6 @@ function editComment(commentId, currentContent) {
             .then(data => {
                 if (data === "SUCCESS") {
                     showToast("Comment updated!");
-                    if (typeof loadComments === 'function') {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const postId = urlParams.get('id');
-                        if (postId) loadComments(postId);
-                    }
                 }
             });
         }
@@ -361,6 +363,10 @@ function editComment(commentId, currentContent) {
 
 function deleteComment(commentId) {
     openConfirmModal("Are you sure you want to delete this comment?", () => {
+        // THE FIX: Optimistic UI instantly hides the comment from the screen!
+        const commentBoxes = document.querySelectorAll(`[id="comment-container-${commentId}"]`);
+        commentBoxes.forEach(box => box.style.display = 'none');
+
         fetch(`${API_BASE}/api/deleteComment`, {
             method: 'POST',
             body: JSON.stringify({ username: currentUser, commentId: commentId.toString() })
@@ -369,14 +375,6 @@ function deleteComment(commentId) {
         .then(data => {
             if (data === "SUCCESS") {
                 showToast("Comment deleted.");
-                if (typeof loadComments === 'function') {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const postId = urlParams.get('id');
-                    if (postId) loadComments(postId);
-                } else {
-                    const commentElem = document.getElementById(`comment-container-${commentId}`);
-                    if (commentElem) commentElem.remove();
-                }
             }
         });
     });
@@ -804,6 +802,12 @@ function executeRepost(postId, isCurrentlyReposted, commentId = null) {
             btn.style.color = '';
             if (countSpan) countSpan.textContent = currentCount > 0 ? currentCount - 1 : 0;
             btn.setAttribute('onclick', `event.stopPropagation(); openRepostMenu(${postId}, false, ${commentId || 'null'})`);
+            
+            // THE FIX: If you undo a repost while on your profile, instantly vanish the post card!
+            if (window.location.pathname.includes('profile.html')) {
+                const postCard = btn.closest('.post');
+                if (postCard) postCard.style.display = 'none';
+            }
         } else {
             btn.style.background = 'rgba(0, 168, 255, 0.1)';
             btn.style.color = '#00a8ff';

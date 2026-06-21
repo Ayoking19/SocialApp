@@ -71,23 +71,27 @@ public class PostSystem {
                             String targetUsername = rsComm.getString("username");
                             int originalPostId = rsComm.getInt("post_id");
                             if (!targetUsername.equals(identifier) && !isNewPostQuote) {
-                                NotificationSystem.createNotification(targetUsername, identifier, "REPOST", originalPostId);
+                                // THE FIX: Explicitly label as REPOST_COMMENT
+                                NotificationSystem.createNotification(targetUsername, identifier, "REPOST_COMMENT", originalPostId);
                             }
                         }
                     }
                 } 
                 else if (parentPostId != null) {
-                    String targetUserQuery = "SELECT users.username, posts.content, posts.parent_post_id FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
+                    // THE FIX: Include posts.image_url to prevent media quotes from being misidentified as pure reposts!
+                    String targetUserQuery = "SELECT users.username, posts.content, posts.image_url, posts.parent_post_id FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
                     try (PreparedStatement targetStmt = conn.prepareStatement(targetUserQuery)) {
                         targetStmt.setInt(1, parentPostId);
                         ResultSet rsTarget = targetStmt.executeQuery();
                         if (rsTarget.next()) {
                             String targetUsername = rsTarget.getString("username");
                             String targetContent = rsTarget.getString("content");
+                            String targetMedia = rsTarget.getString("image_url");
                             int targetParentId = rsTarget.getInt("parent_post_id");
                             boolean hasTargetParent = !rsTarget.wasNull();
 
-                            if ((targetContent == null || targetContent.trim().isEmpty()) && hasTargetParent) {
+                            // THE FIX: Both content AND media must be empty to trigger the bypass logic!
+                            if ((targetContent == null || targetContent.trim().isEmpty()) && (targetMedia == null || targetMedia.trim().isEmpty()) && hasTargetParent) {
                                 finalParentId = targetParentId;
                                 if (!targetUsername.equals(identifier) && !isNewPostQuote) NotificationSystem.createNotification(targetUsername, identifier, "REPOST_REPOST", parentPostId);
                                 String originalQuery = "SELECT users.username FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = ?";
@@ -95,11 +99,11 @@ public class PostSystem {
                                     origStmt.setInt(1, targetParentId);
                                     ResultSet rsOrig = origStmt.executeQuery();
                                     if (rsOrig.next() && !rsOrig.getString("username").equals(identifier) && !isNewPostQuote) {
-                                        NotificationSystem.createNotification(rsOrig.getString("username"), identifier, "REPOST", targetParentId);
+                                        NotificationSystem.createNotification(rsOrig.getString("username"), identifier, "REPOST_POST", targetParentId);
                                     }
                                 }
                             } else {
-                                if (!targetUsername.equals(identifier) && !isNewPostQuote) NotificationSystem.createNotification(targetUsername, identifier, "REPOST", parentPostId);
+                                if (!targetUsername.equals(identifier) && !isNewPostQuote) NotificationSystem.createNotification(targetUsername, identifier, "REPOST_POST", parentPostId);
                             }
                         }
                     }

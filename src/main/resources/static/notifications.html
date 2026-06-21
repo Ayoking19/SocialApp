@@ -135,9 +135,17 @@
                     } else if (n.type === 'QUOTE') {
                         message = `quoted your post/comment.`; /* Legacy Fallback */
                         link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'REPOST_POST') {
+                        // THE FIX: Explicitly handle the new precise Post tag
+                        message = `reposted your post.`;
+                        link = `post.html?id=${n.postId}`;
+                    } else if (n.type === 'REPOST_COMMENT') {
+                        // THE FIX: Explicitly handle the new precise Comment tag
+                        message = `reposted your comment.`;
+                        link = `post.html?id=${n.postId}&highlightUser=${currentUser}`; 
                     } else if (n.type === 'REPOST') {
-                        message = `reposted your post/comment.`;
-                        link = `post.html?id=${n.postId}&highlightUser=${currentUser}`; // THE FIX: Gracefully handles both post and comment reposts
+                        message = `reposted your post/comment.`; /* Legacy Fallback */
+                        link = `post.html?id=${n.postId}&highlightUser=${currentUser}`;
                     } else if (n.type === 'REPOST_REPOST') {
                         message = `reposted your repost.`;
                         link = `post.html?id=${n.postId}`;
