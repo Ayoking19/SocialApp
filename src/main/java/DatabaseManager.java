@@ -7,21 +7,17 @@ import java.sql.Statement;
 
 public class DatabaseManager {
     
-    private static final String DATABASE_URL = "jdbc:sqlite:social_network.db";
+    // THE FIX: Injected your precise Railway internal network routing credentials
+    // THE FIX: Your permanent Aiven MySQL database routing
+    private static final String DATABASE_URL = "jdbc:mysql://mysql-dbd948d-oluyemiayomikun689-4378.j.aivencloud.com:14711/defaultdb?sslMode=REQUIRED";
+    private static final String DB_USER = "avnadmin";
+    private static final String DB_PASSWORD = "AVNS_JPZBPVEMHsknCarmRnH";
 
     public static Connection connect() {
         Connection conn = null;
         try {
-            conn = DriverManager.getConnection(DATABASE_URL);
-            
-            // THE FIX: Injecting WAL mode to prevent database locking and connection bleed!
-            try (Statement pragmaStmt = conn.createStatement()) {
-                pragmaStmt.execute("PRAGMA journal_mode=WAL;");
-                pragmaStmt.execute("PRAGMA synchronous=NORMAL;");
-                pragmaStmt.execute("PRAGMA cache_size=-64000;");
-            }
-            
-            System.out.println("Connection to SQLite has been established with WAL mode active.");
+            conn = DriverManager.getConnection(DATABASE_URL, DB_USER, DB_PASSWORD);
+            System.out.println("Connection to Railway MySQL has been established successfully.");
         } catch (SQLException e) {
             System.out.println("Connection Error: " + e.getMessage());
         }
@@ -29,128 +25,108 @@ public class DatabaseManager {
     }
 
     public static void initializeDatabase() {
+        // THE FIX: Translated all SQLite 'AUTOINCREMENT' commands into MySQL 'AUTO_INCREMENT' syntax
         String createUsersTable = "CREATE TABLE IF NOT EXISTS users ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "username TEXT NOT NULL UNIQUE,"
-                + "email TEXT NOT NULL UNIQUE,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "username TEXT NOT NULL,"
+                + "email TEXT NOT NULL,"
                 + "password TEXT NOT NULL,"
                 + "bio TEXT,"
                 + "profile_pic_url TEXT,"
-                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "UNIQUE(username(255)),"
+                + "UNIQUE(email(255))"
                 + ");";
          
         String createPostsTable = "CREATE TABLE IF NOT EXISTS posts ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "user_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "user_id INT NOT NULL,"
                 + "content TEXT NOT NULL,"
                 + "image_url TEXT,"
                 + "video_url TEXT,"
-                + "parent_post_id INTEGER DEFAULT NULL," 
-                + "parent_comment_id INTEGER DEFAULT NULL," 
+                + "parent_post_id INT DEFAULT NULL," 
+                + "parent_comment_id INT DEFAULT NULL," 
                 + "is_edited BOOLEAN DEFAULT 0," 
-                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (user_id) REFERENCES users(id),"
-                + "FOREIGN KEY (parent_post_id) REFERENCES posts(id),"
-                + "FOREIGN KEY (parent_comment_id) REFERENCES comments(id)" 
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
 
         String createCommentsTable = "CREATE TABLE IF NOT EXISTS comments ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "post_id INTEGER NOT NULL,"
-                + "user_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "post_id INT NOT NULL,"
+                + "user_id INT NOT NULL,"
                 + "content TEXT NOT NULL,"
-                + "parent_comment_id INTEGER DEFAULT NULL," // [NEW]: Threaded Replies
+                + "parent_comment_id INT DEFAULT NULL," 
                 + "is_edited BOOLEAN DEFAULT 0,"
-                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (post_id) REFERENCES posts(id),"
-                + "FOREIGN KEY (user_id) REFERENCES users(id),"
-                + "FOREIGN KEY (parent_comment_id) REFERENCES comments(id)" // [NEW]: Self-Referential Foreign Key
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
         
         String createLikesTable = "CREATE TABLE IF NOT EXISTS likes ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "user_id INTEGER NOT NULL,"
-                + "post_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "user_id INT NOT NULL,"
+                + "post_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (user_id) REFERENCES users(id),"
-                + "FOREIGN KEY (post_id) REFERENCES posts(id),"
                 + "UNIQUE(user_id, post_id)" 
                 + ");";            
 
         String createCommentLikesTable = "CREATE TABLE IF NOT EXISTS comment_likes ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "user_id INTEGER NOT NULL,"
-                + "comment_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "user_id INT NOT NULL,"
+                + "comment_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (user_id) REFERENCES users(id),"
-                + "FOREIGN KEY (comment_id) REFERENCES comments(id),"
                 + "UNIQUE(user_id, comment_id)" 
                 + ");";
                       
         String createFollowersTable = "CREATE TABLE IF NOT EXISTS followers ("
-                + "follower_id INTEGER NOT NULL,"
-                + "following_id INTEGER NOT NULL,"
+                + "follower_id INT NOT NULL,"
+                + "following_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (follower_id) REFERENCES users(id),"
-                + "FOREIGN KEY (following_id) REFERENCES users(id),"
                 + "PRIMARY KEY (follower_id, following_id)"
                 + ");";
 
         String createNotificationsTable = "CREATE TABLE IF NOT EXISTS notifications ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
                 + "recipient_user TEXT NOT NULL,"
                 + "actor_user TEXT NOT NULL,"
                 + "type TEXT NOT NULL," 
-                + "post_id INTEGER,"    
+                + "post_id INT,"    
                 + "is_read BOOLEAN DEFAULT 0,"
                 + "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
 
         String createMessagesTable = "CREATE TABLE IF NOT EXISTS messages ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "sender_id INTEGER NOT NULL,"
-                + "receiver_id INTEGER,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "sender_id INT NOT NULL,"
+                + "receiver_id INT,"
                 + "content TEXT,"
                 + "image_url TEXT," 
                 + "is_edited BOOLEAN DEFAULT 0,"
                 + "is_forwarded BOOLEAN DEFAULT 0,"
                 + "deleted_by_receiver BOOLEAN DEFAULT 0,"
-                + "reply_to_id INTEGER DEFAULT NULL,"
+                + "reply_to_id INT DEFAULT NULL,"
                 + "is_read BOOLEAN DEFAULT 0,"
-                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (sender_id) REFERENCES users(id),"
-                + "FOREIGN KEY (receiver_id) REFERENCES users(id),"
-                + "FOREIGN KEY (reply_to_id) REFERENCES messages(id)"
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                 + ");";
 
         String createBlockedUsersTable = "CREATE TABLE IF NOT EXISTS blocked_users ("
-                + "blocker_id INTEGER NOT NULL,"
-                + "blocked_id INTEGER NOT NULL,"
+                + "blocker_id INT NOT NULL,"
+                + "blocked_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY (blocker_id) REFERENCES users(id),"
-                + "FOREIGN KEY (blocked_id) REFERENCES users(id),"
                 + "PRIMARY KEY (blocker_id, blocked_id)"
                 + ");";
 
-        // --- NEW: THE SAVED POSTS ENGINE ---
         String createSavedPostsTable = "CREATE TABLE IF NOT EXISTS saved_posts ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "user_id INTEGER NOT NULL,"
-                + "post_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "user_id INT NOT NULL,"
+                + "post_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,"
-                + "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,"
                 + "UNIQUE(user_id, post_id)"
                 + ");";
 
-        // --- NEW: THE SAVED COMMENTS ENGINE ---
         String createSavedCommentsTable = "CREATE TABLE IF NOT EXISTS saved_comments ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                + "user_id INTEGER NOT NULL,"
-                + "comment_id INTEGER NOT NULL,"
+                + "id INT AUTO_INCREMENT PRIMARY KEY,"
+                + "user_id INT NOT NULL,"
+                + "comment_id INT NOT NULL,"
                 + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                + "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,"
-                + "FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE,"
                 + "UNIQUE(user_id, comment_id)"
                 + ");";
 
@@ -166,28 +142,26 @@ public class DatabaseManager {
             stmt.execute(createNotificationsTable); 
             stmt.execute(createMessagesTable);
             stmt.execute(createBlockedUsersTable);
-            
-            // Execute the new saved posts and comments table creation
             stmt.execute(createSavedPostsTable);
             stmt.execute(createSavedCommentsTable);
             
             /* ========================================= */
             /* --- THE SCHEMA MIGRATION ENGINE ---       */
             /* ========================================= */
-            try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_post_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_post_id INT DEFAULT NULL"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE posts ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE comments ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
-            try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_comment_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE posts ADD COLUMN parent_comment_id INT DEFAULT NULL"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN image_url TEXT"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN is_edited BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN is_forwarded BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
             try { stmt.execute("ALTER TABLE messages ADD COLUMN deleted_by_receiver BOOLEAN DEFAULT 0"); } catch (SQLException e) {}
-            try { stmt.execute("ALTER TABLE messages ADD COLUMN reply_to_id INTEGER DEFAULT NULL"); } catch (SQLException e) {}
-            try { stmt.execute("ALTER TABLE comments ADD COLUMN parent_comment_id INTEGER DEFAULT NULL"); } catch (SQLException e) {} // [NEW]: Threaded Replies Migration
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN reply_to_id INT DEFAULT NULL"); } catch (SQLException e) {}
+            try { stmt.execute("ALTER TABLE comments ADD COLUMN parent_comment_id INT DEFAULT NULL"); } catch (SQLException e) {} 
             
-            System.out.println("All database tables have been successfully initialized!");
+            System.out.println("All MySQL database tables have been successfully initialized!");
         } catch (SQLException e) {
-            System.out.println("Error creating tables: " + e.getMessage());
+            System.out.println("Error creating MySQL tables: " + e.getMessage());
         }
     }
 }
