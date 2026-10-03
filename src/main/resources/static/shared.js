@@ -2,7 +2,7 @@
 /* --- SHARED SOCIAL CORE (V1.9 - X-STYLE ARCHITECTURE) --- */
 /* ========================================= */
 
-const API_BASE = "https://socialappwebsite.me";
+const API_BASE = "https://social-media-solitary-feather-1429.fly.dev";
 
 const currentUser = localStorage.getItem("currentUser");
 

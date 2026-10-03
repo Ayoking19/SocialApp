@@ -17,8 +17,13 @@ import java.util.UUID;
 public class Main {
     
     public static void main(String[] args) {
-        SettingsSystem.removeGhostFollowers();
-        SettingsSystem.removeGhostActivity();
+        // THE FIX: Only run the database functions if the connection is successfully established
+        if (DatabaseManager.connect() != null) {
+            SettingsSystem.removeGhostFollowers();
+            SettingsSystem.removeGhostActivity();
+        } else {
+            System.out.println("Warning: Database offline. Skipping ghost follower cleanup.");
+        }
         
         System.out.println("=== Starting Social Media Backend ===");
         DatabaseManager.initializeDatabase();
@@ -67,7 +72,8 @@ public class Main {
         } catch (Exception e) {}
 
         try {
-            HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+            // THE FIX: Binding explicitly to 0.0.0.0 allows Fly.io to route web traffic to your Java app
+            HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
 
             /* ========================================= */
             /* --- 1. THE SECURE GOOGLE ENDPOINT ---     */

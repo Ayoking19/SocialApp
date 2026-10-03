@@ -9,7 +9,7 @@ public class DatabaseManager {
     
     // THE FIX: Injected your precise Railway internal network routing credentials
     // THE FIX: Your permanent Aiven MySQL database routing
-    private static final String DATABASE_URL = "jdbc:mysql://mysql-dbd948d-oluyemiayomikun689-4378.j.aivencloud.com:14711/defaultdb?sslMode=REQUIRED";
+    private static final String DATABASE_URL = "jdbc:mysql://mysql-dbd948d-oluyemiayomikun689-4378.j.aivencloud.com:14711/defaultdb?sslMode=REQUIRED&requireSSL=true";
     private static final String DB_USER = "avnadmin";
     private static final String DB_PASSWORD = "AVNS_JPZBPVEMHsknCarmRnH";
 
